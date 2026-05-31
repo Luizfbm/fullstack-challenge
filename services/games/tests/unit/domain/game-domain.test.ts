@@ -23,9 +23,13 @@ describe("Bet", () => {
 
     bet.cashOut(25000);
 
-    expect(bet.status).toBe("CASHED_OUT");
+    expect(bet.status).toBe("CASHOUT_PENDING_CREDIT");
     expect(bet.cashoutMultiplierBp).toBe(25000);
     expect(bet.payoutCents).toBe(2500n);
+
+    bet.completeCashOut();
+
+    expect(bet.status).toBe("CASHED_OUT");
   });
 
   test("does not cash out twice", () => {
@@ -125,7 +129,35 @@ describe("Round", () => {
     round.start(new Date("2026-05-30T10:00:11.000Z"));
     const bet = round.cashOut("player-1", 15000);
 
+    expect(bet.status).toBe("CASHOUT_PENDING_CREDIT");
+
+    round.completeCashOut("player-1");
+
     expect(bet.status).toBe("CASHED_OUT");
+  });
+
+  test("does not allow cashout at or after crash point", () => {
+    const round = Round.openBetting({
+      id: "round-1",
+      bettingStartsAt,
+      bettingEndsAt,
+      crashPointBp: 15000,
+      serverSeedHash: "seed-hash",
+      clientSeed: "client",
+      nonce: 1,
+      chainIndex: 1,
+    });
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+    round.start(new Date("2026-05-30T10:00:11.000Z"));
+
+    expect(() => round.cashOut("player-1", 15000)).toThrow(
+      InvalidRoundStateError,
+    );
   });
 
   test("marks non-cashed out bets as lost after crash", () => {

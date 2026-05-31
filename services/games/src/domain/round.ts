@@ -15,6 +15,14 @@ type OpenBettingParams = {
   nextServerSeedHash?: string | null;
 };
 
+type RestoreRoundParams = OpenBettingParams & {
+  status: RoundStatus;
+  startedAt?: Date | null;
+  crashedAt?: Date | null;
+  serverSeed?: string | null;
+  bets?: Bet[];
+};
+
 type PlaceBetParams = {
   id: string;
   playerId: string;
@@ -57,6 +65,23 @@ export class Round {
       params.chainIndex,
       params.nextServerSeedHash ?? null,
     );
+  }
+
+  static restore(params: RestoreRoundParams): Round {
+    const round = Round.openBetting(params);
+
+    round.currentStatus = params.status;
+    round.currentStartedAt = params.startedAt ?? null;
+    round.currentCrashedAt = params.crashedAt ?? null;
+    round.currentServerSeed = params.serverSeed ?? null;
+
+    for (const bet of params.bets ?? []) {
+      if (bet.status !== "REJECTED") {
+        round.acceptedBets.set(bet.playerId, bet);
+      }
+    }
+
+    return round;
   }
 
   get status(): RoundStatus {
@@ -114,6 +139,10 @@ export class Round {
       throw new InvalidRoundStateError("Cashout is only allowed while running");
     }
 
+    if (multiplierBp >= this.crashPointBp) {
+      throw new InvalidRoundStateError("Cashout is not allowed after crash point");
+    }
+
     const bet = this.acceptedBets.get(playerId);
 
     if (!bet) {
@@ -121,6 +150,18 @@ export class Round {
     }
 
     bet.cashOut(multiplierBp);
+
+    return bet;
+  }
+
+  completeCashOut(playerId: string): Bet {
+    const bet = this.acceptedBets.get(playerId);
+
+    if (!bet) {
+      throw new InvalidRoundStateError("Player has no bet in this round");
+    }
+
+    bet.completeCashOut();
 
     return bet;
   }

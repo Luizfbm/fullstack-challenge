@@ -1,0 +1,6 @@
+export const MIN_BET_AMOUNT_CENTS = 100n;
+export const MAX_BET_AMOUNT_CENTS = 100000n;
+export const HOUSE_EDGE_BP = 100;
+export const DEFAULT_ROUND_HISTORY_LIMIT = 20;
+export const DEFAULT_PLAYER_BETS_LIMIT = 20;
+export const MULTIPLIER_GROWTH_BP_PER_SECOND = 1000;

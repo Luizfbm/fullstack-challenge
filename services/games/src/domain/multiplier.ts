@@ -14,3 +14,20 @@ export function calculatePayoutCents(
 
   return (amountCents * BigInt(multiplierBp)) / BigInt(BASE_MULTIPLIER_BP);
 }
+
+export function calculateCurrentMultiplierBp(
+  startedAt: Date,
+  now: Date,
+  growthBpPerSecond = 1000,
+): number {
+  if (!Number.isInteger(growthBpPerSecond) || growthBpPerSecond <= 0) {
+    throw new Error("Multiplier growth must be a positive integer");
+  }
+
+  const elapsedMs = Math.max(0, now.getTime() - startedAt.getTime());
+
+  return (
+    BASE_MULTIPLIER_BP +
+    Math.floor((elapsedMs * growthBpPerSecond) / 1000)
+  );
+}
