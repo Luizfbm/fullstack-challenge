@@ -471,6 +471,23 @@ Cada entrada deve conter:
   E2E via Docker/Kong/Keycloak.
 - Status: resolvido.
 
+### 28. Validacao da skill de babysit falhou por tooling Python e YAML invalido
+
+- Contexto: criacao da skill `gh-pr-babysit`, usando o validador oficial do
+  `skill-creator`.
+- Sintoma: `python` nao existia no ambiente local; ao usar `python3`, o
+  validador falhou por ausencia do pacote `PyYAML`; depois disso, a skill
+  falhou por frontmatter YAML invalido na descricao com `:`.
+- Causa: o macOS local dispoe de `python3`, nao `python`; o pacote `PyYAML`
+  ainda nao estava instalado; a descricao do frontmatter precisava estar entre
+  aspas por conter dois-pontos.
+- Correcao: instalado `PyYAML` com `python3 -m pip install --user PyYAML` e
+  corrigida a descricao do frontmatter da skill.
+- Validacao: `python3 ~/.codex/skills/.system/skill-creator/scripts/quick_validate.py
+  ~/.codex/skills/gh-pr-babysit` passou; `diff -qr` confirmou que a skill local
+  esta igual a copia versionada.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -496,6 +513,14 @@ Cada entrada deve conter:
 - `bun run ci:e2e`
 - `bun run lint`
 - `docker compose config`
+- `bun test scripts/quality`
+- `python3 ~/.codex/skills/.system/skill-creator/scripts/quick_validate.py
+  ~/.codex/skills/gh-pr-babysit`
+- `diff -qr docs/superpowers/skills/gh-pr-babysit
+  ~/.codex/skills/gh-pr-babysit`
+- `gh pr view --json number,url,headRefName,state,mergeStateStatus,statusCheckRollup`
+- `gh pr checks 2`
+- `~/.codex/skills/gh-pr-babysit/scripts/fetch_review_threads.py --pr 2`
 - `docker compose up -d --build`
 - Fluxo E2E autenticado via Kong com Keycloak real:
   `POST /games/bet`, `POST /games/bet/cashout`, `GET /wallets/me`,

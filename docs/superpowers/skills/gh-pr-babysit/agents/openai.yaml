@@ -1,0 +1,6 @@
+interface:
+  display_name: "GitHub PR Babysit"
+  short_description: "Loop on PR checks and review threads"
+  default_prompt: "Use $gh-pr-babysit to monitor this PR, fix failures, address review comments, and resolve conversations after verification."
+policy:
+  allow_implicit_invocation: true
