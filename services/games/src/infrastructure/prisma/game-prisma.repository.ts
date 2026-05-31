@@ -31,6 +31,19 @@ export class GamePrismaRepository implements GameRepository {
     return round ? this.toRound(round) : null;
   }
 
+  async findLatestRound(): Promise<Round | null> {
+    const round = await this.prisma.round.findFirst({
+      orderBy: {
+        chainIndex: "desc",
+      },
+      include: {
+        bets: true,
+      },
+    });
+
+    return round ? this.toRound(round) : null;
+  }
+
   async findRoundById(roundId: string): Promise<Round | null> {
     const round = await this.prisma.round.findUnique({
       where: { id: roundId },

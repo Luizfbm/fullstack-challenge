@@ -5,6 +5,7 @@ export const GAME_REPOSITORY = Symbol("GAME_REPOSITORY");
 
 export interface GameRepository {
   findCurrentRound(): Promise<Round | null>;
+  findLatestRound(): Promise<Round | null>;
   findRoundById(roundId: string): Promise<Round | null>;
   listRoundHistory(limit: number): Promise<Round[]>;
   listBetsByPlayerId(playerId: string, limit: number): Promise<Bet[]>;

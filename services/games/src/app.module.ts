@@ -11,15 +11,21 @@ import {
   WalletClient,
 } from "./application/ports/wallet.client";
 import { CashOutUseCase } from "./application/use-cases/cash-out.use-case";
+import { AdvanceRoundLifecycleUseCase } from "./application/use-cases/advance-round-lifecycle.use-case";
 import { GetCurrentRoundUseCase } from "./application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "./application/use-cases/list-my-bets.use-case";
 import { ListRoundHistoryUseCase } from "./application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "./application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "./application/use-cases/verify-round.use-case";
+import { RoundLifecycleRunner } from "./infrastructure/lifecycle/round-lifecycle-runner";
 import { RabbitMqWalletClient } from "./infrastructure/messaging/rabbitmq-wallet.client";
+import { HashChainRoundSeedProvider } from "./infrastructure/provably-fair/hash-chain-round-seed-provider";
 import { GamePrismaRepository } from "./infrastructure/prisma/game-prisma.repository";
 import { prismaClient } from "./infrastructure/prisma/prisma-client";
 import { GamesController } from "./presentation/controllers/games.controller";
+
+const DEFAULT_HASH_CHAIN_ROOT_SEED =
+  "local-dev-crash-game-hash-chain-root-seed";
 
 @Module({
   controllers: [GamesController],
@@ -52,6 +58,52 @@ import { GamesController } from "./presentation/controllers/games.controller";
       useValue: {
         now: (): Date => new Date(),
       } satisfies Clock,
+    },
+    {
+      provide: HashChainRoundSeedProvider,
+      useFactory: (): HashChainRoundSeedProvider =>
+        new HashChainRoundSeedProvider({
+          rootSeed:
+            process.env.GAME_HASH_CHAIN_ROOT_SEED ??
+            DEFAULT_HASH_CHAIN_ROOT_SEED,
+          chainLength: Number(process.env.GAME_HASH_CHAIN_LENGTH ?? 10000),
+          clientSeed: process.env.GAME_CLIENT_SEED ?? "crash-game-client-seed",
+        }),
+    },
+    {
+      provide: AdvanceRoundLifecycleUseCase,
+      useFactory: (
+        gameRepository: GameRepository,
+        idGenerator: IdGenerator,
+        clock: Clock,
+        roundSeedProvider: HashChainRoundSeedProvider,
+      ): AdvanceRoundLifecycleUseCase =>
+        new AdvanceRoundLifecycleUseCase(
+          gameRepository,
+          idGenerator,
+          clock,
+          roundSeedProvider,
+          {
+            bettingWindowMs: Number(process.env.ROUND_BETTING_WINDOW_MS ?? 10000),
+          },
+        ),
+      inject: [
+        GAME_REPOSITORY,
+        ID_GENERATOR,
+        CLOCK,
+        HashChainRoundSeedProvider,
+      ],
+    },
+    {
+      provide: RoundLifecycleRunner,
+      useFactory: (
+        advanceRoundLifecycleUseCase: AdvanceRoundLifecycleUseCase,
+      ): RoundLifecycleRunner =>
+        new RoundLifecycleRunner(
+          advanceRoundLifecycleUseCase,
+          Number(process.env.ROUND_LIFECYCLE_INTERVAL_MS ?? 500),
+        ),
+      inject: [AdvanceRoundLifecycleUseCase],
     },
     {
       provide: GetCurrentRoundUseCase,

@@ -6,7 +6,12 @@ import { BetAmountOutOfRangeError, WalletCreditFailedError } from "../../../src/
 import { Clock } from "../../../src/application/ports/clock";
 import { GameRepository } from "../../../src/application/ports/game.repository";
 import { IdGenerator } from "../../../src/application/ports/id-generator";
+import {
+  RoundSeedMaterial,
+  RoundSeedProvider,
+} from "../../../src/application/ports/round-seed-provider";
 import { WalletClient, WalletOperationInput, WalletOperationResult } from "../../../src/application/ports/wallet.client";
+import { AdvanceRoundLifecycleUseCase } from "../../../src/application/use-cases/advance-round-lifecycle.use-case";
 import { CashOutUseCase } from "../../../src/application/use-cases/cash-out.use-case";
 import { PlaceBetUseCase } from "../../../src/application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "../../../src/application/use-cases/verify-round.use-case";
@@ -15,27 +20,49 @@ import { HOUSE_EDGE_BP } from "../../../src/application/game.constants";
 
 class InMemoryGameRepository implements GameRepository {
   public savedRounds: Round[] = [];
+  private readonly rounds = new Map<string, Round>();
 
-  constructor(public currentRound: Round | null) {}
+  constructor(public currentRound: Round | null) {
+    if (currentRound) {
+      this.rounds.set(currentRound.id, currentRound);
+    }
+  }
 
   async findCurrentRound(): Promise<Round | null> {
-    return this.currentRound;
+    return (
+      [...this.rounds.values()]
+        .filter((round) => round.status === "BETTING" || round.status === "RUNNING")
+        .sort((left, right) => right.chainIndex - left.chainIndex)[0] ?? null
+    );
+  }
+
+  async findLatestRound(): Promise<Round | null> {
+    return (
+      [...this.rounds.values()].sort(
+        (left, right) => right.chainIndex - left.chainIndex,
+      )[0] ?? null
+    );
   }
 
   async findRoundById(roundId: string): Promise<Round | null> {
-    return this.currentRound?.id === roundId ? this.currentRound : null;
+    return this.rounds.get(roundId) ?? null;
   }
 
   async listRoundHistory(): Promise<Round[]> {
-    return this.currentRound ? [this.currentRound] : [];
+    return [...this.rounds.values()].filter(
+      (round) => round.status === "CRASHED" || round.status === "SETTLED",
+    );
   }
 
   async listBetsByPlayerId(playerId: string): Promise<Bet[]> {
-    return this.currentRound?.bets.filter((bet) => bet.playerId === playerId) ?? [];
+    return [...this.rounds.values()].flatMap((round) =>
+      round.bets.filter((bet) => bet.playerId === playerId),
+    );
   }
 
   async saveRound(round: Round): Promise<void> {
     this.currentRound = round;
+    this.rounds.set(round.id, round);
     this.savedRounds.push(round);
   }
 }
@@ -78,6 +105,23 @@ class FakeWalletClient implements WalletClient {
   }
 }
 
+class FakeRoundSeedProvider implements RoundSeedProvider {
+  getRoundSeed(chainIndex: number): RoundSeedMaterial {
+    return {
+      serverSeed: `server-seed-${chainIndex}`,
+      serverSeedHash: `server-seed-hash-${chainIndex}`,
+      clientSeed: "client-seed",
+      nonce: chainIndex,
+      crashPointBp: 12000,
+      nextServerSeedHash: null,
+    };
+  }
+
+  getServerSeed(chainIndex: number): string {
+    return `server-seed-${chainIndex}`;
+  }
+}
+
 function openRound(crashPointBp = 30000): Round {
   return Round.openBetting({
     id: "round-1",
@@ -90,6 +134,90 @@ function openRound(crashPointBp = 30000): Round {
     chainIndex: 1,
   });
 }
+
+describe("AdvanceRoundLifecycleUseCase", () => {
+  test("opens a betting round when there is no current round", async () => {
+    const repository = new InMemoryGameRepository(null);
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-1"),
+      new FixedClock(new Date("2026-05-30T10:00:00.000Z")),
+      new FakeRoundSeedProvider(),
+      { bettingWindowMs: 10000 },
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.action).toBe("ROUND_OPENED");
+    expect(result.round?.status).toBe("BETTING");
+    expect(result.round?.chainIndex).toBe(1);
+    expect(result.round?.serverSeedHash).toBe("server-seed-hash-1");
+    expect(result.round?.bettingEndsAt.toISOString()).toBe(
+      "2026-05-30T10:00:10.000Z",
+    );
+  });
+
+  test("starts a betting round after the betting window ends", async () => {
+    const repository = new InMemoryGameRepository(openRound());
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:10.000Z")),
+      new FakeRoundSeedProvider(),
+      { bettingWindowMs: 10000 },
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.action).toBe("ROUND_STARTED");
+    expect(result.round?.status).toBe("RUNNING");
+    expect(result.round?.startedAt?.toISOString()).toBe(
+      "2026-05-30T10:00:10.000Z",
+    );
+  });
+
+  test("crashes a running round when multiplier reaches the crash point", async () => {
+    const round = openRound(12000);
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const repository = new InMemoryGameRepository(round);
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FakeRoundSeedProvider(),
+      { bettingWindowMs: 10000 },
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.action).toBe("ROUND_CRASHED");
+    expect(result.round?.status).toBe("CRASHED");
+    expect(result.round?.serverSeed).toBe("server-seed-1");
+  });
+
+  test("opens the next chain index after a crashed round", async () => {
+    const crashedRound = openRound(10000);
+    crashedRound.start(new Date("2026-05-30T10:00:10.000Z"));
+    crashedRound.crash(
+      new Date("2026-05-30T10:00:11.000Z"),
+      "server-seed-1",
+    );
+    const repository = new InMemoryGameRepository(crashedRound);
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FakeRoundSeedProvider(),
+      { bettingWindowMs: 10000 },
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.action).toBe("ROUND_OPENED");
+    expect(result.round?.id).toBe("round-2");
+    expect(result.round?.chainIndex).toBe(2);
+  });
+});
 
 describe("PlaceBetUseCase", () => {
   test("debits the wallet with an idempotent reference and saves the accepted bet", async () => {

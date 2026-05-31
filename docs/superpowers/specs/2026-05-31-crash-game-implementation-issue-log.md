@@ -230,6 +230,22 @@ Cada entrada deve conter:
   com HTML; `bun run build` em `frontend` passou.
 - Status: resolvido.
 
+### 16. Validacao via Kong executada com stack parcial
+
+- Contexto: validacao do ciclo automatico de rodadas apos rebuild isolado do
+  servico `games`.
+- Sintoma: `curl http://localhost:8000/games/rounds/current` falhou com
+  `Failed to connect to localhost port 8000`, e o parser JSON recebeu EOF.
+- Causa: o comando usado para rebuild foi `docker compose up -d --build games`,
+  que recriou apenas `games` e dependencias diretas; o Kong nao estava ativo
+  naquele momento. Nao era falha do endpoint do Game.
+- Correcao: repetir a validacao com `docker compose up -d --build`, subindo a
+  stack completa conforme o README.
+- Validacao: `docker compose ps` mostrou todos os servicos healthy; `GET
+  /games/rounds/current`, `GET /games/rounds/history?limit=5`, `POST
+  /games/bet` e `GET /wallets/me` via Kong responderam corretamente.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`

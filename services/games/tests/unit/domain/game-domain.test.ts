@@ -4,6 +4,7 @@ import { InvalidBetStateError, InvalidRoundStateError } from "../../../src/domai
 import { calculatePayoutCents } from "../../../src/domain/multiplier";
 import { ProvablyFair } from "../../../src/domain/provably-fair";
 import { Round } from "../../../src/domain/round";
+import { HashChainRoundSeedProvider } from "../../../src/infrastructure/provably-fair/hash-chain-round-seed-provider";
 
 describe("multiplier", () => {
   test("calculates payout in cents with floor rounding", () => {
@@ -220,5 +221,24 @@ describe("ProvablyFair", () => {
 
     expect(ProvablyFair.verifySeed(serverSeed, serverSeedHash)).toBe(true);
     expect(ProvablyFair.verifySeed("other-seed", serverSeedHash)).toBe(false);
+  });
+
+  test("derives deterministic round seeds from a hash chain", () => {
+    const provider = new HashChainRoundSeedProvider({
+      rootSeed: "root-seed",
+      chainLength: 3,
+      clientSeed: "client-seed",
+    });
+    const first = provider.getRoundSeed(1);
+    const second = provider.getRoundSeed(2);
+
+    expect(first.serverSeed).toBe(
+      ProvablyFair.hashSeed(ProvablyFair.hashSeed("root-seed")),
+    );
+    expect(second.serverSeed).toBe(ProvablyFair.hashSeed("root-seed"));
+    expect(first.serverSeedHash).toBe(
+      ProvablyFair.hashSeed(first.serverSeed),
+    );
+    expect(first.crashPointBp).toBeGreaterThanOrEqual(10000);
   });
 });
