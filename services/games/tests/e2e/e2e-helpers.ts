@@ -92,33 +92,51 @@ export async function withE2ELock<T>(callback: () => Promise<T>): Promise<T> {
 }
 
 export async function getAccessToken(): Promise<string> {
-  const response = await fetch(
-    `${KEYCLOAK_BASE_URL}/realms/crash-game/protocol/openid-connect/token`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        grant_type: "password",
-        client_id: "crash-game-client",
-        username: "player",
-        password: "player123",
-      }),
-    },
-  );
+  let lastFailure = "no request attempted";
 
-  if (!response.ok) {
-    throw new Error(`Keycloak token request failed with ${response.status}`);
+  try {
+    return await waitFor(async () => {
+      try {
+        const response = await fetch(
+          `${KEYCLOAK_BASE_URL}/realms/crash-game/protocol/openid-connect/token`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              grant_type: "password",
+              client_id: "crash-game-client",
+              username: "player",
+              password: "player123",
+            }),
+          },
+        );
+
+        if (!response.ok) {
+          lastFailure = `${response.status}: ${await response.text()}`;
+          return null;
+        }
+
+        const body = (await response.json()) as { access_token?: string };
+
+        if (!body.access_token) {
+          lastFailure = "token response did not include access_token";
+          return null;
+        }
+
+        return body.access_token;
+      } catch (error) {
+        lastFailure =
+          error instanceof Error ? error.message : "unexpected token request failure";
+        return null;
+      }
+    }, "Keycloak token endpoint", 60000);
+  } catch {
+    throw new Error(
+      `Timed out waiting for Keycloak token endpoint. Last failure: ${lastFailure}`,
+    );
   }
-
-  const body = (await response.json()) as { access_token?: string };
-
-  if (!body.access_token) {
-    throw new Error("Keycloak token response did not include access_token");
-  }
-
-  return body.access_token;
 }
 
 export async function apiJson<T>(

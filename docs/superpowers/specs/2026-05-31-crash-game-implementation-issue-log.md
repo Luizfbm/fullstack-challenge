@@ -452,6 +452,25 @@ Cada entrada deve conter:
   `bun run check:types` regenerou os clients e passou.
 - Status: resolvido.
 
+### 27. CI Docker E2E falhou por Keycloak ainda inicializando o token endpoint
+
+- Contexto: Pull Request #1 no GitHub Actions, job
+  `Quality Gate / Docker Kong Keycloak E2E`, passo
+  `Run API E2E through Kong and Keycloak`.
+- Sintoma: os testes E2E `cashout-flow.e2e.test.ts` e
+  `crash-loss-flow.e2e.test.ts` falharam em `getAccessToken()` com
+  `ECONNRESET` ao chamar
+  `http://localhost:8080/realms/crash-game/protocol/openid-connect/token`.
+- Causa: no runner limpo do GitHub Actions, o healthcheck de Docker/Kong
+  passava antes do endpoint de token do Keycloak estar pronto para aceitar a
+  primeira requisicao real usada pelos testes.
+- Correcao: `getAccessToken()` passou a aguardar o token endpoint com retry,
+  tratando respostas nao-OK, token ausente e falhas transientes de conexao
+  antes de falhar com a ultima causa observada.
+- Validacao: `bun run ci:local` passou; `bun run ci:e2e` passou com 9 testes
+  E2E via Docker/Kong/Keycloak.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -475,6 +494,8 @@ Cada entrada deve conter:
 - `bun run ci:local`
 - `cd services/games && bun test tests/e2e/crash-loss-flow.e2e.test.ts`
 - `bun run ci:e2e`
+- `bun run lint`
+- `docker compose config`
 - `docker compose up -d --build`
 - Fluxo E2E autenticado via Kong com Keycloak real:
   `POST /games/bet`, `POST /games/bet/cashout`, `GET /wallets/me`,
