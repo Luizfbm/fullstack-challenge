@@ -12,7 +12,7 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_EXTRA_DATABASES: games,wallets
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin"]
@@ -54,7 +54,7 @@ services:
     volumes:
       - ./docker/keycloak:/opt/keycloak/data/import:ro
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q '200'"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q '200'"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -89,6 +89,10 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      games:
+        condition: service_healthy
+      wallets:
+        condition: service_healthy
 
   # ---------------------------------------------------------------------------
   # Games Service
@@ -103,7 +107,8 @@ services:
       PORT: 4001
       DATABASE_URL: postgresql://admin:admin@postgres:5432/games
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-      KEYCLOAK_ISSUER: http://keycloak:8080/realms/crash-game
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/crash-game
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/crash-game/protocol/openid-connect/certs
       KEYCLOAK_CLIENT_ID: crash-game-client
     depends_on:
       postgres:
@@ -130,7 +135,8 @@ services:
       PORT: 4002
       DATABASE_URL: postgresql://admin:admin@postgres:5432/wallets
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-      KEYCLOAK_ISSUER: http://keycloak:8080/realms/crash-game
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/crash-game
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/crash-game/protocol/openid-connect/certs
       KEYCLOAK_CLIENT_ID: crash-game-client
       INITIAL_WALLET_BALANCE_CENTS: 100000
     depends_on:

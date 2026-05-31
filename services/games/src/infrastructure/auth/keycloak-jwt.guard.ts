@@ -23,8 +23,12 @@ export class KeycloakJwtGuard implements CanActivate {
   private readonly clientId =
     process.env.KEYCLOAK_CLIENT_ID ?? "crash-game-client";
 
+  private readonly jwksUrl =
+    process.env.KEYCLOAK_JWKS_URL ??
+    `${this.issuer}/protocol/openid-connect/certs`;
+
   private readonly jwks = createRemoteJWKSet(
-    new URL(`${this.issuer}/protocol/openid-connect/certs`),
+    new URL(this.jwksUrl),
   );
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
