@@ -1,5 +1,14 @@
-import { Activity, Clock3, Coins, History, Users } from "lucide-react";
+import {
+  Activity,
+  Clock3,
+  Coins,
+  History,
+  Users,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
+import { useGameRealtime } from "../../hooks/use-game-realtime";
 import {
   useCurrentRoundQuery,
   useMyBetsQuery,
@@ -12,6 +21,7 @@ import type {
   RoundResponse,
   RoundStatus,
 } from "../../services/game-api";
+import type { RealtimeRoundPayload } from "../../services/realtime-events";
 import { formatCents } from "../../services/money";
 import { Badge } from "../ui/badge";
 import { BetControlsPanel } from "./bet-controls-panel";
@@ -23,7 +33,8 @@ export function GameDashboardShell() {
   const historyQuery = useRoundHistoryQuery(8);
   const myBetsQuery = useMyBetsQuery(isAuthenticated, 5);
   const walletQuery = useWalletQuery(isAuthenticated);
-  const currentRound = currentRoundQuery.data ?? null;
+  const realtime = useGameRealtime(currentRoundQuery.data ?? null);
+  const currentRound = realtime.round ?? currentRoundQuery.data ?? null;
   const roundBets = getRoundBets(currentRound);
   const activeBet = findActiveBet(currentRound, myBetsQuery.data ?? []);
   const apiError = [
@@ -47,10 +58,20 @@ export function GameDashboardShell() {
                   : "Sem rodada ativa"}
             </p>
           </div>
-          <Badge variant={roundBadgeVariant(currentRound?.status)}>
-            <Clock3 className="size-3.5" aria-hidden="true" />
-            {currentRound?.status ?? "SYNC"}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={realtimeBadgeVariant(realtime.connectionStatus)}>
+              {realtime.connectionStatus === "connected" ? (
+                <Wifi className="size-3.5" aria-hidden="true" />
+              ) : (
+                <WifiOff className="size-3.5" aria-hidden="true" />
+              )}
+              {realtime.connectionStatus === "connected" ? "LIVE" : "REST"}
+            </Badge>
+            <Badge variant={roundBadgeVariant(currentRound?.status)}>
+              <Clock3 className="size-3.5" aria-hidden="true" />
+              {currentRound?.status ?? "SYNC"}
+            </Badge>
+          </div>
         </div>
 
         <div className="grid min-h-[22rem] place-items-center rounded-md border border-zinc-800 bg-zinc-950">
@@ -187,13 +208,23 @@ function findActiveBet(
   );
 }
 
-function formatRoundMultiplier(round: RoundResponse | null): string {
+type DashboardRound = (RoundResponse | RealtimeRoundPayload) & {
+  currentMultiplierBp?: number | null;
+};
+
+function formatRoundMultiplier(round: DashboardRound | null): string {
   if (!round) {
     return "1.00x";
   }
 
+  if (typeof round.currentMultiplierBp === "number") {
+    return `${(round.currentMultiplierBp / 10000).toFixed(2)}x`;
+  }
+
   if (round.status === "CRASHED" || round.status === "SETTLED") {
-    return `${(round.crashPointBp / 10000).toFixed(2)}x`;
+    return round.crashPointBp
+      ? `${(round.crashPointBp / 10000).toFixed(2)}x`
+      : "CRASHED";
   }
 
   return round.status === "RUNNING" ? "RUNNING" : "1.00x";
@@ -213,6 +244,10 @@ function roundBadgeVariant(status?: RoundStatus) {
   }
 
   return "warning";
+}
+
+function realtimeBadgeVariant(status: string) {
+  return status === "connected" ? "success" : "neutral";
 }
 
 function truncateHash(value?: string | null): string {

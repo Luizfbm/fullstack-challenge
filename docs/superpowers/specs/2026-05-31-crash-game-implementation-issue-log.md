@@ -522,6 +522,43 @@ Cada entrada deve conter:
   com login, aposta e cashout renderizou sem blank screen.
 - Status: resolvido.
 
+### 31. REST revelava crashPointBp antes do reveal da rodada
+
+- Contexto: revisao antes do Passo 11, ao comparar REST com os eventos
+  WebSocket.
+- Sintoma: `GET /games/rounds/current` e `GET /games/rounds/:roundId/verify`
+  retornavam `crashPointBp` mesmo quando `serverSeed` ainda nao tinha sido
+  revelado.
+- Causa: o serializer REST usava diretamente `round.crashPointBp`, enquanto o
+  serializer realtime ja escondia o crash point antes do reveal.
+- Correcao: REST e verify agora retornam `crashPointBp: null` antes do reveal e
+  so revelam o valor quando `serverSeed` existe. Os E2E continuam podendo
+  preparar rodadas por consulta direta ao banco de teste, sem vazar o valor pela
+  API publica.
+- Regressao: adicionados testes unitarios em `GamesController` e
+  `VerifyRoundUseCase` cobrindo crash point escondido antes do reveal e
+  revelado depois do crash.
+- Validacao: `cd services/games && bun test tests/unit`,
+  `bunx tsc --noEmit -p services/games/tsconfig.json`, `cd frontend && bun
+  test` e `bunx tsc --noEmit -p frontend/tsconfig.json` passaram.
+- Status: resolvido.
+
+### 32. Passo 11 falhou na catraca por duplicacao de tipos WebSocket
+
+- Contexto: Passo 11, integracao WebSocket no frontend.
+- Sintoma: `bun run ci:local` falhou em `quality:gate`; cobertura e percentual
+  de duplicacao melhoraram, mas `duplication.duplicatedLines` subiu de 250 para
+  265 e `duplication.clones` subiu de 15 para 16.
+- Causa: os tipos frontend de payload realtime repetiam textualmente parte dos
+  tipos WebSocket do backend, criando um novo clone no `jscpd`.
+- Correcao: o frontend passou a modelar o metadado `emittedAt` com um envelope
+  generico, mantendo o contrato sem repetir o mesmo bloco do backend.
+- Regressao: o Quality Gate agora volta a exigir `duplication.duplicatedLines`
+  em 250 e `duplication.clones` em 15, sem alterar o baseline.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test` e `bun run test:coverage && bun run quality:gate` passaram.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -565,6 +602,16 @@ Cada entrada deve conter:
 - Validacao visual/browser do Passo 10:
   login frontend com `player/player123`, aposta via UI, saldo atualizado,
   cashout via UI e mesa sem blank screen apos regressao de `bets`.
+- Passo 11 focado:
+  `cd frontend && bun test`, `bunx tsc --noEmit -p frontend/tsconfig.json`,
+  `cd services/games && bun test tests/unit` e
+  `bunx tsc --noEmit -p services/games/tsconfig.json`.
+- Passo 11 catraca:
+  `bun run test:coverage && bun run quality:gate`.
+- Passo 11 completo:
+  `cd frontend && bun run build`, `bun run ci:local`, `bun run ci:e2e` e
+  validacao visual/browser em duas abas em `http://localhost:8000/`, ambas com
+  badge `LIVE` e a mesma rodada.
 
 ## Validacoes Docker Ja Executadas
 
@@ -585,5 +632,4 @@ Cada entrada deve conter:
 
 ## Validacoes Ainda Pendentes
 
-- Integracao REST completa no frontend sera implementada no Passo 10.
-- Integracao WebSocket completa no frontend sera implementada no Passo 11.
+- Proximo passo do plano: Passo 12, construir a UI principal do jogo.

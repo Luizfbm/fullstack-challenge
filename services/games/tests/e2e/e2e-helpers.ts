@@ -37,7 +37,7 @@ export type RoundResponse = {
   bettingEndsAt: string;
   startedAt: string | null;
   crashedAt: string | null;
-  crashPointBp: number;
+  crashPointBp: number | null;
   serverSeedHash: string;
   serverSeed: string | null;
   clientSeed: string;
@@ -59,7 +59,7 @@ export type VerifyRoundResponse = {
   nextServerSeedHash: string | null;
   algorithm: string;
   houseEdgeBp: number;
-  crashPointBp: number;
+  crashPointBp: number | null;
   recalculatedCrashPointBp: number | null;
   serverSeedMatchesCommitment: boolean | null;
   fair: boolean | null;
@@ -229,7 +229,7 @@ export async function prepareBettingRound(
     if (
       currentRound.status === "BETTING" &&
       currentRound.bets.length === 0 &&
-      currentRound.crashPointBp >= minCrashPointBp
+      (await getRoundCrashPointBp(currentRound.id)) >= minCrashPointBp
     ) {
       return currentRound;
     }
@@ -335,4 +335,11 @@ async function waitForHealthyEndpoint(path: string): Promise<void> {
 
 async function runGamesSql(sql: string): Promise<void> {
   await $`docker compose -f ${COMPOSE_FILE} exec -T postgres psql -U admin -d games -c ${sql}`.quiet();
+}
+
+async function getRoundCrashPointBp(roundId: string): Promise<number> {
+  const result =
+    await $`docker compose -f ${COMPOSE_FILE} exec -T postgres psql -U admin -d games -At -c ${`SELECT "crashPointBp" FROM rounds WHERE id = '${roundId}';`}`.text();
+
+  return Number(result.trim());
 }

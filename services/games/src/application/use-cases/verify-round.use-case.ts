@@ -20,7 +20,7 @@ type VerifyRoundResult = {
   nextServerSeedHash: string | null;
   algorithm: string;
   houseEdgeBp: number;
-  crashPointBp: number;
+  crashPointBp: number | null;
   recalculatedCrashPointBp: number | null;
   serverSeedMatchesCommitment: boolean | null;
   fair: boolean | null;
@@ -49,7 +49,7 @@ export class VerifyRoundUseCase {
         nextServerSeedHash: round.nextServerSeedHash,
         algorithm: "HMAC_SHA256(serverSeed, clientSeed:nonce)",
         houseEdgeBp: HOUSE_EDGE_BP,
-        crashPointBp: round.crashPointBp,
+        crashPointBp: null,
         recalculatedCrashPointBp: null,
         serverSeedMatchesCommitment: null,
         fair: null,

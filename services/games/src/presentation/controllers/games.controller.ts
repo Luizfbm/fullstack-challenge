@@ -176,7 +176,7 @@ export class GamesController {
       bettingEndsAt: round.bettingEndsAt.toISOString(),
       startedAt: round.startedAt?.toISOString() ?? null,
       crashedAt: round.crashedAt?.toISOString() ?? null,
-      crashPointBp: round.crashPointBp,
+      crashPointBp: round.serverSeed ? round.crashPointBp : null,
       serverSeedHash: round.serverSeedHash,
       serverSeed: round.serverSeed,
       clientSeed: round.clientSeed,

@@ -503,6 +503,18 @@ describe("CashOutUseCase", () => {
 });
 
 describe("VerifyRoundUseCase", () => {
+  test("keeps the crash point hidden before server seed reveal", async () => {
+    const round = openRound(25000);
+    const useCase = new VerifyRoundUseCase(new InMemoryGameRepository(round));
+
+    const result = await useCase.execute({ roundId: "round-1" });
+
+    expect(result.revealed).toBe(false);
+    expect(result.crashPointBp).toBeNull();
+    expect(result.recalculatedCrashPointBp).toBeNull();
+    expect(result.fair).toBeNull();
+  });
+
   test("recalculates the crash point after the server seed is revealed", async () => {
     const serverSeed = "server-seed";
     const crashPointBp = ProvablyFair.calculateCrashPointBp({
