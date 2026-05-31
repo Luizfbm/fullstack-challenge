@@ -192,8 +192,8 @@ export async function verifyRound(
 }
 
 export async function ensureStackIsHealthy(): Promise<void> {
-  await apiJson("/games/health");
-  await apiJson("/wallets/health");
+  await waitForHealthyEndpoint("/games/health");
+  await waitForHealthyEndpoint("/wallets/health");
 }
 
 export async function prepareBettingRound(
@@ -286,6 +286,33 @@ async function waitFor<T>(
   }
 
   throw new Error(`Timed out waiting for ${description}`);
+}
+
+async function waitForHealthyEndpoint(path: string): Promise<void> {
+  let lastFailure = "no request attempted";
+
+  try {
+    await waitFor(async () => {
+      try {
+        const response = await apiResponse(path);
+
+        if (response.ok) {
+          return true;
+        }
+
+        lastFailure = `${response.status}: ${await response.text()}`;
+        return null;
+      } catch (error) {
+        lastFailure =
+          error instanceof Error ? error.message : "unexpected request failure";
+        return null;
+      }
+    }, `${path} health via Kong`, 30000);
+  } catch {
+    throw new Error(
+      `Timed out waiting for ${path} health via Kong. Last failure: ${lastFailure}`,
+    );
+  }
 }
 
 async function runGamesSql(sql: string): Promise<void> {

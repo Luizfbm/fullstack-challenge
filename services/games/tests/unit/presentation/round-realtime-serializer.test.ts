@@ -1,0 +1,56 @@
+import { describe, expect, test } from "bun:test";
+import { Round } from "../../../src/domain/round";
+import { RoundRealtimeSerializer } from "../../../src/presentation/realtime/round-realtime.serializer";
+
+function runningRound(): Round {
+  const round = Round.openBetting({
+    id: "round-1",
+    bettingStartsAt: new Date("2026-05-31T10:00:00.000Z"),
+    bettingEndsAt: new Date("2026-05-31T10:00:10.000Z"),
+    crashPointBp: 30000,
+    serverSeedHash: "server-seed-hash",
+    clientSeed: "client-seed",
+    nonce: 1,
+    chainIndex: 1,
+    nextServerSeedHash: "next-seed-hash",
+  });
+  round.start(new Date("2026-05-31T10:00:10.000Z"));
+
+  return round;
+}
+
+describe("RoundRealtimeSerializer", () => {
+  test("keeps crash point and server seed hidden before reveal", () => {
+    const serializer = new RoundRealtimeSerializer();
+
+    const payload = serializer.toLifecyclePayload(
+      runningRound(),
+      new Date("2026-05-31T10:00:15.000Z"),
+    );
+
+    expect(payload.roundId).toBe("round-1");
+    expect(payload.currentMultiplierBp).toBe(15000);
+    expect(payload.crashPointBp).toBeNull();
+    expect(payload.serverSeed).toBeNull();
+    expect(payload.serverSeedHash).toBe("server-seed-hash");
+    expect(payload.nextServerSeedHash).toBe("next-seed-hash");
+    expect(payload.emittedAt).toBe("2026-05-31T10:00:15.000Z");
+  });
+
+  test("reveals crash point and server seed after crash", () => {
+    const serializer = new RoundRealtimeSerializer();
+    const round = runningRound();
+    round.crash(new Date("2026-05-31T10:00:20.000Z"), "server-seed");
+
+    const payload = serializer.toLifecyclePayload(
+      round,
+      new Date("2026-05-31T10:00:20.000Z"),
+    );
+
+    expect(payload.status).toBe("CRASHED");
+    expect(payload.crashPointBp).toBe(30000);
+    expect(payload.serverSeed).toBe("server-seed");
+    expect(payload.chainIndex).toBe(1);
+    expect(payload.nonce).toBe(1);
+  });
+});

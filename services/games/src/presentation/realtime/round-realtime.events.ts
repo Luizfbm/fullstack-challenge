@@ -3,6 +3,11 @@ import type { RoundStatus } from "../../domain/round";
 
 export const GAME_REALTIME_NAMESPACE = "/games";
 export const ROUND_SNAPSHOT_EVENT = "round.snapshot";
+export const ROUND_BETTING_STARTED_EVENT = "round.betting_started";
+export const ROUND_STARTED_EVENT = "round.started";
+export const ROUND_TICK_EVENT = "round.tick";
+export const ROUND_CRASHED_EVENT = "round.crashed";
+export const ROUND_SETTLED_EVENT = "round.settled";
 
 export type RealtimeBetPayload = {
   id: string;
@@ -18,6 +23,7 @@ export type RealtimeBetPayload = {
 
 export type RealtimeRoundPayload = {
   id: string;
+  roundId: string;
   status: RoundStatus;
   bettingStartsAt: string;
   bettingEndsAt: string;
@@ -36,5 +42,9 @@ export type RealtimeRoundPayload = {
 
 export type RoundSnapshotPayload = {
   round: RealtimeRoundPayload | null;
+  emittedAt: string;
+};
+
+export type RoundLifecyclePayload = RealtimeRoundPayload & {
   emittedAt: string;
 };

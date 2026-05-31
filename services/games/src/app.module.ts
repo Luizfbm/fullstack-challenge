@@ -7,6 +7,10 @@ import {
 } from "./application/ports/game.repository";
 import { ID_GENERATOR, IdGenerator } from "./application/ports/id-generator";
 import {
+  ROUND_EVENTS_PUBLISHER,
+  RoundEventsPublisher,
+} from "./application/ports/round-events.publisher";
+import {
   WALLET_CLIENT,
   WalletClient,
 } from "./application/ports/wallet.client";
@@ -103,12 +107,14 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
       provide: RoundLifecycleRunner,
       useFactory: (
         advanceRoundLifecycleUseCase: AdvanceRoundLifecycleUseCase,
+        roundEventsPublisher: RoundEventsPublisher,
       ): RoundLifecycleRunner =>
         new RoundLifecycleRunner(
           advanceRoundLifecycleUseCase,
           Number(process.env.ROUND_LIFECYCLE_INTERVAL_MS ?? 500),
+          roundEventsPublisher,
         ),
-      inject: [AdvanceRoundLifecycleUseCase],
+      inject: [AdvanceRoundLifecycleUseCase, ROUND_EVENTS_PUBLISHER],
     },
     {
       provide: GetCurrentRoundUseCase,
@@ -119,6 +125,10 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
     },
     RoundRealtimeSerializer,
     RoundsGateway,
+    {
+      provide: ROUND_EVENTS_PUBLISHER,
+      useExisting: RoundsGateway,
+    },
     {
       provide: ListRoundHistoryUseCase,
       useFactory: (

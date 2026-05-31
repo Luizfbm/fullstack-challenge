@@ -297,6 +297,27 @@ Cada entrada deve conter:
   healthchecks via Kong. Nao houve alteracao de codigo neste ponto.
 - Validacao: apos poucos segundos, `GET /games/health` via Kong retornou
   `200 OK` com `{"status":"ok","service":"games"}`.
+- Recorrencia: no portao de integracao do Passo 5, apos novo
+  `docker compose up -d --build`, `GET /games/health` e em seguida
+  `GET /wallets/health` via Kong retornaram `502` uma vez cada. Os
+  healthchecks diretos em `:4001` e `:4002` retornaram `200`, e os logs do
+  Kong novamente mostraram tentativa contra IP anterior de container com
+  `connect() failed (111: Connection refused)`.
+- Validacao adicional: apos aguardar a estabilizacao do upstream, `GET
+  /games/health` e `GET /wallets/health` via Kong retornaram `200 OK`.
+- Correcao adicional: o helper E2E `ensureStackIsHealthy` passou a aguardar
+  `/games/health` e `/wallets/health` via Kong com retry curto, preservando a
+  falha com a ultima resposta caso o upstream nao estabilize.
+- Causa raiz confirmada: o Kong mantinha DNS stale para nomes de containers
+  recriados. A configuracao padrao de `dns_stale_ttl` e longa para resiliencia
+  em ambientes distribuidos, mas prejudica o ciclo local de
+  `docker compose up -d --build` com containers recriados.
+- Correcao final: o Compose local passou a definir `KONG_DNS_VALID_TTL=1`,
+  `KONG_DNS_STALE_TTL=0` e `KONG_DNS_NOT_FOUND_TTL=1`, reduzindo cache DNS
+  stale do Kong durante desenvolvimento/testes.
+- Validacao final: apos recriar o Kong com essas variaveis, `GET
+  /games/health`, `GET /wallets/health`, handshake Socket.IO em
+  `/games/socket.io` e os 7 testes E2E de API passaram via Kong.
 - Status: resolvido.
 
 ## Validacoes de Regressao Ja Executadas
@@ -332,5 +353,5 @@ Cada entrada deve conter:
 
 ## Validacoes Ainda Pendentes
 
-- testes E2E automatizados que dependem dos containers ativos ainda serao
-  criados em corte posterior.
+- E2E WebSocket completo ainda sera criado no Passo 7 do plano de execucao.
+- Validacao browser/frontend real ainda depende dos passos de frontend.

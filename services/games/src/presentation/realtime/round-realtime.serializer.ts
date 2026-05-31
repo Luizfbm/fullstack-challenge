@@ -5,6 +5,7 @@ import { Round } from "../../domain/round";
 import {
   RealtimeBetPayload,
   RealtimeRoundPayload,
+  RoundLifecyclePayload,
   RoundSnapshotPayload,
 } from "./round-realtime.events";
 
@@ -21,6 +22,16 @@ export class RoundRealtimeSerializer {
     };
   }
 
+  toLifecyclePayload(
+    round: Round,
+    emittedAt = new Date(),
+  ): RoundLifecyclePayload {
+    return {
+      ...this.toRoundPayload(round, { now: emittedAt }),
+      emittedAt: emittedAt.toISOString(),
+    };
+  }
+
   toRoundPayload(
     round: Round,
     options: RoundPayloadOptions = {},
@@ -31,6 +42,7 @@ export class RoundRealtimeSerializer {
 
     return {
       id: round.id,
+      roundId: round.id,
       status: round.status,
       bettingStartsAt: round.bettingStartsAt.toISOString(),
       bettingEndsAt: round.bettingEndsAt.toISOString(),
