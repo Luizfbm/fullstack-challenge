@@ -28,3 +28,20 @@ export class WalletCreditFailedError extends Error {
     this.originalCause = cause;
   }
 }
+
+export class WalletOperationRejectedError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "WalletOperationRejectedError";
+  }
+}
+
+export class WalletOperationTimedOutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Wallet operation timed out after ${timeoutMs}ms`);
+    this.name = "WalletOperationTimedOutError";
+  }
+}

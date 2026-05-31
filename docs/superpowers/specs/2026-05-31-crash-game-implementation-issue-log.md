@@ -82,6 +82,19 @@ Cada entrada deve conter:
   `failed to connect to the docker API`, indicando daemon indisponivel.
 - Status: pendente.
 
+### 6. DTO do Game importava type alias como valor em runtime
+
+- Contexto: testes unitarios do Game apos adicionar DTOs Swagger.
+- Sintoma: `bun test tests/unit` falhou com
+  `SyntaxError: Export named 'BetStatus' not found in module`.
+- Causa: `BetStatus` e um type alias TypeScript, portanto deve ser importado
+  com `import type`; o import normal vira uma expectativa de export em runtime
+  no executor de testes.
+- Correcao: DTOs do Game passaram a importar `BetStatus` e `RoundStatus` com
+  `import type`.
+- Validacao: `bun test tests/unit` em `services/games` passou com 22 testes.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`

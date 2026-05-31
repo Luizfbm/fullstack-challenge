@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import * as amqp from "amqplib";
 import type { Channel, ChannelModel, ConsumeMessage } from "amqplib";
 import {
+  WalletOperationRejectedError,
+  WalletOperationTimedOutError,
+} from "../../application/game.errors";
+import {
   WalletClient,
   WalletOperationInput,
   WalletOperationResult,
@@ -32,23 +36,6 @@ type PendingRequest = {
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
 };
-
-export class WalletRpcError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = "WalletRpcError";
-  }
-}
-
-export class WalletRpcTimeoutError extends Error {
-  constructor(timeoutMs: number) {
-    super(`Wallet RPC timed out after ${timeoutMs}ms`);
-    this.name = "WalletRpcTimeoutError";
-  }
-}
 
 export class RabbitMqWalletClient
   implements WalletClient, OnModuleInit, OnModuleDestroy
@@ -113,7 +100,7 @@ export class RabbitMqWalletClient
     return new Promise<WalletOperationResult>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(correlationId);
-        reject(new WalletRpcTimeoutError(this.timeoutMs));
+        reject(new WalletOperationTimedOutError(this.timeoutMs));
       }, this.timeoutMs);
 
       this.pending.set(correlationId, { resolve, reject, timeout });
@@ -195,7 +182,10 @@ export class RabbitMqWalletClient
       }
 
       pending.reject(
-        new WalletRpcError(response.error.code, response.error.message),
+        new WalletOperationRejectedError(
+          response.error.code,
+          response.error.message,
+        ),
       );
     } catch (error) {
       pending.reject(
