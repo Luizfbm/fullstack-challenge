@@ -14,13 +14,16 @@ import { Badge } from "../ui/badge";
 import { BetControlsPanel } from "./bet-controls-panel";
 import { CrashRoundPanel } from "./crash-round-panel";
 import { getRoundBets } from "./game-dashboard-view-model";
-import { formatRoundMultiplier, roundBadgeVariant } from "./round-formatting";
+import {
+  formatRoundMultiplier,
+  roundHistoryVariant,
+} from "./round-formatting";
 
 export function GameDashboardShell() {
   const { errorMessage, isAuthenticated, username } = useAuth();
   const currentRoundQuery = useCurrentRoundQuery();
-  const historyQuery = useRoundHistoryQuery(8);
-  const myBetsQuery = useMyBetsQuery(isAuthenticated, 5);
+  const historyQuery = useRoundHistoryQuery(20);
+  const myBetsQuery = useMyBetsQuery(isAuthenticated, 10);
   const walletQuery = useWalletQuery(isAuthenticated);
   const realtime = useGameRealtime(currentRoundQuery.data ?? null);
   const currentRound = realtime.round ?? currentRoundQuery.data ?? null;
@@ -34,14 +37,14 @@ export function GameDashboardShell() {
   ].find(Boolean);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_21rem]">
+    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <CrashRoundPanel
         connectionStatus={realtime.connectionStatus}
         isLoading={currentRoundQuery.isLoading}
         round={currentRound}
       />
 
-      <aside className="space-y-4">
+      <aside className="min-w-0 space-y-4">
         <section className="grid grid-cols-2 gap-3">
           <MetricCard
             icon={Coins}
@@ -74,14 +77,15 @@ export function GameDashboardShell() {
             <h2 className="text-sm font-semibold text-zinc-100">Mesa</h2>
           </div>
           <div className="space-y-2">
-            {roundBets.slice(0, 4).map((bet) => (
-              <TableRow
-                key={bet.id}
-                label={bet.username}
-                value={`${formatCents(bet.amountCents)} / ${bet.status}`}
-              />
+            {roundBets.slice(0, 6).map((bet) => (
+              <BetTableRow key={bet.id} bet={bet} />
             ))}
-            {roundBets.length ? null : <TableRow label="apostas" value="-" />}
+            {roundBets.length ? null : (
+              <TableRow
+                label={currentRoundQuery.isLoading ? "sincronizando" : "apostas"}
+                value="-"
+              />
+            )}
           </div>
         </section>
 
@@ -92,11 +96,13 @@ export function GameDashboardShell() {
           </div>
           <div className="flex flex-wrap gap-2">
             {(historyQuery.data ?? []).map((round) => (
-              <Badge key={round.id} variant={roundBadgeVariant(round.status)}>
+              <Badge key={round.id} variant={roundHistoryVariant(round)}>
                 {formatRoundMultiplier(round)}
               </Badge>
             ))}
-            {historyQuery.data?.length ? null : <Badge>-</Badge>}
+            {historyQuery.data?.length ? null : (
+              <Badge>{historyQuery.isLoading ? "..." : "-"}</Badge>
+            )}
           </div>
         </section>
       </aside>
@@ -121,7 +127,7 @@ type MetricCardProps = {
 function MetricCard({ icon: Icon, label, value }: MetricCardProps) {
   return (
     <section
-      className="rounded-md border border-zinc-800 bg-zinc-900/70 p-4"
+      className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/70 p-4"
       data-testid={`metric-${label.toLowerCase()}`}
     >
       <Icon className="mb-3 size-4 text-emerald-300" aria-hidden="true" />
@@ -131,16 +137,49 @@ function MetricCard({ icon: Icon, label, value }: MetricCardProps) {
   );
 }
 
+function BetTableRow({ bet }: { bet: BetResponse }) {
+  const payout = bet.payoutCents ? ` -> ${formatCents(bet.payoutCents)}` : "";
+  const multiplier = bet.cashoutMultiplierBp
+    ? ` @ ${(bet.cashoutMultiplierBp / 10000).toFixed(2)}x`
+    : "";
+
+  return (
+    <TableRow
+      label={bet.username}
+      tone={getBetRowTone(bet)}
+      value={`${bet.status} ${formatCents(bet.amountCents)}${multiplier}${payout}`}
+    />
+  );
+}
+
+function getBetRowTone(bet: BetResponse): "danger" | "neutral" | "success" {
+  if (bet.status === "CASHED_OUT") {
+    return "success";
+  }
+
+  return bet.status === "LOST" ? "danger" : "neutral";
+}
+
 type TableRowProps = {
   label: string;
+  tone?: "danger" | "neutral" | "success";
   value: string;
 };
 
-function TableRow({ label, value }: TableRowProps) {
+function TableRow({ label, tone = "neutral", value }: TableRowProps) {
+  const valueClassName =
+    tone === "success"
+      ? "text-emerald-200"
+      : tone === "danger"
+        ? "text-rose-200"
+        : "text-zinc-200";
+
   return (
-    <div className="flex items-center justify-between rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm">
-      <span className="text-zinc-400">{label}</span>
-      <span className="font-mono text-zinc-200">{value}</span>
+    <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm">
+      <span className="min-w-0 truncate text-zinc-400">{label}</span>
+      <span className={`min-w-0 truncate text-right font-mono ${valueClassName}`}>
+        {value}
+      </span>
     </div>
   );
 }

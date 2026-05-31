@@ -39,6 +39,18 @@ export function roundBadgeVariant(status?: RoundStatus) {
   return "warning";
 }
 
+export function roundHistoryVariant(round: DashboardRound) {
+  if (typeof round.crashPointBp !== "number") {
+    return roundBadgeVariant(round.status);
+  }
+
+  if (round.crashPointBp < 15000) {
+    return "danger";
+  }
+
+  return round.crashPointBp >= 20000 ? "success" : "warning";
+}
+
 export function truncateHash(value?: string | null): string {
   if (!value) {
     return "-";

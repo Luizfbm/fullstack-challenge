@@ -657,6 +657,73 @@ Cada entrada deve conter:
   desktop 1440px com `overflowX: false`.
 - Status: resolvido.
 
+### 38. Passo 12 falhou typecheck por fronteira REST/realtime no cashout
+
+- Contexto: Passo 12, ao adicionar payout potencial no botao de cashout.
+- Sintoma: `bunx tsc --noEmit -p frontend/tsconfig.json` falhou porque
+  `currentMultiplierBp` nao existe em `RoundResponse`.
+- Causa: o painel de aposta ainda aceitava uma rodada REST pura, enquanto a
+  dashboard trabalha com um tipo unificado que pode conter dados realtime.
+- Correcao: `BetControlsPanel` passou a receber `DashboardRound | null`, que
+  modela corretamente a rodada reconciliada REST/WebSocket.
+- Regressao: adicionados testes de `calculatePayoutCents`, timing da rodada,
+  curva visual e cores do historico; o typecheck do frontend voltou a passar.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test`, `cd frontend && bun run build` e `bun run test:coverage && bun
+  run quality:gate` passaram.
+- Status: resolvido.
+
+### 39. Playwright perdeu status CASHED_OUT apos melhoria visual da mesa
+
+- Contexto: Passo 12, validacao browser apos adicionar payout e tratamento
+  visual para a lista de apostas da rodada.
+- Sintoma: `bun run test:e2e:browser` falhou aguardando `CASHED_OUT`, embora a
+  screenshot mostrasse saldo atualizado e payout na mesa.
+- Causa: a refatoracao de `BetTableRow` passou a exibir valor, multiplicador e
+  payout, mas removeu o status textual da aposta.
+- Correcao: a linha da mesa voltou a exibir o status como primeiro item do
+  valor, preservando `CASHED_OUT`, `LOST` e demais estados como informacao
+  visivel e testavel.
+- Regressao: o Playwright continua verificando que cashout aparece na tela apos
+  o fluxo real no browser.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test`, `cd frontend && bun run build` e `bun run test:e2e:browser`
+  passaram depois da correcao.
+- Status: resolvido.
+
+### 40. Validacao mobile detectou overflow horizontal no Passo 12
+
+- Contexto: validacao visual desktop/mobile apos reforcar a tela principal do
+  jogo.
+- Sintoma: a primeira checagem Playwright de mobile retornou `overflowX: true`
+  com `scrollWidth` maior que `clientWidth`.
+- Causa: os containers de grid e os textos monoespacados longos da formula/hash
+  ainda nao forçavam `min-w-0` e quebra segura em todos os pontos necessarios.
+- Correcao: adicionados `min-w-0` nos containers principais da dashboard,
+  painel da rodada, grafico e cards, alem de quebra de texto nos hashes e na
+  formula da curva.
+- Regressao: a validacao visual mobile/desktop mede `overflowX` explicitamente.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test`, `cd frontend && bun run build`, `bun run test:e2e:browser` e
+  validacao visual mobile/desktop com `overflowX: false` passaram.
+- Status: resolvido.
+
+### 41. Script de validacao visual usou import e seletores incorretos
+
+- Contexto: validacao visual final do Passo 12 via script Playwright inline.
+- Sintoma: a primeira execucao falhou com `Cannot find package 'playwright'`
+  e a segunda execucao reportou falsos negativos para timer e grafico.
+- Causa: o projeto importa o runtime de browser por `@playwright/test`, e nao
+  diretamente por `playwright`, e os seletores do script buscavam texto literal
+  `Timer` e `aria-label` inexistente no SVG decorativo.
+- Correcao: o script passou a importar `chromium` de `@playwright/test` e a
+  validar os elementos pela estrutura/textos reais da UI autenticada.
+- Regressao: a validacao visual mobile/desktop agora verifica heading, formula,
+  ritmo, timer, curva SVG e ausencia de overflow horizontal.
+- Validacao: o script Playwright corrigido passou para mobile `390x844` e
+  desktop `1440x900` com `overflowX: false`.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -725,6 +792,18 @@ Cada entrada deve conter:
   `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` e validacao
   visual mobile/desktop via Playwright com formula da curva e `overflowX:
   false`.
+- Passo 12 focado:
+  `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend && bun test`,
+  `cd frontend && bun run build`, `git diff --check` e `bun run test:coverage
+  && bun run quality:gate`.
+- Passo 12 browser:
+  `docker compose up -d --build frontend`, `bun run test:e2e:browser` e script
+  Playwright mobile/desktop validando curva, timer, formula e ausencia de
+  overflow horizontal.
+- Passo 12 final:
+  `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` e script
+  Playwright mobile/desktop corrigido validando curva, timer, formula, ritmo e
+  ausencia de overflow horizontal.
 
 ## Validacoes Docker Ja Executadas
 
@@ -745,4 +824,4 @@ Cada entrada deve conter:
 
 ## Validacoes Ainda Pendentes
 
-- Proximo passo do plano: Passo 12, construir a UI principal do jogo.
+- Proximo passo do plano: Passo 13, adicionar testes frontend.

@@ -6,13 +6,16 @@ import {
   usePlaceBetMutation,
 } from "../../hooks/use-game-rest";
 import { getApiErrorMessage } from "../../services/api-errors";
-import type { BetResponse, RoundResponse } from "../../services/game-api";
+import type { BetResponse } from "../../services/game-api";
+import { formatCents } from "../../services/money";
+import { calculatePayoutCents } from "../../services/payout";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import type { DashboardRound } from "./round-formatting";
 
 type BetControlsPanelProps = {
   activeBet: BetResponse | null;
-  currentRound: RoundResponse | null;
+  currentRound: DashboardRound | null;
 };
 
 export function BetControlsPanel({
@@ -37,6 +40,7 @@ export function BetControlsPanel({
     activeBet?.status === "ACCEPTED" &&
     !cashOutMutation.isPending;
   const mutationError = placeBetMutation.error ?? cashOutMutation.error;
+  const potentialPayout = getPotentialPayout(activeBet, currentRound);
 
   return (
     <section className="rounded-md border border-zinc-800 bg-zinc-900/70 p-4">
@@ -69,7 +73,7 @@ export function BetControlsPanel({
         {betAmountLabel}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Button
           disabled={!canPlaceBet}
           onClick={() =>
@@ -85,20 +89,27 @@ export function BetControlsPanel({
           type="button"
           variant="secondary"
         >
-          {cashOutMutation.isPending ? "Sacando" : "Cash Out"}
+          {cashOutMutation.isPending
+            ? "Sacando"
+            : potentialPayout
+              ? `Cash Out ${formatCents(potentialPayout)}`
+              : "Cash Out"}
         </Button>
       </div>
 
       {activeBet ? (
-        <p className="mt-3 text-xs text-zinc-500">
-          Aposta ativa: {activeBet.status}
-        </p>
+        <div className="mt-3 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
+          <p>Aposta ativa: {activeBet.status}</p>
+          {potentialPayout ? (
+            <p className="mt-1 text-emerald-200">
+              Payout potencial: {formatCents(potentialPayout)}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {mutationError ? (
-        <div className="mt-3 rounded-md border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">
-          {getApiErrorMessage(mutationError)}
-        </div>
+        <ToastNotice message={getApiErrorMessage(mutationError)} />
       ) : null}
 
       {!isAuthenticated ? (
@@ -112,5 +123,34 @@ export function BetControlsPanel({
         </Button>
       ) : null}
     </section>
+  );
+}
+
+function getPotentialPayout(
+  activeBet: BetResponse | null,
+  currentRound: DashboardRound | null,
+): bigint | null {
+  if (!activeBet || !currentRound || activeBet.status !== "ACCEPTED") {
+    return null;
+  }
+
+  const multiplierBp = currentRound.currentMultiplierBp;
+
+  if (typeof multiplierBp !== "number") {
+    return null;
+  }
+
+  return calculatePayoutCents(activeBet.amountCents, multiplierBp);
+}
+
+function ToastNotice({ message }: { message: string }) {
+  return (
+    <div
+      aria-live="polite"
+      className="fixed inset-x-4 bottom-4 z-50 rounded-md border border-rose-400/40 bg-rose-950 px-4 py-3 text-sm text-rose-50 shadow-xl shadow-black/40 sm:left-auto sm:w-96"
+      role="alert"
+    >
+      {message}
+    </div>
   );
 }

@@ -1,14 +1,15 @@
 import { Clock3, Wifi, WifiOff } from "lucide-react";
+import { useNow } from "../../hooks/use-now";
 import {
   getCrashCurveFormula,
   getCrashCurveHumanRate,
 } from "../../services/crash-curve";
+import { getRoundTimerLabel } from "../../services/round-timing";
 import { Badge } from "../ui/badge";
+import { CrashCurveChart } from "./crash-curve-chart";
 import {
   type DashboardRound,
-  formatRoundMultiplier,
   roundBadgeVariant,
-  truncateHash,
 } from "./round-formatting";
 
 type CrashRoundPanelProps = {
@@ -22,8 +23,10 @@ export function CrashRoundPanel({
   isLoading,
   round,
 }: CrashRoundPanelProps) {
+  const now = useNow();
+
   return (
-    <section className="rounded-md border border-zinc-800 bg-zinc-900/70 p-4">
+    <section className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/70 p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-zinc-100">Rodada</h2>
@@ -47,18 +50,10 @@ export function CrashRoundPanel({
         </div>
       </div>
 
-      <div className="grid min-h-[22rem] place-items-center rounded-md border border-zinc-800 bg-zinc-950">
-        <div className="text-center">
-          <p className="text-6xl font-semibold tracking-normal text-zinc-50">
-            {formatRoundMultiplier(round)}
-          </p>
-          <p className="mt-3 font-mono text-xs text-zinc-500">
-            serverSeedHash: {truncateHash(round?.serverSeedHash)}
-          </p>
-          <p className="mt-1 font-mono text-xs text-zinc-600">
-            next: {truncateHash(round?.nextServerSeedHash)}
-          </p>
-        </div>
+      <CrashCurveChart isLoading={isLoading} now={now} round={round} />
+
+      <div className="mt-4 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-300">
+        {getRoundTimerLabel(round, now)}
       </div>
 
       <div className="mt-4 grid gap-2 text-xs text-zinc-500 md:grid-cols-2">
@@ -72,7 +67,8 @@ export function CrashRoundPanel({
 function CurveLine({ label, value }: { label: string; value: string }) {
   return (
     <p>
-      {label}: <span className="font-mono text-zinc-300">{value}</span>
+      {label}:{" "}
+      <span className="break-words font-mono text-zinc-300">{value}</span>
     </p>
   );
 }
