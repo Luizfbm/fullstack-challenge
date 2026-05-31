@@ -23,6 +23,8 @@ import { HashChainRoundSeedProvider } from "./infrastructure/provably-fair/hash-
 import { GamePrismaRepository } from "./infrastructure/prisma/game-prisma.repository";
 import { prismaClient } from "./infrastructure/prisma/prisma-client";
 import { GamesController } from "./presentation/controllers/games.controller";
+import { RoundRealtimeSerializer } from "./presentation/realtime/round-realtime.serializer";
+import { RoundsGateway } from "./presentation/realtime/rounds.gateway";
 
 const DEFAULT_HASH_CHAIN_ROOT_SEED =
   "local-dev-crash-game-hash-chain-root-seed";
@@ -115,6 +117,8 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
       ): GetCurrentRoundUseCase => new GetCurrentRoundUseCase(gameRepository),
       inject: [GAME_REPOSITORY],
     },
+    RoundRealtimeSerializer,
+    RoundsGateway,
     {
       provide: ListRoundHistoryUseCase,
       useFactory: (
