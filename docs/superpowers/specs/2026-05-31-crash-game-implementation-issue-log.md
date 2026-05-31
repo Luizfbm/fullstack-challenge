@@ -430,6 +430,28 @@ Cada entrada deve conter:
   passou com 9 testes E2E via Docker/Kong/Keycloak.
 - Status: resolvido.
 
+### 26. CI falhou no typecheck por Prisma Client ausente em runner limpo
+
+- Contexto: Pull Request #1 no GitHub Actions, job `Quality Gate / Baseline
+  ratchet`, passo `Typecheck`.
+- Sintoma: `bun run check:types` falhou no GitHub com
+  `Cannot find module '../../../prisma/generated/client'` em
+  `services/games/src/infrastructure/prisma/game-prisma.repository.ts` e
+  `services/games/src/infrastructure/prisma/prisma-client.ts`. Os passos de
+  testes, coverage e Quality Gate foram pulados porque o typecheck falhou
+  antes.
+- Causa: o runner do GitHub comeca limpo e nao possui
+  `services/*/prisma/generated/`, que e ignorado pelo git. Localmente o
+  typecheck passava porque o Prisma Client ja tinha sido gerado em execucoes
+  anteriores.
+- Correcao: criado script raiz `db:generate` para gerar os clients de Games e
+  Wallets; `check:types` passou a executar `bun run db:generate` antes dos
+  `tsc`.
+- Validacao: os diretorios `services/games/prisma/generated` e
+  `services/wallets/prisma/generated` foram removidos localmente e
+  `bun run check:types` regenerou os clients e passou.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -445,6 +467,8 @@ Cada entrada deve conter:
 - `docker compose config`
 - `bun run lint`
 - `bun run check:types`
+- `rm -rf services/games/prisma/generated services/wallets/prisma/generated &&
+  bun run check:types`
 - `bun run test:unit`
 - `bun run test:coverage`
 - `bun run quality:gate`
