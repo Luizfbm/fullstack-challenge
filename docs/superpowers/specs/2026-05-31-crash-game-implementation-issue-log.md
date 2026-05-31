@@ -78,6 +78,8 @@ Cada entrada deve conter:
 - Correcao: pendente de abrir/iniciar Docker Desktop.
 - Validacao pendente: executar `docker info`, `docker compose build` e
   `bun run docker:up`.
+- Nova tentativa em 2026-05-31: `docker info` ainda falhou com
+  `failed to connect to the docker API`, indicando daemon indisponivel.
 - Status: pendente.
 
 ## Validacoes de Regressao Ja Executadas
