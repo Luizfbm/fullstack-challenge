@@ -320,6 +320,23 @@ Cada entrada deve conter:
   `/games/socket.io` e os 7 testes E2E de API passaram via Kong.
 - Status: resolvido.
 
+### 20. Build do frontend falhou por mock tipado como `fetch`
+
+- Contexto: Passo 8 do plano de execucao, ao criar a base real do frontend e
+  rodar `cd frontend && bun run build`.
+- Sintoma: `tsc --noEmit -p tsconfig.json` falhou com
+  `Property 'mock' does not exist on type ... fetch` em
+  `src/services/http-client.test.ts`.
+- Causa: o teste convertia `vi.fn(...)` para `typeof fetch` para satisfazer a
+  assinatura do `HttpClient`. Essa conversao removia, para o TypeScript, a API
+  `.mock` do Vitest. Como o `tsconfig` inclui `src`, os testes tambem entram
+  no typecheck do build.
+- Correcao: o teste passou a capturar o `RequestInit` recebido por uma funcao
+  `fetch` fake tipada como `typeof fetch`, sem acessar `.mock`.
+- Validacao: `cd frontend && bun run build` passou; `cd frontend && bun test`
+  passou com 9 testes.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
