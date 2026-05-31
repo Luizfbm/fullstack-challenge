@@ -12,6 +12,21 @@ const REPO_ROOT = resolve(import.meta.dir, "../../../..");
 const COMPOSE_FILE = resolve(REPO_ROOT, "docker-compose.yml");
 const LOCK_DIR = resolve(tmpdir(), "crash-game-e2e-lock");
 const PLAYER_ID = "9fbd6f4e-4d5e-4e45-9ce0-91f35b72324f";
+const DEFAULT_E2E_BALANCE_CENTS = 100000n;
+
+export type DeterministicRoundScenario =
+  | "cashout"
+  | "clean-betting"
+  | "fast-crash";
+
+export const DETERMINISTIC_ROUND_FIXTURES: Record<
+  DeterministicRoundScenario,
+  { chainIndex: number; crashPointBp: number }
+> = {
+  cashout: { chainIndex: 1, crashPointBp: 35353 },
+  "clean-betting": { chainIndex: 1, crashPointBp: 35353 },
+  "fast-crash": { chainIndex: 2, crashPointBp: 12973 },
+};
 
 export type BetResponse = {
   id: string;
@@ -38,6 +53,7 @@ export type RoundResponse = {
   startedAt: string | null;
   crashedAt: string | null;
   crashPointBp: number | null;
+  multiplierGrowthBpPerSecond: number;
   serverSeedHash: string;
   serverSeed: string | null;
   clientSeed: string;
@@ -243,6 +259,45 @@ export async function prepareBettingRound(
   throw new Error("Could not prepare a suitable betting round");
 }
 
+export async function prepareDeterministicRound(
+  scenario: DeterministicRoundScenario = "clean-betting",
+): Promise<RoundResponse> {
+  const fixture = DETERMINISTIC_ROUND_FIXTURES[scenario];
+
+  await resetE2EGameState();
+  await setWalletBalance(DEFAULT_E2E_BALANCE_CENTS);
+
+  let round = await waitForCurrentRound();
+
+  while (round.chainIndex < fixture.chainIndex) {
+    await forceBettingRoundToStart(round.id);
+    const runningRound = await waitForCurrentStatus("RUNNING");
+    await forceRunningRoundToCrash(runningRound.id);
+    await waitForRoundStatus(runningRound.id, "SETTLED");
+    round = await waitForCurrentRound();
+  }
+
+  if (round.chainIndex !== fixture.chainIndex || round.status !== "BETTING") {
+    throw new Error(
+      `Expected deterministic ${scenario} round at chain index ${fixture.chainIndex}, got ${round.status} #${round.chainIndex}`,
+    );
+  }
+
+  const crashPointBp = await getRoundCrashPointBp(round.id);
+
+  if (crashPointBp !== fixture.crashPointBp) {
+    throw new Error(
+      `Expected deterministic ${scenario} crash point ${fixture.crashPointBp}, got ${crashPointBp}`,
+    );
+  }
+
+  if (round.bets.length > 0) {
+    throw new Error(`Expected deterministic ${scenario} round without bets`);
+  }
+
+  return round;
+}
+
 export async function forceBettingRoundToStart(roundId: string): Promise<void> {
   await runGamesSql(
     `UPDATE rounds SET "bettingEndsAt" = NOW() WHERE id = '${roundId}' AND status = 'BETTING';`,
@@ -280,6 +335,13 @@ export async function setWalletBalance(
   balanceCents: bigint,
 ): Promise<void> {
   await $`docker compose -f ${COMPOSE_FILE} exec -T postgres psql -U admin -d wallets -c ${`UPDATE wallets SET "balanceCents" = ${balanceCents.toString()} WHERE "playerId" = '${PLAYER_ID}';`}`.quiet();
+}
+
+export async function getRoundCrashPointBp(roundId: string): Promise<number> {
+  const result =
+    await $`docker compose -f ${COMPOSE_FILE} exec -T postgres psql -U admin -d games -At -c ${`SELECT "crashPointBp" FROM rounds WHERE id = '${roundId}';`}`.text();
+
+  return Number(result.trim());
 }
 
 async function waitForCurrentRound(): Promise<RoundResponse> {
@@ -337,9 +399,6 @@ async function runGamesSql(sql: string): Promise<void> {
   await $`docker compose -f ${COMPOSE_FILE} exec -T postgres psql -U admin -d games -c ${sql}`.quiet();
 }
 
-async function getRoundCrashPointBp(roundId: string): Promise<number> {
-  const result =
-    await $`docker compose -f ${COMPOSE_FILE} exec -T postgres psql -U admin -d games -At -c ${`SELECT "crashPointBp" FROM rounds WHERE id = '${roundId}';`}`.text();
-
-  return Number(result.trim());
+async function resetE2EGameState(): Promise<void> {
+  await runGamesSql("DELETE FROM bets; DELETE FROM rounds;");
 }

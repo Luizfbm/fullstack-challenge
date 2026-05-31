@@ -24,6 +24,9 @@ export class RoundResponseDto {
   @ApiProperty({ example: 25000, nullable: true })
   crashPointBp!: number | null;
 
+  @ApiProperty({ example: 1000 })
+  multiplierGrowthBpPerSecond!: number;
+
   @ApiProperty()
   serverSeedHash!: string;
 

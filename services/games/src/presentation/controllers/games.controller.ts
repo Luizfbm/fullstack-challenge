@@ -31,7 +31,6 @@ import { ListMyBetsUseCase } from "../../application/use-cases/list-my-bets.use-
 import { ListRoundHistoryUseCase } from "../../application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "../../application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "../../application/use-cases/verify-round.use-case";
-import { Bet } from "../../domain/bet";
 import {
   InvalidBetStateError,
   InvalidRoundStateError,
@@ -47,6 +46,7 @@ import {
   RoundResponseDto,
   VerifyRoundResponseDto,
 } from "../dtos/round-response.dto";
+import { toPublicBetFields, toPublicRoundFields } from "../round-response.mapper";
 
 @ApiTags("games")
 @Controller()
@@ -111,7 +111,7 @@ export class GamesController {
       limit: this.parseLimit(limit),
     });
 
-    return bets.map((bet) => this.toBetResponse(bet));
+    return bets.map(toPublicBetFields);
   }
 
   @Post("bet")
@@ -130,7 +130,7 @@ export class GamesController {
         amountCents: body.amountCents,
       });
 
-      return this.toBetResponse(result.bet);
+      return toPublicBetFields(result.bet);
     } catch (error) {
       throw this.toHttpError(error);
     }
@@ -148,7 +148,7 @@ export class GamesController {
         playerId: user.playerId,
       });
 
-      return this.toBetResponse(result.bet);
+      return toPublicBetFields(result.bet);
     } catch (error) {
       throw this.toHttpError(error);
     }
@@ -170,34 +170,8 @@ export class GamesController {
 
   private toRoundResponse(round: Round): RoundResponseDto {
     return {
-      id: round.id,
-      status: round.status,
-      bettingStartsAt: round.bettingStartsAt.toISOString(),
-      bettingEndsAt: round.bettingEndsAt.toISOString(),
-      startedAt: round.startedAt?.toISOString() ?? null,
-      crashedAt: round.crashedAt?.toISOString() ?? null,
-      crashPointBp: round.serverSeed ? round.crashPointBp : null,
-      serverSeedHash: round.serverSeedHash,
-      serverSeed: round.serverSeed,
-      clientSeed: round.clientSeed,
-      nonce: round.nonce,
-      chainIndex: round.chainIndex,
-      nextServerSeedHash: round.nextServerSeedHash,
-      bets: round.bets.map((bet) => this.toBetResponse(bet)),
-    };
-  }
-
-  private toBetResponse(bet: Bet): BetResponseDto {
-    return {
-      id: bet.id,
-      roundId: bet.roundId,
-      playerId: bet.playerId,
-      username: bet.username,
-      amountCents: bet.amountCents.toString(),
-      status: bet.status,
-      cashoutMultiplierBp: bet.cashoutMultiplierBp,
-      payoutCents: bet.payoutCents?.toString() ?? null,
-      rejectionReason: bet.rejectionReason,
+      ...toPublicRoundFields(round),
+      bets: round.bets.map(toPublicBetFields),
     };
   }
 

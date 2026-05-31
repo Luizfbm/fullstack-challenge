@@ -1,6 +1,26 @@
 _format_version: "3.0"
 
 services:
+  - name: games-bet-service
+    url: http://games:4001/bet
+    routes:
+      - name: games-bet-route
+        methods:
+          - POST
+        paths:
+          - /games/bet
+        strip_path: true
+
+  - name: games-cashout-service
+    url: http://games:4001/bet/cashout
+    routes:
+      - name: games-cashout-route
+        methods:
+          - POST
+        paths:
+          - /games/bet/cashout
+        strip_path: true
+
   - name: games-service
     url: http://games:4001
     routes:
@@ -17,6 +37,14 @@ services:
           - /wallets
         strip_path: true
 
+  - name: wallets-health-service
+    url: http://wallets:4002/health
+    routes:
+      - name: wallets-health-route
+        paths:
+          - /wallets/health
+        strip_path: true
+
   - name: frontend-service
     url: http://frontend:3000
     routes:
@@ -24,3 +52,28 @@ services:
         paths:
           - /
         strip_path: false
+
+plugins:
+  - name: rate-limiting
+    route: games-bet-route
+    config:
+      limit_by: ip
+      second: 10
+      minute: 120
+      policy: local
+
+  - name: rate-limiting
+    route: games-cashout-route
+    config:
+      limit_by: ip
+      second: 10
+      minute: 120
+      policy: local
+
+  - name: rate-limiting
+    route: wallets-routes
+    config:
+      limit_by: ip
+      second: 20
+      minute: 240
+      policy: local

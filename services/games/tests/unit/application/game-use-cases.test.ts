@@ -14,13 +14,22 @@ import {
 import { WalletClient, WalletOperationInput, WalletOperationResult } from "../../../src/application/ports/wallet.client";
 import { AdvanceRoundLifecycleUseCase } from "../../../src/application/use-cases/advance-round-lifecycle.use-case";
 import { CashOutUseCase } from "../../../src/application/use-cases/cash-out.use-case";
+import { GetCurrentRoundUseCase } from "../../../src/application/use-cases/get-current-round.use-case";
+import { ListMyBetsUseCase } from "../../../src/application/use-cases/list-my-bets.use-case";
+import { ListRoundHistoryUseCase } from "../../../src/application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "../../../src/application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "../../../src/application/use-cases/verify-round.use-case";
 import { ProvablyFair } from "../../../src/domain/provably-fair";
-import { HOUSE_EDGE_BP } from "../../../src/application/game.constants";
+import {
+  DEFAULT_ROUND_HISTORY_LIMIT,
+  HOUSE_EDGE_BP,
+} from "../../../src/application/game.constants";
 
 class InMemoryGameRepository implements GameRepository {
   public savedRounds: Round[] = [];
+  public lastBetsByPlayerIdInput: { playerId: string; limit: number } | null =
+    null;
+  public lastRoundHistoryLimit: number | null = null;
   private readonly rounds = new Map<string, Round>();
 
   constructor(public currentRound: Round | null) {
@@ -49,13 +58,17 @@ class InMemoryGameRepository implements GameRepository {
     return this.rounds.get(roundId) ?? null;
   }
 
-  async listRoundHistory(): Promise<Round[]> {
+  async listRoundHistory(limit: number): Promise<Round[]> {
+    this.lastRoundHistoryLimit = limit;
+
     return [...this.rounds.values()].filter(
       (round) => round.status === "CRASHED" || round.status === "SETTLED",
     );
   }
 
-  async listBetsByPlayerId(playerId: string): Promise<Bet[]> {
+  async listBetsByPlayerId(playerId: string, limit: number): Promise<Bet[]> {
+    this.lastBetsByPlayerIdInput = { playerId, limit };
+
     return [...this.rounds.values()].flatMap((round) =>
       round.bets.filter((bet) => bet.playerId === playerId),
     );
@@ -158,6 +171,37 @@ function openRound(crashPointBp = 30000): Round {
     chainIndex: 1,
   });
 }
+
+describe("read game use cases", () => {
+  test("loads the current round from the repository", async () => {
+    const round = openRound();
+    const repository = new InMemoryGameRepository(round);
+    const useCase = new GetCurrentRoundUseCase(repository);
+
+    await expect(useCase.execute()).resolves.toBe(round);
+  });
+
+  test("uses the default history limit when none is provided", async () => {
+    const repository = new InMemoryGameRepository(openRound());
+    const useCase = new ListRoundHistoryUseCase(repository);
+
+    await useCase.execute();
+
+    expect(repository.lastRoundHistoryLimit).toBe(DEFAULT_ROUND_HISTORY_LIMIT);
+  });
+
+  test("uses the requested player bet limit", async () => {
+    const repository = new InMemoryGameRepository(openRound());
+    const useCase = new ListMyBetsUseCase(repository);
+
+    await useCase.execute({ playerId: "player-1", limit: 3 });
+
+    expect(repository.lastBetsByPlayerIdInput).toEqual({
+      playerId: "player-1",
+      limit: 3,
+    });
+  });
+});
 
 describe("AdvanceRoundLifecycleUseCase", () => {
   test("opens a betting round when there is no current round", async () => {

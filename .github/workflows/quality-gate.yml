@@ -125,6 +125,12 @@ jobs:
       - name: Run API E2E through Kong and Keycloak
         run: bun run ci:e2e
 
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run browser E2E through Kong and Keycloak
+        run: bun run test:e2e:browser
+
       - name: Capture Docker logs
         if: always()
         run: |
@@ -136,7 +142,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: docker-e2e
-          path: quality/reports/docker-compose.log
+          path: |
+            quality/reports/docker-compose.log
+            quality/reports/playwright
+            quality/reports/playwright-html
           if-no-files-found: ignore
 
       - name: Stop Docker stack

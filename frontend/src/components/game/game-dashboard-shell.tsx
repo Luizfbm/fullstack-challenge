@@ -1,12 +1,4 @@
-import {
-  Activity,
-  Clock3,
-  Coins,
-  History,
-  Users,
-  Wifi,
-  WifiOff,
-} from "lucide-react";
+import { Activity, Coins, History, Users } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 import { useGameRealtime } from "../../hooks/use-game-realtime";
 import {
@@ -16,16 +8,13 @@ import {
   useWalletQuery,
 } from "../../hooks/use-game-rest";
 import { getApiErrorMessage } from "../../services/api-errors";
-import type {
-  BetResponse,
-  RoundResponse,
-  RoundStatus,
-} from "../../services/game-api";
-import type { RealtimeRoundPayload } from "../../services/realtime-events";
+import type { BetResponse, RoundResponse } from "../../services/game-api";
 import { formatCents } from "../../services/money";
 import { Badge } from "../ui/badge";
 import { BetControlsPanel } from "./bet-controls-panel";
+import { CrashRoundPanel } from "./crash-round-panel";
 import { getRoundBets } from "./game-dashboard-view-model";
+import { formatRoundMultiplier, roundBadgeVariant } from "./round-formatting";
 
 export function GameDashboardShell() {
   const { errorMessage, isAuthenticated, username } = useAuth();
@@ -46,48 +35,11 @@ export function GameDashboardShell() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_21rem]">
-      <section className="rounded-md border border-zinc-800 bg-zinc-900/70 p-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-100">Rodada</h2>
-            <p className="mt-1 text-xs text-zinc-500">
-              {currentRound
-                ? `#${currentRound.chainIndex} / nonce ${currentRound.nonce}`
-                : currentRoundQuery.isLoading
-                  ? "Carregando rodada"
-                  : "Sem rodada ativa"}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={realtimeBadgeVariant(realtime.connectionStatus)}>
-              {realtime.connectionStatus === "connected" ? (
-                <Wifi className="size-3.5" aria-hidden="true" />
-              ) : (
-                <WifiOff className="size-3.5" aria-hidden="true" />
-              )}
-              {realtime.connectionStatus === "connected" ? "LIVE" : "REST"}
-            </Badge>
-            <Badge variant={roundBadgeVariant(currentRound?.status)}>
-              <Clock3 className="size-3.5" aria-hidden="true" />
-              {currentRound?.status ?? "SYNC"}
-            </Badge>
-          </div>
-        </div>
-
-        <div className="grid min-h-[22rem] place-items-center rounded-md border border-zinc-800 bg-zinc-950">
-          <div className="text-center">
-            <p className="text-6xl font-semibold tracking-normal text-zinc-50">
-              {formatRoundMultiplier(currentRound)}
-            </p>
-            <p className="mt-3 font-mono text-xs text-zinc-500">
-              serverSeedHash: {truncateHash(currentRound?.serverSeedHash)}
-            </p>
-            <p className="mt-1 font-mono text-xs text-zinc-600">
-              next: {truncateHash(currentRound?.nextServerSeedHash)}
-            </p>
-          </div>
-        </div>
-      </section>
+      <CrashRoundPanel
+        connectionStatus={realtime.connectionStatus}
+        isLoading={currentRoundQuery.isLoading}
+        round={currentRound}
+      />
 
       <aside className="space-y-4">
         <section className="grid grid-cols-2 gap-3">
@@ -168,7 +120,10 @@ type MetricCardProps = {
 
 function MetricCard({ icon: Icon, label, value }: MetricCardProps) {
   return (
-    <section className="rounded-md border border-zinc-800 bg-zinc-900/70 p-4">
+    <section
+      className="rounded-md border border-zinc-800 bg-zinc-900/70 p-4"
+      data-testid={`metric-${label.toLowerCase()}`}
+    >
       <Icon className="mb-3 size-4 text-emerald-300" aria-hidden="true" />
       <p className="text-xs text-zinc-500">{label}</p>
       <p className="mt-1 text-lg font-semibold text-zinc-50">{value}</p>
@@ -206,54 +161,4 @@ function findActiveBet(
           bet.status === "CASHOUT_PENDING_CREDIT"),
     ) ?? null
   );
-}
-
-type DashboardRound = (RoundResponse | RealtimeRoundPayload) & {
-  currentMultiplierBp?: number | null;
-};
-
-function formatRoundMultiplier(round: DashboardRound | null): string {
-  if (!round) {
-    return "1.00x";
-  }
-
-  if (typeof round.currentMultiplierBp === "number") {
-    return `${(round.currentMultiplierBp / 10000).toFixed(2)}x`;
-  }
-
-  if (round.status === "CRASHED" || round.status === "SETTLED") {
-    return round.crashPointBp
-      ? `${(round.crashPointBp / 10000).toFixed(2)}x`
-      : "CRASHED";
-  }
-
-  return round.status === "RUNNING" ? "RUNNING" : "1.00x";
-}
-
-function roundBadgeVariant(status?: RoundStatus) {
-  if (status === "RUNNING") {
-    return "success";
-  }
-
-  if (status === "CRASHED") {
-    return "danger";
-  }
-
-  if (status === "SETTLED") {
-    return "neutral";
-  }
-
-  return "warning";
-}
-
-function realtimeBadgeVariant(status: string) {
-  return status === "connected" ? "success" : "neutral";
-}
-
-function truncateHash(value?: string | null): string {
-  if (!value) {
-    return "-";
-  }
-
-  return `${value.slice(0, 10)}...${value.slice(-8)}`;
 }
