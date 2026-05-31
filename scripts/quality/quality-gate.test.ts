@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import {
   compareQualityMetrics,
-  renderQualityGateMarkdown,
   type QualityMetrics,
 } from "./quality-gate";
+import { renderQualityGateMarkdown } from "./quality-gate-report";
 
 describe("quality gate ratchet", () => {
   test("passes when metrics are equal to the baseline", () => {
@@ -22,6 +22,7 @@ describe("quality gate ratchet", () => {
       globalCoverage: 91,
       gamesCoverage: 92,
       duplicatedLines: 8,
+      duplicationClones: 0,
       duplicationPercentage: 1.5,
       largestFileLineCount: 118,
       filesOverLimit: 0,
@@ -54,6 +55,7 @@ describe("quality gate ratchet", () => {
     const current = createMetrics({
       duplicationPercentage: 2.51,
       duplicatedLines: 11,
+      duplicationClones: 2,
     });
 
     const result = compareQualityMetrics(baseline, current);
@@ -62,6 +64,7 @@ describe("quality gate ratchet", () => {
     expect(result.failures.map((finding) => finding.metric)).toEqual([
       "duplication.percentage",
       "duplication.duplicatedLines",
+      "duplication.clones",
     ]);
   });
 
@@ -107,9 +110,11 @@ describe("quality gate ratchet", () => {
     });
 
     const result = compareQualityMetrics(baseline, current);
-    const markdown = renderQualityGateMarkdown(result, current);
+    const markdown = renderQualityGateMarkdown(result, baseline, current);
 
     expect(markdown).toContain("# Quality Gate Failed");
+    expect(markdown).toContain("| Metric | Baseline | Current | Delta | Status |");
+    expect(markdown).toContain("| coverage.global.lines.pct | 90 | 88 | -2 | fail |");
     expect(markdown).toContain("coverage.global.lines.pct");
     expect(markdown).toContain("security.high");
     expect(markdown).toContain("Baseline: 90");
@@ -124,6 +129,7 @@ function createMetrics(overrides: Partial<{
   frontendCoverage: number;
   duplicationPercentage: number;
   duplicatedLines: number;
+  duplicationClones: number;
   largestFileLineCount: number;
   filesOverLimit: number;
   highVulnerabilities: number;
@@ -147,7 +153,7 @@ function createMetrics(overrides: Partial<{
     duplication: {
       percentage: overrides.duplicationPercentage ?? 2.5,
       duplicatedLines: overrides.duplicatedLines ?? 10,
-      clones: 1,
+      clones: overrides.duplicationClones ?? 1,
     },
     files: {
       sourceFiles: 20,

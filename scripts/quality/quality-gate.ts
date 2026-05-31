@@ -125,6 +125,14 @@ export function compareQualityMetrics(
 
   addMaximumFailure({
     findings: failures,
+    metric: "duplication.clones",
+    message: "Duplicated clone count increased.",
+    baseline: baseline.duplication.clones,
+    current: current.duplication.clones,
+  });
+
+  addMaximumFailure({
+    findings: failures,
     metric: "files.largestFile.lineCount",
     message: "Largest source file got larger.",
     baseline: baseline.files.largestFile.lineCount,
@@ -166,35 +174,6 @@ export function compareQualityMetrics(
   };
 }
 
-export function renderQualityGateMarkdown(
-  result: QualityGateResult,
-  current: QualityMetrics,
-): string {
-  const lines = [
-    `# Quality Gate ${result.status === "passed" ? "Passed" : "Failed"}`,
-    "",
-    `Generated at: ${current.generatedAt}`,
-    "",
-    "## Current Metrics",
-    "",
-    `- Global line coverage: ${formatPercent(current.coverage.global.pct)}`,
-    `- Duplicated code: ${formatPercent(current.duplication.percentage)} (${current.duplication.duplicatedLines} lines)`,
-    `- Largest source file: ${current.files.largestFile.path} (${current.files.largestFile.lineCount} lines)`,
-    `- Files over ${current.files.lineLimit} lines: ${current.files.filesOverLimit}`,
-    `- Vulnerabilities: critical=${current.security.critical}, high=${current.security.high}, moderate=${current.security.moderate}, low=${current.security.low}`,
-    "",
-  ];
-
-  appendFindings(lines, "Failures", result.failures);
-  appendFindings(lines, "Warnings", result.warnings);
-
-  if (result.failures.length === 0 && result.warnings.length === 0) {
-    lines.push("No regressions or warnings were detected.");
-  }
-
-  return `${lines.join("\n")}\n`;
-}
-
 function addMinimumFailure(input: {
   findings: QualityGateFinding[];
   metric: string;
@@ -229,40 +208,4 @@ function addMaximumFailure(input: {
       current: input.current,
     });
   }
-}
-
-function appendFindings(
-  lines: string[],
-  title: string,
-  findings: QualityGateFinding[],
-): void {
-  lines.push(`## ${title}`, "");
-
-  if (findings.length === 0) {
-    lines.push(`No ${title.toLowerCase()}.`, "");
-    return;
-  }
-
-  for (const finding of findings) {
-    const comparison =
-      finding.baseline === undefined || finding.current === undefined
-        ? ""
-        : ` Baseline: ${formatNumber(finding.baseline)}. Current: ${formatNumber(finding.current)}.`;
-
-    lines.push(`- **${finding.metric}**: ${finding.message}${comparison}`);
-  }
-
-  lines.push("");
-}
-
-function formatPercent(value: number): string {
-  return `${formatNumber(value)}%`;
-}
-
-function formatNumber(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-
-  return value.toFixed(2);
 }
