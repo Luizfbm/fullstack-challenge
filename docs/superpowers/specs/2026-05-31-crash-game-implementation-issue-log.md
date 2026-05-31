@@ -178,6 +178,58 @@ Cada entrada deve conter:
   passaram com token real.
 - Status: resolvido.
 
+### 12. Healthcheck do Postgres gerava erro para banco `admin`
+
+- Contexto: execucao da stack Docker com o Postgres healthy.
+- Sintoma: logs recorrentes com
+  `FATAL: database "admin" does not exist`.
+- Causa: o healthcheck usava `pg_isready -U admin`; quando o banco nao e
+  informado, o cliente tenta conectar no banco com o mesmo nome do usuario
+  (`admin`). No Compose, o banco padrao criado e `postgres`, e os bancos de
+  dominio sao `games` e `wallets`.
+- Correcao: healthcheck alterado para `pg_isready -U admin -d postgres`.
+- Validacao: `docker compose up -d --build` subiu a stack; `docker compose ps`
+  mostrou `postgres` healthy; logs recentes checados com `rg` nao tiveram
+  novas ocorrencias de `database "admin" does not exist`.
+- Status: resolvido.
+
+### 13. Kong nao possuia rota raiz para `http://localhost:8000`
+
+- Contexto: acesso manual ao gateway em `http://localhost:8000`.
+- Sintoma: Kong retornou `404` com `no Route matched with those values`.
+- Causa: a configuracao declarativa do Kong tinha apenas rotas `/games` e
+  `/wallets`; nao havia rota para `/`.
+- Correcao: adicionada rota raiz `/` apontando para o servico `frontend`.
+- Validacao: `GET /` via Kong retornou `200 OK` com HTML do frontend; `GET
+  /games/health` e `GET /wallets/health` continuaram retornando `200`.
+- Status: resolvido.
+
+### 14. URL incorreta do console administrativo do Keycloak
+
+- Contexto: acesso manual a `http://localhost:8080/admin/admin`.
+- Sintoma: tela do Keycloak informou erro interno.
+- Causa: `/admin/admin` nao e a rota do console administrativo. O console do
+  realm master fica em `/admin/master/console/`.
+- Correcao: nao exigiu mudanca de codigo; a URL correta deve ser usada na
+  validacao e na orientacao de execucao local.
+- Validacao: `http://localhost:8080/admin/master/console/` retornou `200`; a
+  senha `admin/admin` foi validada obtendo token no realm `master`.
+- Status: resolvido.
+
+### 15. Frontend bloqueava requisicoes proxied pelo Kong
+
+- Contexto: validacao de `GET /` via Kong apos adicionar rota raiz para o
+  frontend.
+- Sintoma: `http://localhost:8000/` retornou `403 Forbidden` com mensagem
+  `Blocked request. This host ("frontend") is not allowed`.
+- Causa: o Vite recebeu a requisicao proxied com host interno `frontend` e
+  bloqueou esse host por nao estar em `server.allowedHosts`.
+- Correcao: `frontend/vite.config.ts` passou a permitir o host interno
+  `frontend` em `server.allowedHosts` e `preview.allowedHosts`.
+- Validacao: frontend rebuildado/recriado; `GET /` via Kong retornou `200 OK`
+  com HTML; `bun run build` em `frontend` passou.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -198,6 +250,11 @@ Cada entrada deve conter:
 - `docker compose ps`
 - `GET /games/health` via Kong
 - `GET /wallets/health` via Kong
+- `GET /` via Kong retornando HTML do frontend
+- `GET /admin/master/console/` no Keycloak retornando 200
+- token de admin do Keycloak validado com `admin/admin`
+- RabbitMQ management API validada com `admin/admin`
+- token do usuario `player/player123` validado no realm `crash-game`
 - `POST /wallets` e `GET /wallets/me` via Kong com token real do Keycloak
 
 ## Validacoes Ainda Pendentes

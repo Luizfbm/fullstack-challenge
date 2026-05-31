@@ -15,7 +15,7 @@ services:
       - postgres_data:/var/lib/postgresql
       - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -85,6 +85,8 @@ services:
       timeout: 5s
       retries: 10
     depends_on:
+      frontend:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       rabbitmq:
@@ -165,9 +167,6 @@ services:
       VITE_KEYCLOAK_URL: http://localhost:8080
       VITE_KEYCLOAK_REALM: crash-game
       VITE_KEYCLOAK_CLIENT_ID: crash-game-client
-    depends_on:
-      kong:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:3000').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 10s

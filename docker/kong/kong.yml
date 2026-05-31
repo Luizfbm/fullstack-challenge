@@ -16,3 +16,11 @@ services:
         paths:
           - /wallets
         strip_path: true
+
+  - name: frontend-service
+    url: http://frontend:3000
+    routes:
+      - name: frontend-root
+        paths:
+          - /
+        strip_path: false
