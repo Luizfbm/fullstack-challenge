@@ -9,6 +9,7 @@ import {
 import { toCents } from "../cents";
 import { GameRepository } from "../ports/game.repository";
 import { IdGenerator } from "../ports/id-generator";
+import { RoundEventsPublisher } from "../ports/round-events.publisher";
 import { WalletClient } from "../ports/wallet.client";
 import { Bet } from "../../domain/bet";
 
@@ -28,6 +29,7 @@ export class PlaceBetUseCase {
     private readonly gameRepository: GameRepository,
     private readonly walletClient: WalletClient,
     private readonly idGenerator: IdGenerator,
+    private readonly roundEventsPublisher: RoundEventsPublisher,
   ) {}
 
   async execute(input: PlaceBetInput): Promise<PlaceBetResult> {
@@ -61,6 +63,7 @@ export class PlaceBetUseCase {
     });
 
     await this.gameRepository.saveRound(round);
+    await this.roundEventsPublisher.publishBetPlaced(bet);
 
     return {
       bet,

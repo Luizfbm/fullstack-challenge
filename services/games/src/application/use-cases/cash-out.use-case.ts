@@ -7,6 +7,7 @@ import {
 } from "../game.errors";
 import { Clock } from "../ports/clock";
 import { GameRepository } from "../ports/game.repository";
+import { RoundEventsPublisher } from "../ports/round-events.publisher";
 import { WalletClient } from "../ports/wallet.client";
 import { Bet } from "../../domain/bet";
 import { InvalidRoundStateError } from "../../domain/game.errors";
@@ -26,6 +27,7 @@ export class CashOutUseCase {
     private readonly gameRepository: GameRepository,
     private readonly walletClient: WalletClient,
     private readonly clock: Clock,
+    private readonly roundEventsPublisher: RoundEventsPublisher,
   ) {}
 
   async execute(input: CashOutInput): Promise<CashOutResult> {
@@ -63,6 +65,7 @@ export class CashOutUseCase {
 
       round.completeCashOut(input.playerId);
       await this.gameRepository.saveRound(round);
+      await this.roundEventsPublisher.publishBetCashedOut(bet);
 
       return {
         bet,

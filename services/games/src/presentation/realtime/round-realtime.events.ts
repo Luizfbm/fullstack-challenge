@@ -8,9 +8,12 @@ export const ROUND_STARTED_EVENT = "round.started";
 export const ROUND_TICK_EVENT = "round.tick";
 export const ROUND_CRASHED_EVENT = "round.crashed";
 export const ROUND_SETTLED_EVENT = "round.settled";
+export const BET_PLACED_EVENT = "bet.placed";
+export const BET_CASHED_OUT_EVENT = "bet.cashed_out";
 
 export type RealtimeBetPayload = {
   id: string;
+  betId: string;
   roundId: string;
   playerId: string;
   username: string;
@@ -46,5 +49,9 @@ export type RoundSnapshotPayload = {
 };
 
 export type RoundLifecyclePayload = RealtimeRoundPayload & {
+  emittedAt: string;
+};
+
+export type BetRealtimePayload = RealtimeBetPayload & {
   emittedAt: string;
 };

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Bet } from "../../../src/domain/bet";
 import { Round } from "../../../src/domain/round";
 import { RoundRealtimeSerializer } from "../../../src/presentation/realtime/round-realtime.serializer";
 
@@ -52,5 +53,35 @@ describe("RoundRealtimeSerializer", () => {
     expect(payload.serverSeed).toBe("server-seed");
     expect(payload.chainIndex).toBe(1);
     expect(payload.nonce).toBe(1);
+  });
+
+  test("serializes bet realtime payload with betId and monetary strings", () => {
+    const serializer = new RoundRealtimeSerializer();
+    const bet = Bet.accepted({
+      id: "bet-1",
+      roundId: "round-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+
+    const payload = serializer.toBetRealtimePayload(
+      bet,
+      new Date("2026-05-31T10:00:20.000Z"),
+    );
+
+    expect(payload).toEqual({
+      id: "bet-1",
+      betId: "bet-1",
+      roundId: "round-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: "1000",
+      status: "ACCEPTED",
+      cashoutMultiplierBp: null,
+      payoutCents: null,
+      rejectionReason: null,
+      emittedAt: "2026-05-31T10:00:20.000Z",
+    });
   });
 });

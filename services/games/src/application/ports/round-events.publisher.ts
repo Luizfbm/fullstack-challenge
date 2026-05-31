@@ -1,3 +1,4 @@
+import type { Bet } from "../../domain/bet";
 import type { Round } from "../../domain/round";
 
 export const ROUND_EVENTS_PUBLISHER = Symbol("ROUND_EVENTS_PUBLISHER");
@@ -8,4 +9,6 @@ export interface RoundEventsPublisher {
   publishTick(round: Round): Promise<void>;
   publishCrashed(round: Round): Promise<void>;
   publishSettled(round: Round): Promise<void>;
+  publishBetPlaced(bet: Bet): Promise<void>;
+  publishBetCashedOut(bet: Bet): Promise<void>;
 }

@@ -154,9 +154,20 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         gameRepository: GameRepository,
         walletClient: WalletClient,
         idGenerator: IdGenerator,
+        roundEventsPublisher: RoundEventsPublisher,
       ): PlaceBetUseCase =>
-        new PlaceBetUseCase(gameRepository, walletClient, idGenerator),
-      inject: [GAME_REPOSITORY, WALLET_CLIENT, ID_GENERATOR],
+        new PlaceBetUseCase(
+          gameRepository,
+          walletClient,
+          idGenerator,
+          roundEventsPublisher,
+        ),
+      inject: [
+        GAME_REPOSITORY,
+        WALLET_CLIENT,
+        ID_GENERATOR,
+        ROUND_EVENTS_PUBLISHER,
+      ],
     },
     {
       provide: CashOutUseCase,
@@ -164,9 +175,15 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         gameRepository: GameRepository,
         walletClient: WalletClient,
         clock: Clock,
+        roundEventsPublisher: RoundEventsPublisher,
       ): CashOutUseCase =>
-        new CashOutUseCase(gameRepository, walletClient, clock),
-      inject: [GAME_REPOSITORY, WALLET_CLIENT, CLOCK],
+        new CashOutUseCase(
+          gameRepository,
+          walletClient,
+          clock,
+          roundEventsPublisher,
+        ),
+      inject: [GAME_REPOSITORY, WALLET_CLIENT, CLOCK, ROUND_EVENTS_PUBLISHER],
     },
   ],
 })

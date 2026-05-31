@@ -6,6 +6,7 @@ import { BetAmountOutOfRangeError, WalletCreditFailedError } from "../../../src/
 import { Clock } from "../../../src/application/ports/clock";
 import { GameRepository } from "../../../src/application/ports/game.repository";
 import { IdGenerator } from "../../../src/application/ports/id-generator";
+import type { RoundEventsPublisher } from "../../../src/application/ports/round-events.publisher";
 import {
   RoundSeedMaterial,
   RoundSeedProvider,
@@ -119,6 +120,29 @@ class FakeRoundSeedProvider implements RoundSeedProvider {
 
   getServerSeed(chainIndex: number): string {
     return `server-seed-${chainIndex}`;
+  }
+}
+
+class FakeRoundEventsPublisher implements RoundEventsPublisher {
+  public betPlacedEvents: Bet[] = [];
+  public betCashedOutEvents: Bet[] = [];
+
+  async publishBettingStarted(): Promise<void> {}
+
+  async publishStarted(): Promise<void> {}
+
+  async publishTick(): Promise<void> {}
+
+  async publishCrashed(): Promise<void> {}
+
+  async publishSettled(): Promise<void> {}
+
+  async publishBetPlaced(bet: Bet): Promise<void> {
+    this.betPlacedEvents.push(bet);
+  }
+
+  async publishBetCashedOut(bet: Bet): Promise<void> {
+    this.betCashedOutEvents.push(bet);
   }
 }
 
@@ -303,10 +327,12 @@ describe("PlaceBetUseCase", () => {
   test("debits the wallet with an idempotent reference and saves the accepted bet", async () => {
     const repository = new InMemoryGameRepository(openRound());
     const walletClient = new FakeWalletClient();
+    const roundEventsPublisher = new FakeRoundEventsPublisher();
     const useCase = new PlaceBetUseCase(
       repository,
       walletClient,
       new FixedIdGenerator("bet-1"),
+      roundEventsPublisher,
     );
 
     const result = await useCase.execute({
@@ -326,6 +352,9 @@ describe("PlaceBetUseCase", () => {
       },
     ]);
     expect(repository.currentRound?.bets).toHaveLength(1);
+    expect(roundEventsPublisher.betPlacedEvents.map((bet) => bet.id)).toEqual([
+      "bet-1",
+    ]);
   });
 
   test("rejects out-of-range amounts before debiting the wallet", async () => {
@@ -335,6 +364,7 @@ describe("PlaceBetUseCase", () => {
       repository,
       walletClient,
       new FixedIdGenerator("bet-1"),
+      new FakeRoundEventsPublisher(),
     );
 
     await expect(
@@ -357,10 +387,12 @@ describe("PlaceBetUseCase", () => {
     });
     const repository = new InMemoryGameRepository(round);
     const walletClient = new FakeWalletClient();
+    const roundEventsPublisher = new FakeRoundEventsPublisher();
     const useCase = new PlaceBetUseCase(
       repository,
       walletClient,
       new FixedIdGenerator("bet-2"),
+      roundEventsPublisher,
     );
 
     await expect(
@@ -371,6 +403,7 @@ describe("PlaceBetUseCase", () => {
       }),
     ).rejects.toThrow(InvalidRoundStateError);
     expect(walletClient.debits).toHaveLength(0);
+    expect(roundEventsPublisher.betPlacedEvents).toHaveLength(0);
   });
 });
 
@@ -386,10 +419,12 @@ describe("CashOutUseCase", () => {
     round.start(new Date("2026-05-30T10:00:10.000Z"));
     const repository = new InMemoryGameRepository(round);
     const walletClient = new FakeWalletClient();
+    const roundEventsPublisher = new FakeRoundEventsPublisher();
     const useCase = new CashOutUseCase(
       repository,
       walletClient,
       new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      roundEventsPublisher,
     );
 
     const result = await useCase.execute({ playerId: "player-1" });
@@ -405,6 +440,12 @@ describe("CashOutUseCase", () => {
         reason: "CASHOUT_PAYOUT",
       },
     ]);
+    expect(
+      roundEventsPublisher.betCashedOutEvents.map((bet) => bet.id),
+    ).toEqual(["bet-1"]);
+    expect(roundEventsPublisher.betCashedOutEvents[0]?.status).toBe(
+      "CASHED_OUT",
+    );
   });
 
   test("preserves pending cashout when wallet credit fails", async () => {
@@ -419,10 +460,12 @@ describe("CashOutUseCase", () => {
     const repository = new InMemoryGameRepository(round);
     const walletClient = new FakeWalletClient();
     walletClient.creditError = new Error("wallet unavailable");
+    const roundEventsPublisher = new FakeRoundEventsPublisher();
     const useCase = new CashOutUseCase(
       repository,
       walletClient,
       new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      roundEventsPublisher,
     );
 
     await expect(
@@ -431,6 +474,7 @@ describe("CashOutUseCase", () => {
     expect(repository.currentRound?.bets[0]?.status).toBe(
       "CASHOUT_PENDING_CREDIT",
     );
+    expect(roundEventsPublisher.betCashedOutEvents).toHaveLength(0);
   });
 
   test("does not credit cashout at or after the crash point", async () => {
@@ -448,6 +492,7 @@ describe("CashOutUseCase", () => {
       repository,
       walletClient,
       new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      new FakeRoundEventsPublisher(),
     );
 
     await expect(

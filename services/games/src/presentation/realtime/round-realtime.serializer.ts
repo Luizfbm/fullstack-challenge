@@ -3,6 +3,7 @@ import { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
 import {
+  BetRealtimePayload,
   RealtimeBetPayload,
   RealtimeRoundPayload,
   RoundLifecyclePayload,
@@ -63,6 +64,7 @@ export class RoundRealtimeSerializer {
   toBetPayload(bet: Bet): RealtimeBetPayload {
     return {
       id: bet.id,
+      betId: bet.id,
       roundId: bet.roundId,
       playerId: bet.playerId,
       username: bet.username,
@@ -71,6 +73,13 @@ export class RoundRealtimeSerializer {
       cashoutMultiplierBp: bet.cashoutMultiplierBp,
       payoutCents: bet.payoutCents?.toString() ?? null,
       rejectionReason: bet.rejectionReason,
+    };
+  }
+
+  toBetRealtimePayload(bet: Bet, emittedAt = new Date()): BetRealtimePayload {
+    return {
+      ...this.toBetPayload(bet),
+      emittedAt: emittedAt.toISOString(),
     };
   }
 

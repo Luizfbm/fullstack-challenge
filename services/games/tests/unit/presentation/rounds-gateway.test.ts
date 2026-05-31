@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { GetCurrentRoundUseCase } from "../../../src/application/use-cases/get-current-round.use-case";
 import { Round } from "../../../src/domain/round";
 import {
+  BET_CASHED_OUT_EVENT,
+  BET_PLACED_EVENT,
   GAME_REALTIME_NAMESPACE,
   ROUND_SNAPSHOT_EVENT,
+  BetRealtimePayload,
   RoundSnapshotPayload,
 } from "../../../src/presentation/realtime/round-realtime.events";
 import { RoundRealtimeSerializer } from "../../../src/presentation/realtime/round-realtime.serializer";
@@ -15,6 +18,14 @@ type EmittedEvent = {
 };
 
 class FakeSocket {
+  public readonly emitted: EmittedEvent[] = [];
+
+  emit(event: string, payload: unknown): void {
+    this.emitted.push({ event, payload });
+  }
+}
+
+class FakeNamespace {
   public readonly emitted: EmittedEvent[] = [];
 
   emit(event: string, payload: unknown): void {
@@ -81,6 +92,7 @@ describe("RoundsGateway", () => {
     expect(payload.round?.bets).toEqual([
       {
         id: "bet-1",
+        betId: "bet-1",
         roundId: "round-1",
         playerId: "player-1",
         username: "player",
@@ -104,5 +116,50 @@ describe("RoundsGateway", () => {
 
     const payload = socket.emitted[0]?.payload as RoundSnapshotPayload;
     expect(payload.round).toBeNull();
+  });
+
+  test("emits bet placed and cashed out events with bet payloads", async () => {
+    const namespace = new FakeNamespace();
+    const gateway = new RoundsGateway(
+      new FakeGetCurrentRoundUseCase(null) as GetCurrentRoundUseCase,
+      new RoundRealtimeSerializer(),
+    );
+    (gateway as unknown as { namespace: FakeNamespace }).namespace = namespace;
+
+    const round = openRound();
+    const bet = round.bets[0];
+
+    await gateway.publishBetPlaced(bet);
+
+    round.start(new Date("2026-05-31T10:00:10.000Z"));
+    bet.cashOut(15000);
+    bet.completeCashOut();
+    await gateway.publishBetCashedOut(bet);
+
+    expect(namespace.emitted.map((event) => event.event)).toEqual([
+      BET_PLACED_EVENT,
+      BET_CASHED_OUT_EVENT,
+    ]);
+
+    const placedPayload = namespace.emitted[0]?.payload as BetRealtimePayload;
+    const cashedOutPayload = namespace.emitted[1]?.payload as BetRealtimePayload;
+
+    expect(placedPayload).toMatchObject({
+      betId: "bet-1",
+      roundId: "round-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: "1000",
+      status: "ACCEPTED",
+      payoutCents: null,
+    });
+    expect(placedPayload.emittedAt).toBeString();
+    expect(cashedOutPayload).toMatchObject({
+      betId: "bet-1",
+      status: "CASHED_OUT",
+      cashoutMultiplierBp: 15000,
+      payoutCents: "1500",
+    });
+    expect(cashedOutPayload.emittedAt).toBeString();
   });
 });

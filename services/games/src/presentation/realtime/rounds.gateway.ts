@@ -7,8 +7,11 @@ import {
 import type { Namespace, Socket } from "socket.io";
 import type { RoundEventsPublisher } from "../../application/ports/round-events.publisher";
 import { GetCurrentRoundUseCase } from "../../application/use-cases/get-current-round.use-case";
+import { Bet } from "../../domain/bet";
 import { Round } from "../../domain/round";
 import {
+  BET_CASHED_OUT_EVENT,
+  BET_PLACED_EVENT,
   GAME_REALTIME_NAMESPACE,
   ROUND_BETTING_STARTED_EVENT,
   ROUND_CRASHED_EVENT,
@@ -77,14 +80,49 @@ export class RoundsGateway implements OnGatewayConnection, RoundEventsPublisher 
     this.emitRoundEvent(ROUND_SETTLED_EVENT, round);
   }
 
+  async publishBetPlaced(bet: Bet): Promise<void> {
+    this.emitBetEvent(BET_PLACED_EVENT, bet);
+  }
+
+  async publishBetCashedOut(bet: Bet): Promise<void> {
+    this.emitBetEvent(BET_CASHED_OUT_EVENT, bet);
+  }
+
   private emitRoundEvent(event: string, round: Round): void {
     if (!this.namespace) {
       return;
     }
 
-    this.namespace.emit(
-      event,
-      this.roundRealtimeSerializer.toLifecyclePayload(round),
-    );
+    try {
+      this.namespace.emit(
+        event,
+        this.roundRealtimeSerializer.toLifecyclePayload(round),
+      );
+    } catch (error) {
+      this.logger.error(
+        error instanceof Error
+          ? error.message
+          : "Round realtime event publishing failed",
+      );
+    }
+  }
+
+  private emitBetEvent(event: string, bet: Bet): void {
+    if (!this.namespace) {
+      return;
+    }
+
+    try {
+      this.namespace.emit(
+        event,
+        this.roundRealtimeSerializer.toBetRealtimePayload(bet),
+      );
+    } catch (error) {
+      this.logger.error(
+        error instanceof Error
+          ? error.message
+          : "Bet realtime event publishing failed",
+      );
+    }
   }
 }
