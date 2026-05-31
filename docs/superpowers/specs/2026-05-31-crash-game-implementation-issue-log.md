@@ -488,6 +488,40 @@ Cada entrada deve conter:
   esta igual a copia versionada.
 - Status: resolvido.
 
+### 29. Passo 10 falhou na catraca por duplicacao de tipo frontend/backend
+
+- Contexto: Passo 10, integracao REST no frontend.
+- Sintoma: `bun run ci:local` falhou em `quality:gate`; cobertura e percentual
+  de duplicacao melhoraram, mas `duplication.duplicatedLines` subiu de 250 para
+  268 e `duplication.clones` subiu de 15 para 16.
+- Causa: o tipo frontend `VerifyRoundResponse` repetia textualmente o contrato
+  do use case de verificacao do backend por 19 linhas, disparando `jscpd`.
+- Correcao: o tipo frontend passou a reutilizar os campos comuns de
+  `RoundResponse` via `Pick`, mantendo o contrato tipado sem duplicar o bloco.
+- Validacao: `bun run test:coverage && bun run quality:gate` passou, com
+  `duplication.duplicatedLines` de volta a 250 e `duplication.clones` de volta
+  a 15.
+- Status: resolvido.
+
+### 30. Frontend ficou em branco apos cashout por leitura insegura de bets
+
+- Contexto: Passo 10, validacao visual/browser do fluxo autenticado.
+- Sintoma: depois de apostar pela UI e acionar `Cash Out`, a tela em
+  `http://localhost:8000/` ficou preta; o console do navegador registrou
+  `TypeError: Cannot read properties of undefined (reading 'length')` em
+  `GameDashboardShell`.
+- Causa: a tabela da mesa lia `currentRound?.bets.length`. Se o estado
+  intermediario da query viesse com `currentRound` presente e `bets` ausente,
+  a optional chain protegia apenas `currentRound`, nao `bets`.
+- Correcao: a tela passou a normalizar as apostas da rodada com
+  `getRoundBets()`, retornando lista vazia quando `bets` nao for array.
+- Regressao: adicionado teste frontend para garantir que payload de rodada sem
+  `bets` nao quebra a renderizacao da tabela.
+- Validacao: `cd frontend && bun test` passou com 26 testes; `cd frontend &&
+  bun run build` passou; apos `docker compose up -d --build`, o fluxo visual
+  com login, aposta e cashout renderizou sem blank screen.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -521,10 +555,16 @@ Cada entrada deve conter:
 - `gh pr view --json number,url,headRefName,state,mergeStateStatus,statusCheckRollup`
 - `gh pr checks 2`
 - `~/.codex/skills/gh-pr-babysit/scripts/fetch_review_threads.py --pr 2`
+- `cd frontend && bun test`
+- `cd frontend && bun run build`
+- `bun run test:coverage && bun run quality:gate`
 - `docker compose up -d --build`
 - Fluxo E2E autenticado via Kong com Keycloak real:
   `POST /games/bet`, `POST /games/bet/cashout`, `GET /wallets/me`,
   `GET /games/bets/me?limit=1` e `GET /games/rounds/history?limit=1`
+- Validacao visual/browser do Passo 10:
+  login frontend com `player/player123`, aposta via UI, saldo atualizado,
+  cashout via UI e mesa sem blank screen apos regressao de `bets`.
 
 ## Validacoes Docker Ja Executadas
 
