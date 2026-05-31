@@ -128,6 +128,9 @@ services:
       PORT: 4002
       DATABASE_URL: postgresql://admin:admin@postgres:5432/wallets
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/crash-game
+      KEYCLOAK_CLIENT_ID: crash-game-client
+      INITIAL_WALLET_BALANCE_CENTS: 100000
     depends_on:
       postgres:
         condition: service_healthy
