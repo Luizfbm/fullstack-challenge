@@ -23,7 +23,7 @@ describe("crash loss E2E", () => {
         const token = await getAccessToken();
         const beforeWallet = await getWallet(token);
         const beforeBalance = BigInt(beforeWallet.balanceCents);
-        const bettingRound = await prepareBettingRound();
+        const bettingRound = await prepareBettingRound(10000);
 
         const bet = await placeBet(token, "1000");
 

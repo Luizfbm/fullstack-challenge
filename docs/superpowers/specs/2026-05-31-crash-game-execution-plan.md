@@ -205,6 +205,37 @@ Resultado esperado:
 - [ ] Executar Portao E2E Docker/Kong/Keycloak.
 - [ ] Commit sugerido: `feat(frontend): add keycloak login flow`.
 
+### Passo 9.5: Implementar Quality Gate com baseline e catraca
+
+- [ ] Criar GitHub Actions para Pull Requests e pushes com Bun, lint,
+  typecheck, testes, coverage, quality gate e E2E Docker/Kong/Keycloak.
+- [ ] Usar `bun install --frozen-lockfile`, nao `npm ci`.
+- [ ] Usar `bun audit --audit-level=critical` como bloqueio de seguranca.
+- [ ] Usar `bun audit --audit-level=high` como aviso nao bloqueante.
+- [ ] Adicionar ESLint flat config para backend, frontend e scripts, ignorando
+  codigo gerado por ferramentas como Prisma.
+- [ ] Adicionar scripts raiz: `lint`, `check:types`, `test:unit`,
+  `test:coverage`, `quality:baseline`, `quality:gate`, `ci:local` e `ci:e2e`.
+- [ ] Implementar coletor de metricas para coverage, duplicacao com `jscpd`,
+  tamanho de arquivos e auditoria de pacotes.
+- [ ] Versionar `quality/baseline.json` como fotografia inicial.
+- [ ] Garantir que o CI nunca atualiza o baseline automaticamente.
+- [ ] Garantir que a catraca falha quando coverage cai, duplicacao sobe,
+  maior arquivo aumenta, quantidade de arquivos acima do limite aumenta ou
+  vulnerabilidade critica aparece.
+- [ ] Garantir que vulnerabilidade alta gera aviso no Markdown, mas nao bloqueia.
+- [ ] Gerar `quality/reports/quality-gate-summary.md` e artefatos de coverage
+  para feedback do Pull Request.
+- [ ] Comentar o sumario no Pull Request com `GITHUB_TOKEN`, mantendo artefatos
+  mesmo se o comentario nao for permitido por politicas de fork.
+- [ ] Executar Portao Base.
+- [ ] Executar Portao Frontend.
+- [ ] Executar `bun run test:coverage`.
+- [ ] Executar `bun run quality:gate`.
+- [ ] Executar `bun run ci:local`.
+- [ ] Executar Portao E2E Docker/Kong/Keycloak.
+- [ ] Commit sugerido: `ci: add baseline quality gate`.
+
 ### Passo 10: Integrar REST no frontend
 
 - [ ] Implementar clientes REST para `/games/rounds/current`, `/games/rounds/history`, `/games/rounds/:roundId/verify`, `/games/bets/me`, `/games/bet`, `/games/bet/cashout` e `/wallets/me`.

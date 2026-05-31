@@ -359,6 +359,77 @@ Cada entrada deve conter:
   e exibiu `player`/`Sair` sem erro de auth.
 - Status: resolvido.
 
+### 22. Typecheck dos scripts de qualidade falhou apos incluir `tsconfig`
+
+- Contexto: Passo 9.5 do plano de execucao, ao adicionar scripts do Quality
+  Gate e incluir `scripts/**/*.ts` em `tsconfig.quality.json`.
+- Sintoma: `bun run check:types` falhou com `TS1375` em
+  `scripts/ci/check-kong-health.ts` por top-level await em arquivo sem modulo
+  e `TS18046` em `scripts/quality/collect-metrics.ts` por leitura de
+  `duplicates` como `unknown`.
+- Causa: o healthcheck era um script executavel sem import/export, e o parser
+  do relatorio `jscpd` ainda nao fazia narrowing explicito do campo
+  `duplicates`.
+- Correcao: `scripts/ci/check-kong-health.ts` recebeu `export {}` para ser
+  tratado como modulo, e o parser do `jscpd` passou a converter
+  `duplicates` para `unknown[]` somente depois de `Array.isArray`.
+- Validacao: `bun run check:types` passou.
+- Status: resolvido.
+
+### 23. ESLint varreu Prisma gerado e encontrou import morto em E2E
+
+- Contexto: Passo 9.5 do plano de execucao, primeira execucao de
+  `bun run lint` apos adicionar ESLint flat config.
+- Sintoma: o lint retornou milhares de erros em
+  `services/*/prisma/generated/**`; depois de ignorar gerados, restou
+  `cashOut is defined but never used` em
+  `services/games/tests/e2e/game-validation.e2e.test.ts`.
+- Causa: a configuracao inicial do ESLint nao ignorava codigo gerado pelo
+  Prisma, que nao deve ser editado nem medido como codigo autoral. O E2E tinha
+  um import morto real que ainda nao era verificado por lint.
+- Correcao: `eslint.config.mjs` passou a ignorar
+  `services/*/prisma/generated/**`, e o import `cashOut` foi removido do teste
+  E2E.
+- Validacao: `bun run lint` passou.
+- Status: resolvido.
+
+### 24. Baseline inicial mostrou coletor de qualidade acima do limite
+
+- Contexto: Passo 9.5 do plano de execucao, primeira geracao de
+  `quality/baseline.json`.
+- Sintoma: a fotografia inicial registrou `filesOverLimit: 1` porque
+  `scripts/quality/collect-metrics.ts` ficou com mais de 300 linhas e virou o
+  maior arquivo do projeto.
+- Causa: o coletor concentrava cobertura, duplicacao, auditoria, metricas de
+  arquivos e IO no mesmo modulo.
+- Correcao: o coletor foi dividido em modulos menores:
+  `coverage-metrics.ts`, `duplication-metrics.ts`, `file-metrics.ts`,
+  `security-metrics.ts` e `quality-paths.ts`.
+- Validacao: `bun run test:coverage`, `bun run quality:baseline` e
+  `bun run quality:gate` passaram; o baseline passou a registrar
+  `filesOverLimit: 0`.
+- Status: resolvido.
+
+### 25. E2E de crash/perda falhou por requisito desnecessario de crash alto
+
+- Contexto: Passo 9.5 do plano de execucao, ao rodar `bun run ci:e2e` depois
+  de criar o Quality Gate.
+- Sintoma: `crash-loss-flow.e2e.test.ts` falhou com
+  `Could not prepare a suitable betting round` depois de 46s. O helper
+  `prepareBettingRound` esgotou 20 tentativas procurando rodada com crash
+  point minimo de `3.00x`.
+- Causa: o fluxo de crash/perda nao precisa de crash point alto, porque a
+  aposta deve perder sem cashout. O helper usava o mesmo default exigente do
+  fluxo de cashout, e a sequencia deterministica da hash chain gerou muitos
+  rounds abaixo de `3.00x` naquele trecho.
+- Correcao: o default de `prepareBettingRound` foi reduzido para `1.50x`,
+  suficiente para cashout imediato, e o teste de crash/perda passou a pedir
+  explicitamente `1.00x`, que e o minimo valido de dominio.
+- Validacao: `cd services/games && bun test
+  tests/e2e/crash-loss-flow.e2e.test.ts` passou; depois `bun run ci:e2e`
+  passou com 9 testes E2E via Docker/Kong/Keycloak.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -372,6 +443,14 @@ Cada entrada deve conter:
 - `prisma validate` nos schemas dos servicos
 - `bun run db:generate` nos servicos
 - `docker compose config`
+- `bun run lint`
+- `bun run check:types`
+- `bun run test:unit`
+- `bun run test:coverage`
+- `bun run quality:gate`
+- `bun run ci:local`
+- `cd services/games && bun test tests/e2e/crash-loss-flow.e2e.test.ts`
+- `bun run ci:e2e`
 - `docker compose up -d --build`
 - Fluxo E2E autenticado via Kong com Keycloak real:
   `POST /games/bet`, `POST /games/bet/cashout`, `GET /wallets/me`,

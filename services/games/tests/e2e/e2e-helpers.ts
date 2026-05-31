@@ -197,7 +197,7 @@ export async function ensureStackIsHealthy(): Promise<void> {
 }
 
 export async function prepareBettingRound(
-  minCrashPointBp = 30000,
+  minCrashPointBp = 15000,
 ): Promise<RoundResponse> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const currentRound = await waitForCurrentRound();

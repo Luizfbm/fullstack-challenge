@@ -9,10 +9,26 @@
   "scripts": {
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
-    "docker:prune": "docker compose down -v --rmi all --remove-orphans && docker volume prune -f"
+    "docker:prune": "docker compose down -v --rmi all --remove-orphans && docker volume prune -f",
+    "lint": "eslint .",
+    "check:types": "bunx tsc --noEmit -p services/games/tsconfig.json && bunx tsc --noEmit -p services/wallets/tsconfig.json && bunx tsc --noEmit -p frontend/tsconfig.json && bunx tsc --noEmit -p tsconfig.quality.json",
+    "test:unit": "cd services/games && bun test tests/unit && cd ../wallets && bun test tests/unit && cd ../../frontend && bun test && cd .. && bun test scripts/quality",
+    "test:coverage": "rm -rf coverage && cd services/games && bun test tests/unit --coverage --coverage-reporter=lcov --coverage-dir=../../coverage/services-games && cd ../wallets && bun test tests/unit --coverage --coverage-reporter=lcov --coverage-dir=../../coverage/services-wallets && cd ../../frontend && bunx vitest run --coverage --coverage.provider=v8 --coverage.reporter=lcov --coverage.reportsDirectory=../coverage/frontend && cd .. && bun test scripts/quality --coverage --coverage-reporter=lcov --coverage-dir=coverage/scripts-quality",
+    "quality:baseline": "bun scripts/quality/generate-baseline.ts",
+    "quality:gate": "bun scripts/quality/run-quality-gate.ts",
+    "ci:local": "bun install --frozen-lockfile && bun run lint && bun run check:types && bun run test:unit && bun run test:coverage && bun run quality:gate && docker compose config",
+    "ci:e2e": "docker compose up -d --build && bun scripts/ci/check-kong-health.ts && cd services/games && bun test tests/e2e"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.10.1",
-    "bun-types": "latest"
+    "@vitest/coverage-v8": "^4.1.7",
+    "bun-types": "latest",
+    "eslint": "^10.4.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "jscpd": "^4.2.4",
+    "typescript-eslint": "^8.60.0"
   }
 }
