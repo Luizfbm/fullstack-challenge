@@ -283,6 +283,22 @@ Cada entrada deve conter:
   Kong responderam corretamente.
 - Status: resolvido.
 
+### 19. Kong respondeu 502 imediatamente apos recreate dos backends
+
+- Contexto: portao de integracao do Passo 2 do plano de execucao, apos
+  `docker compose up -d --build` recriar `games` e `wallets`.
+- Sintoma: chamada imediata para `GET /games/health` via Kong retornou
+  `502`, mesmo com `docker compose ps` mostrando `games` healthy poucos
+  segundos depois.
+- Causa: janela curta em que o Kong ainda tentava conectar no IP anterior do
+  container `games` (`connect() failed (111: Connection refused)` nos logs do
+  Kong). O servico `games` novo ja havia iniciado corretamente.
+- Correcao: aguardar a estabilizacao do upstream antes de repetir os
+  healthchecks via Kong. Nao houve alteracao de codigo neste ponto.
+- Validacao: apos poucos segundos, `GET /games/health` via Kong retornou
+  `200 OK` com `{"status":"ok","service":"games"}`.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
