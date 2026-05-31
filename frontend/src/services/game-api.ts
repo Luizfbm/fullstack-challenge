@@ -36,7 +36,7 @@ export type RoundResponse = {
   bettingEndsAt: string;
   startedAt: string | null;
   crashedAt: string | null;
-  crashPointBp: number;
+  crashPointBp: number | null;
   serverSeedHash: string;
   serverSeed: string | null;
   clientSeed: string;

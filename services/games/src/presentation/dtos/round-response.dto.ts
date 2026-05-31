@@ -21,8 +21,8 @@ export class RoundResponseDto {
   @ApiProperty({ nullable: true })
   crashedAt!: string | null;
 
-  @ApiProperty({ example: 25000 })
-  crashPointBp!: number;
+  @ApiProperty({ example: 25000, nullable: true })
+  crashPointBp!: number | null;
 
   @ApiProperty()
   serverSeedHash!: string;
@@ -80,8 +80,8 @@ export class VerifyRoundResponseDto {
   @ApiProperty()
   houseEdgeBp!: number;
 
-  @ApiProperty()
-  crashPointBp!: number;
+  @ApiProperty({ nullable: true })
+  crashPointBp!: number | null;
 
   @ApiProperty({ nullable: true })
   recalculatedCrashPointBp!: number | null;

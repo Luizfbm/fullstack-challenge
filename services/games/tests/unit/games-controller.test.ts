@@ -65,7 +65,7 @@ describe("GamesController", () => {
     await expect(controller.currentRound()).resolves.toMatchObject({
       id: "round-1",
       status: "BETTING",
-      crashPointBp: 25000,
+      crashPointBp: null,
       bets: [
         {
           id: "bet-1",
@@ -73,6 +73,21 @@ describe("GamesController", () => {
           status: "ACCEPTED",
         },
       ],
+    });
+  });
+
+  test("reveals the crash point only after server seed reveal", async () => {
+    const round = openRound();
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    round.crash(new Date("2026-05-30T10:00:12.000Z"), "server-seed");
+    const controller = createController({
+      getCurrentRoundUseCase: { execute: async () => round },
+    });
+
+    await expect(controller.currentRound()).resolves.toMatchObject({
+      crashPointBp: 25000,
+      serverSeed: "server-seed",
+      status: "CRASHED",
     });
   });
 
