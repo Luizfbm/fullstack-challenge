@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "description": "Quality gate baseline. Update this file manually only when the repository quality improves or the baseline policy changes.",
+  "generatedAt": "2026-05-31T16:36:26.268Z",
+  "metrics": {
+    "generatedAt": "2026-05-31T16:36:26.268Z",
+    "coverage": {
+      "global": {
+        "covered": 1740,
+        "total": 2291,
+        "pct": 75.95
+      },
+      "packages": {
+        "services/games": {
+          "covered": 975,
+          "total": 1228,
+          "pct": 79.4
+        },
+        "services/wallets": {
+          "covered": 362,
+          "total": 434,
+          "pct": 83.41
+        },
+        "frontend": {
+          "covered": 125,
+          "total": 176,
+          "pct": 71.02
+        },
+        "scripts/quality": {
+          "covered": 278,
+          "total": 453,
+          "pct": 61.37
+        }
+      }
+    },
+    "duplication": {
+      "percentage": 4.12,
+      "duplicatedLines": 250,
+      "clones": 15
+    },
+    "files": {
+      "sourceFiles": 95,
+      "lineLimit": 300,
+      "filesOverLimit": 0,
+      "largestFile": {
+        "path": "scripts/quality/quality-gate.ts",
+        "lineCount": 269
+      }
+    },
+    "security": {
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0
+    }
+  }
+}
