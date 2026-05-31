@@ -11,6 +11,7 @@ import { GetWalletUseCase } from "./application/use-cases/get-wallet.use-case";
 import { RabbitMqWalletServer } from "./infrastructure/messaging/rabbitmq-wallet-server";
 import { WalletCommandHandler } from "./infrastructure/messaging/wallet-command-handler";
 import { WalletPrismaRepository } from "./infrastructure/prisma/wallet-prisma.repository";
+import { DevelopmentWalletSeeder } from "./infrastructure/seed/development-wallet-seeder";
 import { prismaClient } from "./infrastructure/prisma/prisma-client";
 import { randomUUID } from "node:crypto";
 
@@ -65,6 +66,17 @@ import { randomUUID } from "node:crypto";
           process.env.RABBITMQ_URL ?? "amqp://localhost:5672",
         ),
       inject: [WalletCommandHandler],
+    },
+    {
+      provide: DevelopmentWalletSeeder,
+      useFactory: (
+        createWalletUseCase: CreateWalletUseCase,
+      ): DevelopmentWalletSeeder =>
+        new DevelopmentWalletSeeder(createWalletUseCase, {
+          playerId: process.env.SEED_PLAYER_ID,
+          initialBalanceCents: process.env.INITIAL_WALLET_BALANCE_CENTS,
+        }),
+      inject: [CreateWalletUseCase],
     },
   ],
 })
