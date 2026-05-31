@@ -1,11 +1,11 @@
-import { Zap } from "lucide-react";
-import { buildCrashCurvePolyline } from "../../services/crash-curve";
-import { getRoundProgress } from "../../services/round-timing";
+import { Gauge, RadioTower, ShieldCheck, Zap } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
-import { ChronoVehicle } from "./chrono-vehicle";
+import { CrashFlightScene } from "./crash-flight-scene";
 import {
   type DashboardRound,
   formatRoundMultiplier,
+  roundBadgeVariant,
   truncateHash,
 } from "./round-formatting";
 
@@ -16,8 +16,6 @@ type ChronoStageProps = {
 };
 
 export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
-  const progress = getRoundProgress(round, now);
-  const points = buildCrashCurvePolyline(progress);
   const crashed = round?.status === "CRASHED" || round?.status === "SETTLED";
   const running = round?.status === "RUNNING";
 
@@ -25,130 +23,140 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
     <div
       aria-busy={isLoading}
       className={cn(
-        "chrono-scanline relative min-h-[31rem] min-w-0 overflow-hidden rounded-md border bg-[#05080d]",
+        "chrono-arena chrono-scanline relative min-h-[34rem] min-w-0 overflow-hidden rounded-lg border",
         crashed
-          ? "border-rose-300/35 shadow-[0_0_60px_rgba(251,113,133,0.16)]"
-          : "border-cyan-300/20 shadow-[0_0_70px_rgba(34,211,238,0.12)]",
+          ? "border-rose-300/40 shadow-[0_0_90px_rgba(251,113,133,0.22)]"
+          : "border-cyan-300/25 shadow-[0_0_90px_rgba(34,211,238,0.16)]",
       )}
       data-testid="chrono-stage"
     >
-      <div className="chrono-grid absolute inset-0 opacity-60" />
-      <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black via-slate-950/88 to-transparent" />
-      <CityBackdrop />
-      <TimeTunnel crashed={crashed} running={running} />
-
-      <svg
-        aria-label="Chrono crash curve"
-        className="absolute inset-0 z-10 size-full"
+      <div className="chrono-grid absolute inset-0 opacity-35" />
+      <div className="chrono-rift absolute -right-20 top-1/4 h-56 w-[28rem] rotate-[-18deg]" />
+      <CrashFlightScene isLoading={isLoading} now={now} round={round} />
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-x-[12%] bottom-[24%] z-10 h-px origin-left -rotate-12 bg-gradient-to-r from-zinc-300/10 via-zinc-200/70 to-transparent",
+          running && "chrono-trail-breathe",
+          crashed && "via-rose-200/80",
+        )}
         data-testid="chrono-stage-curve"
-        preserveAspectRatio="none"
-        viewBox="0 0 100 100"
-      >
-        <polyline
-          fill="none"
-          points={points}
-          stroke={crashed ? "#fb7185" : "#22d3ee"}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2.2"
-        />
-        <polyline
-          fill="none"
-          opacity="0.32"
-          points={points}
-          stroke={crashed ? "#fb7185" : "#f59e0b"}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="6"
-        />
-        {crashed ? (
-          <line
-            stroke="#fb7185"
-            strokeDasharray="3 4"
-            strokeWidth="1.3"
-            x1="88"
-            x2="88"
-            y1="13"
-            y2="91"
-          />
-        ) : null}
-      </svg>
+      />
 
-      {crashed ? <div className="chrono-burst absolute inset-8 rounded-full border border-rose-300/30" /> : null}
-
-      <div className="absolute left-5 top-5 z-20 flex flex-wrap gap-2">
-        <Chip tone="cyan">Flux stable</Chip>
-        <Chip tone={crashed ? "rose" : "amber"}>
-          {crashed ? "Timeline rupture" : "Temporal charge"}
-        </Chip>
+      <div className="absolute left-4 top-4 z-20 flex flex-wrap gap-2">
+        <StageChip tone={crashed ? "rose" : "cyan"}>
+          <RadioTower className="size-3.5" aria-hidden="true" />
+          {running ? "LIVE" : round?.status ?? "SYNC"}
+        </StageChip>
+        <StageChip tone="amber">
+          <Zap className="size-3.5" aria-hidden="true" />
+          Flux drive
+        </StageChip>
       </div>
 
-      <div className="relative z-20 grid min-h-[31rem] place-items-center px-5 py-16 text-center">
-        <div>
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-cyan-100">
-            <Zap className="size-3.5" aria-hidden="true" />
+      <div className="absolute right-4 top-4 z-20 hidden max-w-[18rem] min-w-0 rounded-md border border-white/10 bg-black/35 p-3 text-right backdrop-blur-xl sm:block">
+        <p className="text-xs uppercase tracking-[0.24em] text-zinc-400">
+          Commit reveal
+        </p>
+        <p className="mt-1 break-all font-mono text-xs text-cyan-100">
+          {truncateHash(round?.serverSeedHash)}
+        </p>
+      </div>
+
+      <div className="relative z-20 flex min-h-[34rem] flex-col justify-between px-5 py-16">
+        <div className="mx-auto mt-10 max-w-xl text-center">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.3em] text-cyan-100 shadow-[0_0_30px_rgba(34,211,238,0.18)]">
+            <Gauge className="size-3.5" aria-hidden="true" />
             Chrono drive
           </div>
           <p
             className={cn(
-              "font-mono text-7xl font-black tracking-normal text-zinc-50 drop-shadow-[0_8px_0_rgba(0,0,0,0.35)] sm:text-8xl",
+              "text-[clamp(4.5rem,14vw,8.6rem)] font-black leading-none tracking-normal text-zinc-50 drop-shadow-[0_12px_0_rgba(0,0,0,0.32)]",
               running && "chrono-pulse",
               crashed && "text-rose-100",
             )}
           >
             {isLoading ? "..." : formatRoundMultiplier(round)}
           </p>
-          <p className="mt-4 max-w-2xl break-all font-mono text-xs text-zinc-500">
-            serverSeedHash: {truncateHash(round?.serverSeedHash)}
+          <p className="mx-auto mt-4 max-w-xl font-mono text-xs uppercase tracking-[0.24em] text-zinc-400">
+            {running ? "temporal ascent" : crashed ? "timeline rupture" : "launch bay"}
           </p>
+        </div>
+
+        <div className="hidden gap-3 sm:grid md:grid-cols-3">
+          <StageMetric
+            label="Round"
+            value={round ? `#${round.chainIndex} / nonce ${round.nonce}` : "-"}
+          />
+          <StageMetric
+            label="Status"
+            tone={roundBadgeVariant(round?.status)}
+            value={round?.status ?? "SYNC"}
+          />
+          <StageMetric
+            label="Reveal"
+            value={crashed && round?.crashPointBp ? formatRoundMultiplier(round) : "oculto"}
+          />
         </div>
       </div>
 
-      <ChronoVehicle crashed={crashed} running={running} />
-      <div className="chrono-road absolute inset-x-0 bottom-[3.2rem] z-10 h-1 opacity-80" />
-      <div className="absolute inset-x-0 bottom-0 z-10 h-[4rem] border-t border-cyan-300/15 bg-gradient-to-b from-slate-800/85 to-slate-950" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-black via-slate-950/70 to-transparent" />
     </div>
   );
 }
 
-function Chip({ children, tone }: { children: string; tone: "amber" | "cyan" | "rose" }) {
+function StageChip({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone: "amber" | "cyan" | "rose";
+}) {
   const className =
     tone === "cyan"
-      ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"
+      ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
       : tone === "rose"
-        ? "border-rose-300/25 bg-rose-300/10 text-rose-100"
-        : "border-amber-300/25 bg-amber-300/10 text-amber-100";
+        ? "border-rose-300/30 bg-rose-300/10 text-rose-100"
+        : "border-amber-300/30 bg-amber-300/10 text-amber-100";
 
   return (
-    <span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", className)}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] backdrop-blur-xl",
+        className,
+      )}
+    >
       {children}
     </span>
   );
 }
 
-function CityBackdrop() {
-  return (
-    <div className="absolute inset-x-0 bottom-[4rem] z-0 h-[45%] opacity-45">
-      <div className="absolute bottom-0 left-[4%] h-20 w-14 rounded-t-sm bg-slate-800" />
-      <div className="absolute bottom-0 left-[14%] h-32 w-20 rounded-t bg-slate-800" />
-      <div className="absolute bottom-0 left-[28%] h-24 w-24 rounded-t bg-slate-800" />
-      <div className="absolute bottom-0 right-[29%] h-28 w-16 rounded-t bg-slate-800" />
-      <div className="absolute bottom-0 right-[15%] h-44 w-12 rounded-t-full bg-slate-800" />
-      <div className="absolute bottom-0 right-[6%] h-24 w-24 rounded-t bg-slate-800" />
-    </div>
-  );
-}
+function StageMetric({
+  label,
+  tone = "neutral",
+  value,
+}: {
+  label: string;
+  tone?: "danger" | "neutral" | "success" | "warning";
+  value: string;
+}) {
+  const toneClassName =
+    tone === "success"
+      ? "text-emerald-200"
+      : tone === "danger"
+        ? "text-rose-200"
+        : tone === "warning"
+          ? "text-amber-200"
+          : "text-zinc-100";
 
-function TimeTunnel({ crashed, running }: { crashed: boolean; running: boolean }) {
   return (
-    <div
-      className={cn(
-        "absolute left-1/2 top-[42%] h-[22rem] w-[22rem] -translate-x-1/2 -translate-y-1/2 rounded-full border opacity-45 blur-sm",
-        crashed
-          ? "border-rose-300/40 shadow-[0_0_90px_rgba(251,113,133,0.34)]"
-          : "border-cyan-300/35 shadow-[0_0_90px_rgba(34,211,238,0.34)]",
-        running && "chrono-pulse",
-      )}
-    />
+    <div className="rounded-md border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-xl">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-zinc-500">
+        <ShieldCheck className="size-3" aria-hidden="true" />
+        {label}
+      </div>
+      <p className={cn("mt-1 truncate font-mono text-sm font-semibold", toneClassName)}>
+        {value}
+      </p>
+    </div>
   );
 }

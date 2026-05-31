@@ -30,6 +30,7 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
   await expect(
     page.getByText("1.00x + 0.10x por segundo").first(),
   ).toBeVisible();
+  await expectCanvasHasPixels(page);
 
   const balanceBeforeBet = await readDisplayedBalance(page);
 
@@ -62,4 +63,26 @@ async function readDisplayedBalance(page: Page): Promise<string> {
   await expect(balance).toBeVisible();
 
   return balance.innerText();
+}
+
+async function expectCanvasHasPixels(page: Page) {
+  await expect(page.getByTestId("crash-flight-canvas")).toBeVisible();
+  await expect(async () => {
+    const hasPixels = await page
+      .getByTestId("crash-flight-canvas")
+      .evaluate((node) => {
+        const canvas = node as HTMLCanvasElement;
+        const context = canvas.getContext("2d");
+
+        if (context) {
+          const pixel = context.getImageData(0, 0, 1, 1).data;
+
+          return pixel.some((value) => value !== 0);
+        }
+
+        return canvas.toDataURL("image/png").length > 1000;
+      });
+
+    expect(hasPixels).toBe(true);
+  }).toPass();
 }

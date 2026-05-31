@@ -756,6 +756,94 @@ Cada entrada deve conter:
   false` e `overflowX: false`.
 - Status: resolvido.
 
+### 44. Typecheck do redesign 3D falhou por tipos ausentes do Three.js
+
+- Contexto: implementacao da arena 3D do Chrono Crash com Three.js.
+- Sintoma: `bunx tsc --noEmit -p frontend/tsconfig.json` falhou com
+  `Could not find a declaration file for module 'three'`.
+- Causa: o pacote `three` foi adicionado ao workspace frontend, mas a
+  resolucao TypeScript usada pelo Bun precisou de `@types/three` instalado
+  explicitamente.
+- Correcao: `@types/three` foi adicionado como dependencia de desenvolvimento
+  do frontend.
+- Regressao: rerodar `bunx tsc --noEmit -p frontend/tsconfig.json`.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json` passou.
+- Status: resolvido.
+
+### 45. Lint bloqueou uso inseguro de refs e state no componente Three.js
+
+- Contexto: validacao `bun run lint` apos criar `CrashFlightScene`.
+- Sintoma: ESLint reportou `react-hooks/refs` por atualizar `stateRef.current`
+  durante render e `react-hooks/set-state-in-effect` por chamar
+  `setFallbackVisible` diretamente dentro do effect.
+- Causa: a cena Three.js precisa de estado mais recente dentro do
+  `requestAnimationFrame`, mas a primeira implementacao sincronizava esse
+  estado no corpo do componente; o fallback WebGL tambem atualizava state de
+  forma sincronizada no effect.
+- Correcao: mover a sincronizacao do estado da cena para um effect com
+  dependencias e agendar a visibilidade do fallback fora do corpo imediato do
+  effect.
+- Regressao: rerodar `bun run lint`.
+- Validacao: `bun run lint` passou.
+- Status: resolvido.
+
+### 46. Validacao visual mobile mostrou carro 3D cortado no palco
+
+- Contexto: validacao visual Playwright mobile/desktop da arena Three.js.
+- Sintoma: no screenshot mobile `390x844`, o carro procedural aparecia
+  cortado no canto inferior esquerdo e os cards internos do palco reduziam a
+  leitura da cena.
+- Causa: a posicao inicial e a camera da cena foram calibradas primeiro para
+  desktop; em viewport estreita, o aspect ratio cortava a esquerda da cena.
+- Correcao: tornar a posicao/camera do carro responsiva ao aspect ratio e
+  ocultar os cards internos do palco em viewport pequena, mantendo a mesma
+  telemetria logo abaixo.
+- Regressao: rerodar validacao Playwright mobile/desktop com canvas nonblank,
+  `overflowX: false` e `actionOverlap: false`.
+- Validacao: script Playwright mobile/desktop passou com `nonblankCanvas:
+  true`, `hasOverflowX: false` e `actionOverlap: false`.
+- Status: resolvido.
+
+### 47. Comando auxiliar de healthcheck usou variavel reservada do zsh
+
+- Contexto: espera do healthcheck do container `frontend` depois do rebuild.
+- Sintoma: o shell retornou `zsh:1: read-only variable: status`.
+- Causa: `status` e uma variavel especial/read-only do zsh, portanto nao pode
+  ser usada como variavel local em inline shell.
+- Correcao: repetir o comando usando outro nome de variavel.
+- Regressao: rerodar a espera do healthcheck do frontend.
+- Validacao: espera do healthcheck rerodada com `frontend_health` e retornou
+  `frontend=healthy`.
+- Status: resolvido.
+
+### 48. Navegador embutido nao aceitou `networkidle` na validacao visual
+
+- Contexto: verificacao visual final no navegador embutido do Codex.
+- Sintoma: a automacao retornou `playwright_wait_for_load_state does not
+  support networkidle`.
+- Causa: a API Playwright exposta pelo navegador embutido suporta apenas parte
+  da superficie upstream e rejeitou esse estado de load nessa sessao.
+- Correcao: repetir a verificacao usando `load` e validacoes diretas de DOM e
+  canvas.
+- Regressao: rerodar a verificacao no navegador embutido.
+- Validacao: verificacao no navegador embutido avancou com `load`; o erro de
+  `networkidle` nao se repetiu.
+- Status: resolvido.
+
+### 49. Validacao do canvas no navegador embutido falhou com `instanceof`
+
+- Contexto: verificacao visual final no navegador embutido do Codex.
+- Sintoma: o evaluate retornou `TypeError: Right-hand side of 'instanceof' is
+  not an object` ao testar `canvas instanceof HTMLCanvasElement`.
+- Causa: o ambiente read-only de evaluate do navegador embutido nao expôs o
+  construtor `HTMLCanvasElement` como objeto comparavel.
+- Correcao: usar checagem estrutural por `tagName` e presenca de `toDataURL`.
+- Regressao: rerodar a verificacao no navegador embutido.
+- Validacao: verificacao no navegador embutido passou sem excecao e confirmou
+  `hasCanvas: true`, `heading: true` e `overflowX: false`; pixel nonblank foi
+  validado pelo Playwright local.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`

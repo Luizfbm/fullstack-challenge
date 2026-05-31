@@ -21,19 +21,15 @@ export function CrashRoundPanel({
   const now = useNow();
 
   return (
-    <section className="chrono-panel min-w-0 rounded-md border border-cyan-300/15 p-4">
+    <section className="chrono-panel min-w-0 rounded-lg border border-cyan-300/20 p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200">
             Chrono cockpit
           </p>
           <h2 className="mt-1 text-xl font-black text-zinc-50">Crash Game</h2>
-          <p className="mt-1 max-w-xl text-sm text-zinc-400">
-            Acelere a linha do tempo, aposte antes da partida e extraia o
-            payout antes da ruptura.
-          </p>
         </div>
-        <div className="rounded-md border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-right">
+        <div className="rounded-md border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-right shadow-[0_0_28px_rgba(245,158,11,0.12)]">
           <p className="text-xs uppercase tracking-[0.22em] text-amber-200">
             Flux rate
           </p>

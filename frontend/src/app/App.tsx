@@ -6,20 +6,16 @@ import { Badge } from "../components/ui/badge";
 export function App() {
   return (
     <AppShell>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur">
+      <div className="chrono-panel mb-4 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-white/10 p-4">
         <div>
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-amber-100">
+          <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-amber-100">
             <Sparkles className="size-3.5" aria-hidden="true" />
-            Time machine table
+            Temporal arena
           </p>
           <h1 className="text-3xl font-black text-zinc-50 sm:text-4xl">
             Chrono Crash
           </h1>
           <h2 className="sr-only">Crash Game</h2>
-          <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-            Um Crash Game realtime com cockpit retrofuturista, aposta via REST,
-            sincronizacao WebSocket e provably fair por hash chain.
-          </p>
         </div>
 
         <Badge variant="success">
