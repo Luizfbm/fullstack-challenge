@@ -77,12 +77,14 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         idGenerator: IdGenerator,
         clock: Clock,
         roundSeedProvider: HashChainRoundSeedProvider,
+        walletClient: WalletClient,
       ): AdvanceRoundLifecycleUseCase =>
         new AdvanceRoundLifecycleUseCase(
           gameRepository,
           idGenerator,
           clock,
           roundSeedProvider,
+          walletClient,
           {
             bettingWindowMs: Number(process.env.ROUND_BETTING_WINDOW_MS ?? 10000),
           },
@@ -92,6 +94,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         ID_GENERATOR,
         CLOCK,
         HashChainRoundSeedProvider,
+        WALLET_CLIENT,
       ],
     },
     {

@@ -3,6 +3,8 @@ import { Clock } from "../ports/clock";
 import { GameRepository } from "../ports/game.repository";
 import { IdGenerator } from "../ports/id-generator";
 import { RoundSeedProvider } from "../ports/round-seed-provider";
+import type { WalletClient } from "../ports/wallet.client";
+import type { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
 
@@ -14,6 +16,7 @@ export type AdvanceRoundLifecycleAction =
   | "ROUND_OPENED"
   | "ROUND_STARTED"
   | "ROUND_CRASHED"
+  | "ROUND_SETTLED"
   | "NOOP";
 
 export type AdvanceRoundLifecycleResult = {
@@ -27,6 +30,7 @@ export class AdvanceRoundLifecycleUseCase {
     private readonly idGenerator: IdGenerator,
     private readonly clock: Clock,
     private readonly roundSeedProvider: RoundSeedProvider,
+    private readonly walletClient: WalletClient,
     private readonly config: AdvanceRoundLifecycleConfig,
   ) {
     if (
@@ -40,23 +44,26 @@ export class AdvanceRoundLifecycleUseCase {
   async execute(): Promise<AdvanceRoundLifecycleResult> {
     const currentRound = await this.gameRepository.findCurrentRound();
 
-    if (!currentRound) {
-      return this.openNextRound();
-    }
-
-    if (currentRound.status === "BETTING") {
+    if (currentRound?.status === "BETTING") {
       return this.advanceBettingRound(currentRound);
     }
 
-    if (currentRound.status === "RUNNING") {
+    if (currentRound?.status === "RUNNING") {
       return this.advanceRunningRound(currentRound);
     }
 
-    return { action: "NOOP", round: currentRound };
+    const latestRound = await this.gameRepository.findLatestRound();
+
+    if (latestRound?.status === "CRASHED") {
+      return this.settleCrashedRound(latestRound);
+    }
+
+    return this.openNextRound(latestRound);
   }
 
-  private async openNextRound(): Promise<AdvanceRoundLifecycleResult> {
-    const latestRound = await this.gameRepository.findLatestRound();
+  private async openNextRound(
+    latestRound: Round | null,
+  ): Promise<AdvanceRoundLifecycleResult> {
     const chainIndex = (latestRound?.chainIndex ?? 0) + 1;
     const now = this.clock.now();
     const seed = this.roundSeedProvider.getRoundSeed(chainIndex);
@@ -114,5 +121,38 @@ export class AdvanceRoundLifecycleUseCase {
     await this.gameRepository.saveRound(round);
 
     return { action: "ROUND_CRASHED", round };
+  }
+
+  private async settleCrashedRound(
+    round: Round,
+  ): Promise<AdvanceRoundLifecycleResult> {
+    const pendingCashouts = round.bets.filter(
+      (bet) => bet.status === "CASHOUT_PENDING_CREDIT",
+    );
+
+    for (const bet of pendingCashouts) {
+      await this.retryPendingCashout(round, bet);
+      await this.gameRepository.saveRound(round);
+    }
+
+    round.settle();
+    await this.gameRepository.saveRound(round);
+
+    return { action: "ROUND_SETTLED", round };
+  }
+
+  private async retryPendingCashout(round: Round, bet: Bet): Promise<void> {
+    if (bet.payoutCents === null) {
+      throw new Error("Pending cashout has no payout");
+    }
+
+    await this.walletClient.credit({
+      playerId: bet.playerId,
+      amountCents: bet.payoutCents,
+      referenceId: `round:${round.id}:player:${bet.playerId}:cashout-credit`,
+      reason: "CASHOUT_PAYOUT",
+    });
+
+    round.completeCashOut(bet.playerId);
   }
 }

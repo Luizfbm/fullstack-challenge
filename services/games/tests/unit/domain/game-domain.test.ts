@@ -186,6 +186,50 @@ describe("Round", () => {
     expect(round.bets[0]?.status).toBe("LOST");
     expect(round.serverSeed).toBe("server-seed");
   });
+
+  test("settles a crashed round without pending cashouts", () => {
+    const round = Round.openBetting({
+      id: "round-1",
+      bettingStartsAt,
+      bettingEndsAt,
+      crashPointBp: 20000,
+      serverSeedHash: "seed-hash",
+      clientSeed: "client",
+      nonce: 1,
+      chainIndex: 1,
+    });
+    round.start(new Date("2026-05-30T10:00:11.000Z"));
+    round.crash(new Date("2026-05-30T10:00:12.000Z"), "server-seed");
+
+    round.settle();
+
+    expect(round.status).toBe("SETTLED");
+  });
+
+  test("does not settle while a cashout credit is pending", () => {
+    const round = Round.openBetting({
+      id: "round-1",
+      bettingStartsAt,
+      bettingEndsAt,
+      crashPointBp: 30000,
+      serverSeedHash: "seed-hash",
+      clientSeed: "client",
+      nonce: 1,
+      chainIndex: 1,
+    });
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+    round.start(new Date("2026-05-30T10:00:11.000Z"));
+    round.cashOut("player-1", 15000);
+    round.crash(new Date("2026-05-30T10:00:12.000Z"), "server-seed");
+
+    expect(() => round.settle()).toThrow(InvalidRoundStateError);
+    expect(round.status).toBe("CRASHED");
+  });
 });
 
 describe("ProvablyFair", () => {

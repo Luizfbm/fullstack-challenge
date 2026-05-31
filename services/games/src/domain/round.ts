@@ -179,4 +179,18 @@ export class Round {
       bet.markLost();
     }
   }
+
+  settle(): void {
+    if (this.currentStatus !== "CRASHED") {
+      throw new InvalidRoundStateError("Only crashed rounds can settle");
+    }
+
+    if (this.bets.some((bet) => bet.status === "CASHOUT_PENDING_CREDIT")) {
+      throw new InvalidRoundStateError(
+        "Cannot settle round with pending cashouts",
+      );
+    }
+
+    this.currentStatus = "SETTLED";
+  }
 }

@@ -143,6 +143,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
       new FixedIdGenerator("round-1"),
       new FixedClock(new Date("2026-05-30T10:00:00.000Z")),
       new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
       { bettingWindowMs: 10000 },
     );
 
@@ -164,6 +165,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
       new FixedIdGenerator("round-2"),
       new FixedClock(new Date("2026-05-30T10:00:10.000Z")),
       new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
       { bettingWindowMs: 10000 },
     );
 
@@ -185,6 +187,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
       new FixedIdGenerator("round-2"),
       new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
       new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
       { bettingWindowMs: 10000 },
     );
 
@@ -195,7 +198,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     expect(result.round?.serverSeed).toBe("server-seed-1");
   });
 
-  test("opens the next chain index after a crashed round", async () => {
+  test("settles a crashed round before opening the next round", async () => {
     const crashedRound = openRound(10000);
     crashedRound.start(new Date("2026-05-30T10:00:10.000Z"));
     crashedRound.crash(
@@ -208,14 +211,91 @@ describe("AdvanceRoundLifecycleUseCase", () => {
       new FixedIdGenerator("round-2"),
       new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
       new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
+      { bettingWindowMs: 10000 },
+    );
+
+    const settled = await useCase.execute();
+    const opened = await useCase.execute();
+
+    expect(settled.action).toBe("ROUND_SETTLED");
+    expect(settled.round?.status).toBe("SETTLED");
+    expect(opened.action).toBe("ROUND_OPENED");
+    expect(opened.round?.id).toBe("round-2");
+    expect(opened.round?.chainIndex).toBe(2);
+  });
+
+  test("retries pending cashout credits before settlement", async () => {
+    const crashedRound = openRound(30000);
+    crashedRound.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+    crashedRound.start(new Date("2026-05-30T10:00:10.000Z"));
+    crashedRound.cashOut("player-1", 15000);
+    crashedRound.crash(
+      new Date("2026-05-30T10:00:11.000Z"),
+      "server-seed-1",
+    );
+    const repository = new InMemoryGameRepository(crashedRound);
+    const walletClient = new FakeWalletClient();
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FakeRoundSeedProvider(),
+      walletClient,
       { bettingWindowMs: 10000 },
     );
 
     const result = await useCase.execute();
 
-    expect(result.action).toBe("ROUND_OPENED");
-    expect(result.round?.id).toBe("round-2");
-    expect(result.round?.chainIndex).toBe(2);
+    expect(result.action).toBe("ROUND_SETTLED");
+    expect(result.round?.bets[0]?.status).toBe("CASHED_OUT");
+    expect(walletClient.credits).toEqual([
+      {
+        playerId: "player-1",
+        amountCents: 1500n,
+        referenceId: "round:round-1:player:player-1:cashout-credit",
+        reason: "CASHOUT_PAYOUT",
+      },
+    ]);
+  });
+
+  test("keeps a crashed round unsettled when pending cashout retry fails", async () => {
+    const crashedRound = openRound(30000);
+    crashedRound.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+    crashedRound.start(new Date("2026-05-30T10:00:10.000Z"));
+    crashedRound.cashOut("player-1", 15000);
+    crashedRound.crash(
+      new Date("2026-05-30T10:00:11.000Z"),
+      "server-seed-1",
+    );
+    const repository = new InMemoryGameRepository(crashedRound);
+    const walletClient = new FakeWalletClient();
+    walletClient.creditError = new Error("wallet unavailable");
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FakeRoundSeedProvider(),
+      walletClient,
+      { bettingWindowMs: 10000 },
+    );
+
+    await expect(useCase.execute()).rejects.toThrow("wallet unavailable");
+
+    expect(repository.currentRound?.status).toBe("CRASHED");
+    expect(repository.currentRound?.bets[0]?.status).toBe(
+      "CASHOUT_PENDING_CREDIT",
+    );
   });
 });
 

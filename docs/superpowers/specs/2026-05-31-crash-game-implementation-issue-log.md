@@ -246,6 +246,43 @@ Cada entrada deve conter:
   /games/bet` e `GET /wallets/me` via Kong responderam corretamente.
 - Status: resolvido.
 
+### 17. Script de validacao E2E falhou ao parsear resposta vazia
+
+- Contexto: validacao manual do fluxo autenticado completo via Kong
+  (`bet -> cashout -> wallet -> history -> settlement`).
+- Sintoma: o script exibiu `SyntaxError: JSON Parse error: Unexpected EOF`
+  durante polling de `GET /games/rounds/current`; em uma tentativa anterior,
+  tambem houve `read-only variable: status` no shell.
+- Causa: durante a transicao `CRASHED -> SETTLED -> BETTING`, existe uma
+  janela curta em que nao ha rodada atual. O parser tentava executar
+  `JSON.parse` mesmo quando o corpo estava vazio. Alem disso, `status` e uma
+  variavel especial no `zsh`, portanto nao deve ser usada como variavel local
+  em scripts de validacao.
+- Correcao: script de validacao refeito usando `bash`, variavel local
+  `current_round_status` e parser que trata corpo vazio antes de parsear JSON.
+- Validacao: o fluxo E2E rodou limpo via Kong com token real do Keycloak:
+  `POST /games/bet` retornou `ACCEPTED`, `POST /games/bet/cashout` retornou
+  `CASHED_OUT`, `GET /wallets/me` retornou saldo atualizado,
+  `GET /games/bets/me?limit=1` retornou a aposta sacada e
+  `GET /games/rounds/history?limit=1` retornou rodada `SETTLED`.
+- Status: resolvido.
+
+### 18. Containers Docker do projeto nao estavam mais presentes
+
+- Contexto: verificacao final da stack apos validacoes E2E.
+- Sintoma: `docker compose ps` listou apenas o cabecalho e
+  `curl http://localhost:8000/games/rounds/history?limit=1` falhou com
+  `Failed to connect to localhost port 8000`.
+- Causa: os containers do projeto `fullstack-challenge-*` nao existiam mais em
+  `docker ps -a`. Nao houve erro de aplicacao nos logs porque os containers
+  ja tinham sido removidos; a causa externa da remocao nao foi identificada.
+- Correcao: stack recriada com `docker compose up -d --build`.
+- Validacao: `docker compose ps` mostrou `frontend`, `games`, `keycloak`,
+  `kong`, `postgres`, `rabbitmq` e `wallets` como healthy; `GET
+  /games/health`, `GET /wallets/health` e `GET /games/rounds/current` via
+  Kong responderam corretamente.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -257,6 +294,10 @@ Cada entrada deve conter:
 - `prisma validate` nos schemas dos servicos
 - `bun run db:generate` nos servicos
 - `docker compose config`
+- `docker compose up -d --build`
+- Fluxo E2E autenticado via Kong com Keycloak real:
+  `POST /games/bet`, `POST /games/bet/cashout`, `GET /wallets/me`,
+  `GET /games/bets/me?limit=1` e `GET /games/rounds/history?limit=1`
 
 ## Validacoes Docker Ja Executadas
 
