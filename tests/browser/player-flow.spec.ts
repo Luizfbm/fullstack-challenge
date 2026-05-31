@@ -1,0 +1,63 @@
+import { execFileSync } from "node:child_process";
+import { expect, test, type Page } from "@playwright/test";
+
+test("player can login, bet, cash out, and keep the realtime table visible", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { exact: true, name: "Entrar" }).click();
+
+  await page.locator('input[name="username"]').fill("player");
+  await page.locator('input[name="password"]').fill("player123");
+  await page.locator('button[type="submit"]').click();
+
+  await expect(page).toHaveURL("http://localhost:8000/");
+  await expect(page.getByRole("banner").getByText("player")).toBeVisible();
+
+  execFileSync("bun", ["run", "e2e:prepare", "cashout"], {
+    stdio: "inherit",
+  });
+
+  await page.reload();
+
+  await expect(page.getByText("LIVE")).toBeVisible();
+  await expect(page.getByText("BETTING")).toBeVisible();
+  await expect(
+    page.getByText(
+      "multiplierBp = 10000 + floor(elapsedMs * 1000 / 1000)",
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("1.00x + 0.10x por segundo")).toBeVisible();
+
+  const balanceBeforeBet = await readDisplayedBalance(page);
+
+  await expect(page.getByRole("button", { name: "Apostar" })).toBeEnabled();
+  await page.getByRole("button", { name: "Apostar" }).click();
+
+  await expect(page.getByText("Aposta ativa: ACCEPTED")).toBeVisible();
+  await expect(async () => {
+    const balanceAfterBet = await readDisplayedBalance(page);
+
+    expect(balanceAfterBet).not.toBe(balanceBeforeBet);
+  }).toPass();
+  const balanceAfterBet = await readDisplayedBalance(page);
+
+  await expect(page.getByRole("button", { name: "Cash Out" })).toBeEnabled();
+  await page.getByRole("button", { name: "Cash Out" }).click();
+
+  await expect(page.getByText("CASHED_OUT")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Crash Game" })).toBeVisible();
+  await expect(async () => {
+    const currentBalance = await readDisplayedBalance(page);
+
+    expect(currentBalance).not.toBe(balanceAfterBet);
+  }).toPass();
+});
+
+async function readDisplayedBalance(page: Page): Promise<string> {
+  const balance = page.getByTestId("metric-saldo").locator("p").last();
+
+  await expect(balance).toBeVisible();
+
+  return balance.innerText();
+}

@@ -2,6 +2,7 @@ import { MULTIPLIER_GROWTH_BP_PER_SECOND } from "../../application/game.constant
 import { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
+import { toPublicBetFields, toPublicRoundFields } from "../round-response.mapper";
 import {
   BetRealtimePayload,
   RealtimeBetPayload,
@@ -41,38 +42,20 @@ export class RoundRealtimeSerializer {
       options.currentMultiplierBp ??
       this.calculateCurrentMultiplierBp(round, options.now ?? new Date());
 
+    const publicRound = toPublicRoundFields(round);
+
     return {
-      id: round.id,
-      roundId: round.id,
-      status: round.status,
-      bettingStartsAt: round.bettingStartsAt.toISOString(),
-      bettingEndsAt: round.bettingEndsAt.toISOString(),
-      startedAt: round.startedAt?.toISOString() ?? null,
-      crashedAt: round.crashedAt?.toISOString() ?? null,
+      ...publicRound,
+      roundId: publicRound.id,
       currentMultiplierBp,
-      crashPointBp: round.serverSeed ? round.crashPointBp : null,
-      serverSeedHash: round.serverSeedHash,
-      serverSeed: round.serverSeed,
-      clientSeed: round.clientSeed,
-      nonce: round.nonce,
-      chainIndex: round.chainIndex,
-      nextServerSeedHash: round.nextServerSeedHash,
       bets: round.bets.map((bet) => this.toBetPayload(bet)),
     };
   }
 
   toBetPayload(bet: Bet): RealtimeBetPayload {
     return {
-      id: bet.id,
+      ...toPublicBetFields(bet),
       betId: bet.id,
-      roundId: bet.roundId,
-      playerId: bet.playerId,
-      username: bet.username,
-      amountCents: bet.amountCents.toString(),
-      status: bet.status,
-      cashoutMultiplierBp: bet.cashoutMultiplierBp,
-      payoutCents: bet.payoutCents?.toString() ?? null,
-      rejectionReason: bet.rejectionReason,
     };
   }
 

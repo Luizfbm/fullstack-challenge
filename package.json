@@ -15,6 +15,8 @@
     "check:types": "bun run db:generate && bunx tsc --noEmit -p services/games/tsconfig.json && bunx tsc --noEmit -p services/wallets/tsconfig.json && bunx tsc --noEmit -p frontend/tsconfig.json && bunx tsc --noEmit -p tsconfig.quality.json",
     "test:unit": "cd services/games && bun test tests/unit && cd ../wallets && bun test tests/unit && cd ../../frontend && bun test && cd .. && bun test scripts/quality",
     "test:coverage": "rm -rf coverage && cd services/games && bun test tests/unit --coverage --coverage-reporter=lcov --coverage-dir=../../coverage/services-games && cd ../wallets && bun test tests/unit --coverage --coverage-reporter=lcov --coverage-dir=../../coverage/services-wallets && cd ../../frontend && bunx vitest run --coverage --coverage.provider=v8 --coverage.reporter=lcov --coverage.reportsDirectory=../coverage/frontend && cd .. && bun test scripts/quality --coverage --coverage-reporter=lcov --coverage-dir=coverage/scripts-quality",
+    "test:e2e:browser": "playwright test",
+    "e2e:prepare": "bun scripts/e2e/prepare-deterministic-state.ts",
     "quality:baseline": "bun scripts/quality/generate-baseline.ts",
     "quality:gate": "bun scripts/quality/run-quality-gate.ts",
     "ci:local": "bun install --frozen-lockfile && bun run lint && bun run check:types && bun run test:unit && bun run test:coverage && bun run quality:gate && docker compose config",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^24.10.1",
     "@vitest/coverage-v8": "^4.1.7",
     "bun-types": "latest",

@@ -84,6 +84,7 @@ function restRound(status: RoundResponse["status"]): RoundResponse {
     crashedAt: null,
     crashPointBp: null,
     id: "round-1",
+    multiplierGrowthBpPerSecond: 1000,
     nextServerSeedHash: null,
     nonce: 1,
     serverSeed: null,

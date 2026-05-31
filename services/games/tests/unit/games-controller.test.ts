@@ -66,6 +66,7 @@ describe("GamesController", () => {
       id: "round-1",
       status: "BETTING",
       crashPointBp: null,
+      multiplierGrowthBpPerSecond: 1000,
       bets: [
         {
           id: "bet-1",

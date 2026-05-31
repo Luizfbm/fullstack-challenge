@@ -32,6 +32,7 @@ describe("RoundRealtimeSerializer", () => {
     expect(payload.roundId).toBe("round-1");
     expect(payload.currentMultiplierBp).toBe(15000);
     expect(payload.crashPointBp).toBeNull();
+    expect(payload.multiplierGrowthBpPerSecond).toBe(1000);
     expect(payload.serverSeed).toBeNull();
     expect(payload.serverSeedHash).toBe("server-seed-hash");
     expect(payload.nextServerSeedHash).toBe("next-seed-hash");

@@ -559,6 +559,104 @@ Cada entrada deve conter:
   bun test` e `bun run test:coverage && bun run quality:gate` passaram.
 - Status: resolvido.
 
+### 33. Rate limiting nao bloqueou requisicoes anonimas no primeiro teste
+
+- Contexto: bonus de rate limiting via Kong, ao rodar o E2E isolado
+  `rate-limiting.e2e.test.ts`.
+- Sintoma: 12 chamadas rapidas para `POST /games/bet` retornaram `401`, sem
+  nenhuma resposta `429`.
+- Causa: o plugin `rate-limiting` do Kong estava com `limit_by` padrao
+  `consumer`; como as chamadas anonimas nao tinham consumer, a janela nao
+  contava como esperado para esse teste.
+- Correcao: os plugins de rate limit passaram a usar `limit_by: ip`, mantendo
+  `policy: local`.
+- Regressao: adicionado E2E que confirma `429` em rota de aposta e, ao mesmo
+  tempo, valida que `/games/health`, `/wallets/health` e `/` nao sao limitados.
+- Validacao: `docker compose restart kong` recarregou a config declarativa;
+  `cd services/games && bun test tests/e2e/rate-limiting.e2e.test.ts` passou.
+- Status: resolvido.
+
+### 34. Playwright E2E falhou por seletores ambiguos e frontend desatualizado
+
+- Contexto: bonus de Playwright browser E2E para o fluxo real do jogador.
+- Sintoma: o teste falhou primeiro porque `Entrar` tambem encontrava
+  `Entrar para apostar`; depois `player` e `Crash Game` tambem tinham mais de
+  um match. Em uma execucao intermediaria, o teste procurou `data-testid`
+  novo em uma imagem Docker antiga do frontend.
+- Causa: seletores amplos em uma tela com textos repetidos e container
+  frontend ainda nao reconstruido depois da alteracao local.
+- Correcao: os seletores foram escopados por papel/regiao (`banner`, `heading`
+  e match exato) e o saldo passou a ter `data-testid` estavel. A stack foi
+  reconstruida antes da validacao browser.
+- Regressao: o teste Playwright agora cobre login Keycloak, fixture
+  deterministica, `LIVE`, formula da curva, aposta, cashout, saldo atualizado e
+  tela renderizada apos eventos realtime.
+- Validacao: `docker compose up -d --build && bun scripts/ci/check-kong-health.ts
+  && bun run test:e2e:browser` passou.
+- Status: resolvido.
+
+### 35. Bonus falhou na catraca por maior arquivo e linha duplicada
+
+- Contexto: pacote de bonus, ao rodar `bun run test:coverage && bun run
+  quality:gate`.
+- Sintoma: o Quality Gate falhou com `files.largestFile.lineCount` em 294
+  contra baseline 269 e `duplication.duplicatedLines` em 251 contra baseline
+  250.
+- Causa: a formula da curva foi adicionada diretamente na dashboard, deixando
+  `game-dashboard-shell.tsx` grande demais; alem disso, o novo campo
+  `multiplierGrowthBpPerSecond` aumentou a duplicacao textual entre o mapper
+  REST e o serializer WebSocket.
+- Correcao: a UI da rodada foi extraida para `CrashRoundPanel` e helpers de
+  formatacao; REST e WebSocket passaram a usar um mapper publico comum para
+  campos de rodada e aposta.
+- Regressao: o proprio Quality Gate valida que maior arquivo e duplicacao nao
+  pioram em relacao ao baseline.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `bunx tsc
+  --noEmit -p services/games/tsconfig.json`, `cd frontend && bun test`, `cd
+  services/games && bun test tests/unit` e `bun run test:coverage && bun run
+  quality:gate` passaram depois da correcao.
+- Status: resolvido.
+
+### 36. Refatoracao do bonus reduziu cobertura do pacote Games
+
+- Contexto: segunda execucao de `bun run test:coverage && bun run
+  quality:gate`, depois da correcao de duplicacao.
+- Sintoma: duplicacao e maior arquivo passaram, mas
+  `coverage.packages.services/games.lines.pct` caiu para 79.25 contra baseline
+  79.40.
+- Causa: a refatoracao mudou a distribuicao de linhas cobertas no pacote Games
+  e os use cases de leitura ainda nao tinham testes diretos suficientes para
+  sustentar a catraca.
+- Correcao: adicionados testes unitarios para `GetCurrentRoundUseCase`,
+  `ListRoundHistoryUseCase` e `ListMyBetsUseCase`.
+- Erro intermediario: o primeiro teste novo esperava limite padrao 10 para
+  historico, mas o valor real do dominio e `DEFAULT_ROUND_HISTORY_LIMIT = 20`.
+  O teste foi corrigido para usar a constante do codigo.
+- Regressao: a cobertura do pacote Games volta a ser validada pelo Quality Gate
+  sem alterar o baseline.
+- Validacao: `bunx tsc --noEmit -p services/games/tsconfig.json`, `cd
+  services/games && bun test tests/unit/application/game-use-cases.test.ts`,
+  `bun run test:coverage && bun run quality:gate` e `bun run ci:local`
+  passaram.
+- Status: resolvido.
+
+### 37. Validacao visual teve erros de comando antes de passar
+
+- Contexto: checagem visual desktop/mobile apos o Playwright E2E passar.
+- Sintoma: a automacao do browser da sessao falhou ao aguardar `networkidle`;
+  depois, o script local de Playwright falhou por expansao de template string no
+  `zsh` e por importar `playwright` em vez de `@playwright/test`.
+- Causa: diferencas da API disponivel no browser da sessao e erro de quoting no
+  comando local; nao houve falha funcional da aplicacao.
+- Correcao: a checagem no browser passou a usar `load`; o script local foi
+  reexecutado com aspas simples e importando `@playwright/test`.
+- Regressao: a validacao final confirma a formula da curva e ausencia de
+  overflow horizontal em viewport mobile e desktop.
+- Validacao: browser da sessao em `http://localhost:8000/` encontrou titulo,
+  formula, ritmo e status realtime; script Playwright validou mobile 390px e
+  desktop 1440px com `overflowX: false`.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -612,6 +710,21 @@ Cada entrada deve conter:
   `cd frontend && bun run build`, `bun run ci:local`, `bun run ci:e2e` e
   validacao visual/browser em duas abas em `http://localhost:8000/`, ambas com
   badge `LIVE` e a mesma rodada.
+- Bonus focado:
+  `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend && bun test`,
+  `bunx tsc --noEmit -p services/games/tsconfig.json`,
+  `bunx tsc --noEmit -p tsconfig.quality.json`, `bun run e2e:prepare
+  clean-betting`, `cd services/games && bun test
+  tests/e2e/deterministic-seed.e2e.test.ts` e `cd services/games && bun test
+  tests/e2e/rate-limiting.e2e.test.ts`.
+- Bonus Playwright:
+  `bunx playwright install chromium`, `cd frontend && bun run build` e
+  `docker compose up -d --build && bun scripts/ci/check-kong-health.ts && bun
+  run test:e2e:browser`.
+- Bonus final:
+  `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` e validacao
+  visual mobile/desktop via Playwright com formula da curva e `overflowX:
+  false`.
 
 ## Validacoes Docker Ja Executadas
 
