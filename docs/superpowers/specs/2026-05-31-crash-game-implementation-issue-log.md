@@ -724,6 +724,38 @@ Cada entrada deve conter:
   desktop `1440x900` com `overflowX: false`.
 - Status: resolvido.
 
+### 42. E2E browser ficou ambiguo com duplicidade legitima de status
+
+- Contexto: redesign Chrono Crash adicionou telemetria de rodape com status
+  realtime alem do badge existente da rodada.
+- Sintoma: `bun run test:e2e:browser` falhou em strict mode porque
+  `getByText("LIVE")` e depois `getByText("BETTING")` passaram a encontrar
+  duas ocorrencias visiveis; o mesmo ocorreu com o texto humano do ritmo da
+  curva e com o heading legado `Crash Game`.
+- Causa: o teste estava acoplado a uma unica ocorrencia visual de status,
+  mas o redesign passou a exibir os mesmos dados reais em badge e telemetria.
+- Correcao: o E2E agora valida a primeira ocorrencia visivel dos textos de
+  status e usa o heading principal `Chrono Crash` para confirmar que a tela
+  permanece renderizada apos cashout.
+- Regressao: rerodar `bun run test:e2e:browser` apos a correcao.
+- Validacao: `bun run test:e2e:browser` passou apos a correcao.
+- Status: resolvido.
+
+### 43. Rail mobile sobrepunha o palco Chrono Crash
+
+- Contexto: validacao visual mobile do redesign Chrono Crash.
+- Sintoma: o rail de navegacao fixo na parte inferior aparecia sobre o palco,
+  cortando parte do multiplicador e do cockpit.
+- Causa: o rail mobile usava `position: fixed`, o que nao reservava espaco no
+  layout e sobrepunha conteudo essencial do jogo.
+- Correcao: o shell mobile passou a usar layout em coluna e o rail ficou
+  `sticky` no fluxo da pagina; no desktop ele continua como rail vertical.
+- Regressao: rerodar validacao visual mobile/desktop com screenshot e
+  `overflowX: false`.
+- Validacao: script Playwright mobile/desktop passou com `overlapsStage:
+  false` e `overflowX: false`.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -804,6 +836,18 @@ Cada entrada deve conter:
   `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` e script
   Playwright mobile/desktop corrigido validando curva, timer, formula, ritmo e
   ausencia de overflow horizontal.
+- Redesign Chrono Crash:
+  `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend && bun test`,
+  `cd frontend && bun run build`, `bun run lint`, `bun run test:coverage &&
+  bun run quality:gate`, `docker compose config`, `docker compose up -d
+  --build frontend`, `bun run test:e2e:browser` e script Playwright
+  mobile/desktop validando cockpit, curva, mesa, historico, botoes, formula,
+  `overlapsStage: false` e `overflowX: false`.
+- Redesign Chrono Crash final:
+  `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` e script
+  Playwright final em mobile `390x844` e desktop `1440x900` validando
+  `hasStage`, `hasCurve`, `hasActions`, `hasTables`, `overlapsStage: false`
+  e `overflowX: false`.
 
 ## Validacoes Docker Ja Executadas
 

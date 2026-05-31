@@ -1,16 +1,11 @@
-import { Clock3, Wifi, WifiOff } from "lucide-react";
 import { useNow } from "../../hooks/use-now";
 import {
   getCrashCurveFormula,
   getCrashCurveHumanRate,
 } from "../../services/crash-curve";
-import { getRoundTimerLabel } from "../../services/round-timing";
-import { Badge } from "../ui/badge";
+import { ChronoTelemetry } from "./chrono-telemetry";
 import { CrashCurveChart } from "./crash-curve-chart";
-import {
-  type DashboardRound,
-  roundBadgeVariant,
-} from "./round-formatting";
+import type { DashboardRound } from "./round-formatting";
 
 type CrashRoundPanelProps = {
   connectionStatus: string;
@@ -26,34 +21,37 @@ export function CrashRoundPanel({
   const now = useNow();
 
   return (
-    <section className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/70 p-4">
+    <section className="chrono-panel min-w-0 rounded-md border border-cyan-300/15 p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-100">Rodada</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            {formatRoundIdentity(round, isLoading)}
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200">
+            Chrono cockpit
+          </p>
+          <h2 className="mt-1 text-xl font-black text-zinc-50">Crash Game</h2>
+          <p className="mt-1 max-w-xl text-sm text-zinc-400">
+            Acelere a linha do tempo, aposte antes da partida e extraia o
+            payout antes da ruptura.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={connectionStatus === "connected" ? "success" : "neutral"}>
-            {connectionStatus === "connected" ? (
-              <Wifi className="size-3.5" aria-hidden="true" />
-            ) : (
-              <WifiOff className="size-3.5" aria-hidden="true" />
-            )}
-            {connectionStatus === "connected" ? "LIVE" : "REST"}
-          </Badge>
-          <Badge variant={roundBadgeVariant(round?.status)}>
-            <Clock3 className="size-3.5" aria-hidden="true" />
-            {round?.status ?? "SYNC"}
-          </Badge>
+        <div className="rounded-md border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-right">
+          <p className="text-xs uppercase tracking-[0.22em] text-amber-200">
+            Flux rate
+          </p>
+          <p className="font-mono text-sm font-semibold text-zinc-50">
+            {formatCurveRate(round)}
+          </p>
         </div>
       </div>
 
       <CrashCurveChart isLoading={isLoading} now={now} round={round} />
 
-      <div className="mt-4 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-300">
-        {getRoundTimerLabel(round, now)}
+      <div className="mt-4">
+        <ChronoTelemetry
+          connectionStatus={connectionStatus}
+          isLoading={isLoading}
+          now={now}
+          round={round}
+        />
       </div>
 
       <div className="mt-4 grid gap-2 text-xs text-zinc-500 md:grid-cols-2">
@@ -66,19 +64,11 @@ export function CrashRoundPanel({
 
 function CurveLine({ label, value }: { label: string; value: string }) {
   return (
-    <p>
+    <p className="rounded-md border border-white/5 bg-black/20 px-3 py-2">
       {label}:{" "}
-      <span className="break-words font-mono text-zinc-300">{value}</span>
+      <span className="break-words font-mono text-cyan-100">{value}</span>
     </p>
   );
-}
-
-function formatRoundIdentity(round: DashboardRound | null, isLoading: boolean) {
-  if (round) {
-    return `#${round.chainIndex} / nonce ${round.nonce}`;
-  }
-
-  return isLoading ? "Carregando rodada" : "Sem rodada ativa";
 }
 
 function formatCurveFormula(round: DashboardRound | null): string {

@@ -20,14 +20,16 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
 
   await page.reload();
 
-  await expect(page.getByText("LIVE")).toBeVisible();
-  await expect(page.getByText("BETTING")).toBeVisible();
+  await expect(page.getByText("LIVE").first()).toBeVisible();
+  await expect(page.getByText("BETTING").first()).toBeVisible();
   await expect(
     page.getByText(
       "multiplierBp = 10000 + floor(elapsedMs * 1000 / 1000)",
-    ),
+    ).first(),
   ).toBeVisible();
-  await expect(page.getByText("1.00x + 0.10x por segundo")).toBeVisible();
+  await expect(
+    page.getByText("1.00x + 0.10x por segundo").first(),
+  ).toBeVisible();
 
   const balanceBeforeBet = await readDisplayedBalance(page);
 
@@ -46,7 +48,7 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
   await page.getByRole("button", { name: "Cash Out" }).click();
 
   await expect(page.getByText("CASHED_OUT")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Crash Game" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Chrono Crash" })).toBeVisible();
   await expect(async () => {
     const currentBalance = await readDisplayedBalance(page);
 
