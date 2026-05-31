@@ -12,6 +12,14 @@ export type HttpClientOptions = {
   getAccessToken?: AccessTokenProvider;
 };
 
+let apiAccessTokenProvider: AccessTokenProvider | null = null;
+
+export function setApiAccessTokenProvider(
+  provider: AccessTokenProvider | null,
+): void {
+  apiAccessTokenProvider = provider;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -30,7 +38,7 @@ export class HttpClient {
 
   constructor(options: HttpClientOptions = {}) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? appConfig.apiBaseUrl);
-    this.fetcher = options.fetcher ?? fetch;
+    this.fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
     this.getAccessToken = options.getAccessToken;
   }
 
@@ -45,7 +53,7 @@ export class HttpClient {
     }
 
     if (auth) {
-      const token = await this.getAccessToken?.();
+      const token = await (this.getAccessToken ?? apiAccessTokenProvider)?.();
 
       if (token) {
         requestHeaders.set("Authorization", `Bearer ${token}`);

@@ -1,8 +1,11 @@
 import { Activity, Clock3, Coins, History, Users } from "lucide-react";
+import { useAuth } from "../../hooks/use-auth";
 import { Badge } from "../ui/badge";
 import { BetControlsPanel } from "./bet-controls-panel";
 
 export function GameDashboardShell() {
+  const { errorMessage, isAuthenticated, username } = useAuth();
+
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <section className="rounded-md border border-zinc-800 bg-zinc-900/70 p-4">
@@ -32,8 +35,14 @@ export function GameDashboardShell() {
       <aside className="space-y-4">
         <section className="grid grid-cols-2 gap-3">
           <MetricCard icon={Coins} label="Saldo" value="-" />
-          <MetricCard icon={Users} label="Apostas" value="0" />
+          <MetricCard
+            icon={Users}
+            label="Jogador"
+            value={isAuthenticated ? username ?? "-" : "-"}
+          />
         </section>
+
+        {errorMessage ? <AuthError message={errorMessage} /> : null}
 
         <BetControlsPanel />
 
@@ -61,6 +70,14 @@ export function GameDashboardShell() {
           </div>
         </section>
       </aside>
+    </div>
+  );
+}
+
+function AuthError({ message }: { message: string }) {
+  return (
+    <div className="rounded-md border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">
+      {message}
     </div>
   );
 }

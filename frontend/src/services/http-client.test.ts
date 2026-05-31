@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiError, HttpClient } from "./http-client";
+import {
+  ApiError,
+  HttpClient,
+  setApiAccessTokenProvider,
+} from "./http-client";
 
 describe("HttpClient", () => {
   it("builds Kong-routed urls and parses JSON responses", async () => {
@@ -57,5 +61,54 @@ describe("HttpClient", () => {
       name: "ApiError",
       status: 401,
     } satisfies Partial<ApiError>);
+  });
+
+  it("uses the global access token provider when the client has no local provider", async () => {
+    let requestInit: RequestInit | undefined;
+    const fetcher: typeof fetch = async (_input, init) => {
+      requestInit = init;
+
+      return Response.json({ playerId: "player-1" });
+    };
+    const client = new HttpClient({
+      baseUrl: "http://localhost:8000",
+      fetcher,
+    });
+
+    setApiAccessTokenProvider(() => "global-token");
+
+    try {
+      await client.request("/wallets/me", { auth: true });
+    } finally {
+      setApiAccessTokenProvider(null);
+    }
+
+    const headers = requestInit?.headers;
+
+    expect(headers).toBeInstanceOf(Headers);
+    expect((headers as Headers).get("Authorization")).toBe(
+      "Bearer global-token",
+    );
+  });
+
+  it("binds the default fetcher to globalThis", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetcher = vi.fn(function (this: typeof globalThis) {
+      expect(this).toBe(globalThis);
+
+      return Promise.resolve(Response.json({ ok: true }));
+    }) as unknown as typeof fetch;
+
+    globalThis.fetch = fetcher;
+
+    try {
+      const client = new HttpClient({ baseUrl: "http://localhost:8000" });
+
+      await expect(client.request("/games/health")).resolves.toEqual({
+        ok: true,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

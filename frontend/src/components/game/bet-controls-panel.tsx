@@ -1,9 +1,11 @@
 import { RotateCcw } from "lucide-react";
+import { useAuth } from "../../hooks/use-auth";
 import { useBetSlip } from "../../hooks/use-bet-slip";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 
 export function BetControlsPanel() {
+  const { isAuthenticated, login } = useAuth();
   const { betAmountCents, betAmountLabel, resetBetSlip, setBetAmountCents } =
     useBetSlip();
 
@@ -38,13 +40,24 @@ export function BetControlsPanel() {
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <Button disabled type="button">
+        <Button disabled={!isAuthenticated} type="button">
           Apostar
         </Button>
-        <Button disabled type="button" variant="secondary">
+        <Button disabled={!isAuthenticated} type="button" variant="secondary">
           Cash Out
         </Button>
       </div>
+
+      {!isAuthenticated ? (
+        <Button
+          className="mt-3 w-full"
+          onClick={() => void login()}
+          type="button"
+          variant="ghost"
+        >
+          Entrar para apostar
+        </Button>
+      ) : null}
     </section>
   );
 }

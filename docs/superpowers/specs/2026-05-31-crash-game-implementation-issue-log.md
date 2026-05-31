@@ -337,6 +337,28 @@ Cada entrada deve conter:
   passou com 9 testes.
 - Status: resolvido.
 
+### 21. Callback OIDC falhou por `fetch` sem bind no navegador
+
+- Contexto: Passo 9 do plano de execucao, validacao browser do login
+  Keycloak via `http://localhost:8000/`.
+- Sintoma: apos autenticar `player/player123`, o frontend voltou para `/` com
+  `code` na URL, mas exibiu
+  `Failed to execute 'fetch' on 'Window': Illegal invocation`.
+- Causa: os clientes `HttpClient` e `OidcClient` guardavam o `fetch` nativo
+  como funcao (`this.fetcher = fetch`) e chamavam depois via propriedade de
+  classe. Em navegador, algumas implementacoes exigem que `fetch` seja chamado
+  com `window/globalThis` como receiver; chamado como metodo da instancia, ele
+  falha com `Illegal invocation`.
+- Correcao: os clientes passaram a usar
+  `globalThis.fetch.bind(globalThis)` quando nenhum `fetcher` customizado e
+  informado. O callback OIDC tambem passou a limpar `code/state` da URL e o
+  login pendente quando a troca de token falha.
+- Validacao: `cd frontend && bun run build` passou; `cd frontend && bun test`
+  passou com 19 testes; no browser via `http://localhost:8000/`, o login
+  Keycloak com `player/player123` voltou para `/`, removeu `code/state` da URL
+  e exibiu `player`/`Sair` sem erro de auth.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -345,6 +367,8 @@ Cada entrada deve conter:
 - `bun test tests/unit` em `services/games`
 - `bun test tests/unit` em `services/wallets`
 - `bun run build` em `frontend`
+- `bun test` em `frontend`
+- `bun test tests/e2e` em `services/games`
 - `prisma validate` nos schemas dos servicos
 - `bun run db:generate` nos servicos
 - `docker compose config`
@@ -367,8 +391,10 @@ Cada entrada deve conter:
 - RabbitMQ management API validada com `admin/admin`
 - token do usuario `player/player123` validado no realm `crash-game`
 - `POST /wallets` e `GET /wallets/me` via Kong com token real do Keycloak
+- login frontend via browser em `http://localhost:8000/` com
+  `player/player123`
 
 ## Validacoes Ainda Pendentes
 
-- E2E WebSocket completo ainda sera criado no Passo 7 do plano de execucao.
-- Validacao browser/frontend real ainda depende dos passos de frontend.
+- Integracao REST completa no frontend sera implementada no Passo 10.
+- Integracao WebSocket completa no frontend sera implementada no Passo 11.
