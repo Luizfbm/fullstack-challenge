@@ -13,7 +13,7 @@
     "db:generate": "cd services/games && bun run db:generate && cd ../wallets && bun run db:generate",
     "lint": "eslint .",
     "check:types": "bun run db:generate && bunx tsc --noEmit -p services/games/tsconfig.json && bunx tsc --noEmit -p services/wallets/tsconfig.json && bunx tsc --noEmit -p frontend/tsconfig.json && bunx tsc --noEmit -p tsconfig.quality.json",
-    "test:unit": "cd services/games && bun test tests/unit && cd ../wallets && bun test tests/unit && cd ../../frontend && bun test && cd .. && bun test scripts/quality",
+    "test:unit": "cd services/games && bun test tests/unit && cd ../wallets && bun test tests/unit && cd ../../frontend && bun run test && cd .. && bun test scripts/quality",
     "test:coverage": "rm -rf coverage && cd services/games && bun test tests/unit --coverage --coverage-reporter=lcov --coverage-dir=../../coverage/services-games && cd ../wallets && bun test tests/unit --coverage --coverage-reporter=lcov --coverage-dir=../../coverage/services-wallets && cd ../../frontend && bunx vitest run --coverage --coverage.provider=v8 --coverage.reporter=lcov --coverage.reportsDirectory=../coverage/frontend && cd .. && bun test scripts/quality --coverage --coverage-reporter=lcov --coverage-dir=coverage/scripts-quality",
     "test:e2e:browser": "playwright test",
     "e2e:prepare": "bun scripts/e2e/prepare-deterministic-state.ts",

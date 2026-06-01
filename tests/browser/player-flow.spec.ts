@@ -20,14 +20,16 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
 
   await page.reload();
 
-  await expect(page.getByText("LIVE")).toBeVisible();
-  await expect(page.getByText("BETTING")).toBeVisible();
+  await expect(page.getByText("LIVE").first()).toBeVisible();
+  await expect(page.getByText("BETTING").first()).toBeVisible();
   await expect(
     page.getByText(
       "multiplierBp = 10000 + floor(elapsedMs * 1000 / 1000)",
-    ),
+    ).first(),
   ).toBeVisible();
-  await expect(page.getByText("1.00x + 0.10x por segundo")).toBeVisible();
+  await expect(
+    page.getByText("1.00x + 0.10x por segundo").first(),
+  ).toBeVisible();
 
   const balanceBeforeBet = await readDisplayedBalance(page);
 
@@ -46,7 +48,9 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
   await page.getByRole("button", { name: "Cash Out" }).click();
 
   await expect(page.getByText("CASHED_OUT")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Crash Game" })).toBeVisible();
+  await expectTimeCarAssetLoaded(page);
+  await expectCanvasHasPixels(page);
+  await expect(page.getByRole("heading", { name: "Chrono Crash" })).toBeVisible();
   await expect(async () => {
     const currentBalance = await readDisplayedBalance(page);
 
@@ -60,4 +64,38 @@ async function readDisplayedBalance(page: Page): Promise<string> {
   await expect(balance).toBeVisible();
 
   return balance.innerText();
+}
+
+async function expectTimeCarAssetLoaded(page: Page) {
+  await expect(async () => {
+    const assetLoaded = await page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .some((entry) => entry.name.includes("/models/time-machine-low-poly.glb")),
+    );
+
+    expect(assetLoaded).toBe(true);
+  }).toPass();
+}
+
+async function expectCanvasHasPixels(page: Page) {
+  await expect(page.getByTestId("crash-flight-canvas")).toBeVisible();
+  await expect(async () => {
+    const hasPixels = await page
+      .getByTestId("crash-flight-canvas")
+      .evaluate((node) => {
+        const canvas = node as HTMLCanvasElement;
+        const context = canvas.getContext("2d");
+
+        if (context) {
+          const pixel = context.getImageData(0, 0, 1, 1).data;
+
+          return pixel.some((value) => value !== 0);
+        }
+
+        return canvas.toDataURL("image/png").length > 1000;
+      });
+
+    expect(hasPixels).toBe(true);
+  }).toPass();
 }

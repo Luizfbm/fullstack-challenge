@@ -657,6 +657,253 @@ Cada entrada deve conter:
   desktop 1440px com `overflowX: false`.
 - Status: resolvido.
 
+### 38. Passo 12 falhou typecheck por fronteira REST/realtime no cashout
+
+- Contexto: Passo 12, ao adicionar payout potencial no botao de cashout.
+- Sintoma: `bunx tsc --noEmit -p frontend/tsconfig.json` falhou porque
+  `currentMultiplierBp` nao existe em `RoundResponse`.
+- Causa: o painel de aposta ainda aceitava uma rodada REST pura, enquanto a
+  dashboard trabalha com um tipo unificado que pode conter dados realtime.
+- Correcao: `BetControlsPanel` passou a receber `DashboardRound | null`, que
+  modela corretamente a rodada reconciliada REST/WebSocket.
+- Regressao: adicionados testes de `calculatePayoutCents`, timing da rodada,
+  curva visual e cores do historico; o typecheck do frontend voltou a passar.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test`, `cd frontend && bun run build` e `bun run test:coverage && bun
+  run quality:gate` passaram.
+- Status: resolvido.
+
+### 39. Playwright perdeu status CASHED_OUT apos melhoria visual da mesa
+
+- Contexto: Passo 12, validacao browser apos adicionar payout e tratamento
+  visual para a lista de apostas da rodada.
+- Sintoma: `bun run test:e2e:browser` falhou aguardando `CASHED_OUT`, embora a
+  screenshot mostrasse saldo atualizado e payout na mesa.
+- Causa: a refatoracao de `BetTableRow` passou a exibir valor, multiplicador e
+  payout, mas removeu o status textual da aposta.
+- Correcao: a linha da mesa voltou a exibir o status como primeiro item do
+  valor, preservando `CASHED_OUT`, `LOST` e demais estados como informacao
+  visivel e testavel.
+- Regressao: o Playwright continua verificando que cashout aparece na tela apos
+  o fluxo real no browser.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test`, `cd frontend && bun run build` e `bun run test:e2e:browser`
+  passaram depois da correcao.
+- Status: resolvido.
+
+### 40. Validacao mobile detectou overflow horizontal no Passo 12
+
+- Contexto: validacao visual desktop/mobile apos reforcar a tela principal do
+  jogo.
+- Sintoma: a primeira checagem Playwright de mobile retornou `overflowX: true`
+  com `scrollWidth` maior que `clientWidth`.
+- Causa: os containers de grid e os textos monoespacados longos da formula/hash
+  ainda nao forçavam `min-w-0` e quebra segura em todos os pontos necessarios.
+- Correcao: adicionados `min-w-0` nos containers principais da dashboard,
+  painel da rodada, grafico e cards, alem de quebra de texto nos hashes e na
+  formula da curva.
+- Regressao: a validacao visual mobile/desktop mede `overflowX` explicitamente.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test`, `cd frontend && bun run build`, `bun run test:e2e:browser` e
+  validacao visual mobile/desktop com `overflowX: false` passaram.
+- Status: resolvido.
+
+### 41. Script de validacao visual usou import e seletores incorretos
+
+- Contexto: validacao visual final do Passo 12 via script Playwright inline.
+- Sintoma: a primeira execucao falhou com `Cannot find package 'playwright'`
+  e a segunda execucao reportou falsos negativos para timer e grafico.
+- Causa: o projeto importa o runtime de browser por `@playwright/test`, e nao
+  diretamente por `playwright`, e os seletores do script buscavam texto literal
+  `Timer` e `aria-label` inexistente no SVG decorativo.
+- Correcao: o script passou a importar `chromium` de `@playwright/test` e a
+  validar os elementos pela estrutura/textos reais da UI autenticada.
+- Regressao: a validacao visual mobile/desktop agora verifica heading, formula,
+  ritmo, timer, curva SVG e ausencia de overflow horizontal.
+- Validacao: o script Playwright corrigido passou para mobile `390x844` e
+  desktop `1440x900` com `overflowX: false`.
+- Status: resolvido.
+
+### 42. E2E browser ficou ambiguo com duplicidade legitima de status
+
+- Contexto: redesign Chrono Crash adicionou telemetria de rodape com status
+  realtime alem do badge existente da rodada.
+- Sintoma: `bun run test:e2e:browser` falhou em strict mode porque
+  `getByText("LIVE")` e depois `getByText("BETTING")` passaram a encontrar
+  duas ocorrencias visiveis; o mesmo ocorreu com o texto humano do ritmo da
+  curva e com o heading legado `Crash Game`.
+- Causa: o teste estava acoplado a uma unica ocorrencia visual de status,
+  mas o redesign passou a exibir os mesmos dados reais em badge e telemetria.
+- Correcao: o E2E agora valida a primeira ocorrencia visivel dos textos de
+  status e usa o heading principal `Chrono Crash` para confirmar que a tela
+  permanece renderizada apos cashout.
+- Regressao: rerodar `bun run test:e2e:browser` apos a correcao.
+- Validacao: `bun run test:e2e:browser` passou apos a correcao.
+- Status: resolvido.
+
+### 43. Rail mobile sobrepunha o palco Chrono Crash
+
+- Contexto: validacao visual mobile do redesign Chrono Crash.
+- Sintoma: o rail de navegacao fixo na parte inferior aparecia sobre o palco,
+  cortando parte do multiplicador e do cockpit.
+- Causa: o rail mobile usava `position: fixed`, o que nao reservava espaco no
+  layout e sobrepunha conteudo essencial do jogo.
+- Correcao: o shell mobile passou a usar layout em coluna e o rail ficou
+  `sticky` no fluxo da pagina; no desktop ele continua como rail vertical.
+- Regressao: rerodar validacao visual mobile/desktop com screenshot e
+  `overflowX: false`.
+- Validacao: script Playwright mobile/desktop passou com `overlapsStage:
+  false` e `overflowX: false`.
+- Status: resolvido.
+
+### 44. Typecheck do redesign 3D falhou por tipos ausentes do Three.js
+
+- Contexto: implementacao da arena 3D do Chrono Crash com Three.js.
+- Sintoma: `bunx tsc --noEmit -p frontend/tsconfig.json` falhou com
+  `Could not find a declaration file for module 'three'`.
+- Causa: o pacote `three` foi adicionado ao workspace frontend, mas a
+  resolucao TypeScript usada pelo Bun precisou de `@types/three` instalado
+  explicitamente.
+- Correcao: `@types/three` foi adicionado como dependencia de desenvolvimento
+  do frontend.
+- Regressao: rerodar `bunx tsc --noEmit -p frontend/tsconfig.json`.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json` passou.
+- Status: resolvido.
+
+### 45. Lint bloqueou uso inseguro de refs e state no componente Three.js
+
+- Contexto: validacao `bun run lint` apos criar `CrashFlightScene`.
+- Sintoma: ESLint reportou `react-hooks/refs` por atualizar `stateRef.current`
+  durante render e `react-hooks/set-state-in-effect` por chamar
+  `setFallbackVisible` diretamente dentro do effect.
+- Causa: a cena Three.js precisa de estado mais recente dentro do
+  `requestAnimationFrame`, mas a primeira implementacao sincronizava esse
+  estado no corpo do componente; o fallback WebGL tambem atualizava state de
+  forma sincronizada no effect.
+- Correcao: mover a sincronizacao do estado da cena para um effect com
+  dependencias e agendar a visibilidade do fallback fora do corpo imediato do
+  effect.
+- Regressao: rerodar `bun run lint`.
+- Validacao: `bun run lint` passou.
+- Status: resolvido.
+
+### 46. Validacao visual mobile mostrou carro 3D cortado no palco
+
+- Contexto: validacao visual Playwright mobile/desktop da arena Three.js.
+- Sintoma: no screenshot mobile `390x844`, o carro procedural aparecia
+  cortado no canto inferior esquerdo e os cards internos do palco reduziam a
+  leitura da cena.
+- Causa: a posicao inicial e a camera da cena foram calibradas primeiro para
+  desktop; em viewport estreita, o aspect ratio cortava a esquerda da cena.
+- Correcao: tornar a posicao/camera do carro responsiva ao aspect ratio e
+  ocultar os cards internos do palco em viewport pequena, mantendo a mesma
+  telemetria logo abaixo.
+- Regressao: rerodar validacao Playwright mobile/desktop com canvas nonblank,
+  `overflowX: false` e `actionOverlap: false`.
+- Validacao: script Playwright mobile/desktop passou com `nonblankCanvas:
+  true`, `hasOverflowX: false` e `actionOverlap: false`.
+- Status: resolvido.
+
+### 47. Comando auxiliar de healthcheck usou variavel reservada do zsh
+
+- Contexto: espera do healthcheck do container `frontend` depois do rebuild.
+- Sintoma: o shell retornou `zsh:1: read-only variable: status`.
+- Causa: `status` e uma variavel especial/read-only do zsh, portanto nao pode
+  ser usada como variavel local em inline shell.
+- Correcao: repetir o comando usando outro nome de variavel.
+- Regressao: rerodar a espera do healthcheck do frontend.
+- Validacao: espera do healthcheck rerodada com `frontend_health` e retornou
+  `frontend=healthy`.
+- Status: resolvido.
+
+### 48. Navegador embutido nao aceitou `networkidle` na validacao visual
+
+- Contexto: verificacao visual final no navegador embutido do Codex.
+- Sintoma: a automacao retornou `playwright_wait_for_load_state does not
+  support networkidle`.
+- Causa: a API Playwright exposta pelo navegador embutido suporta apenas parte
+  da superficie upstream e rejeitou esse estado de load nessa sessao.
+- Correcao: repetir a verificacao usando `load` e validacoes diretas de DOM e
+  canvas.
+- Regressao: rerodar a verificacao no navegador embutido.
+- Validacao: verificacao no navegador embutido avancou com `load`; o erro de
+  `networkidle` nao se repetiu.
+- Status: resolvido.
+
+### 49. Validacao do canvas no navegador embutido falhou com `instanceof`
+
+- Contexto: verificacao visual final no navegador embutido do Codex.
+- Sintoma: o evaluate retornou `TypeError: Right-hand side of 'instanceof' is
+  not an object` ao testar `canvas instanceof HTMLCanvasElement`.
+- Causa: o ambiente read-only de evaluate do navegador embutido nao expôs o
+  construtor `HTMLCanvasElement` como objeto comparavel.
+- Correcao: usar checagem estrutural por `tagName` e presenca de `toDataURL`.
+- Regressao: rerodar a verificacao no navegador embutido.
+- Validacao: verificacao no navegador embutido passou sem excecao e confirmou
+  `hasCanvas: true`, `heading: true` e `overflowX: false`; pixel nonblank foi
+  validado pelo Playwright local.
+- Status: resolvido.
+
+### 50. Modelo GLB do carro carregava com a dianteira invertida
+
+- Contexto: integracao do asset `time-machine-low-poly.glb` na arena Three.js.
+- Sintoma: o carro aparecia com a traseira apontando para a direcao de voo; a
+  dianteira deveria ficar voltada para a direita da cena.
+- Causa: o GLB importado usa orientacao local diferente da convencao da cena,
+  que move o carro no eixo `+X`.
+- Correcao: o adaptador do modelo passou a aplicar rotacao `Y = Math.PI` antes
+  da normalizacao/centralizacao do GLB.
+- Regressao: adicionado teste unitario garantindo que um marcador de dianteira
+  termina com `x` maior que o marcador traseiro depois da preparacao do asset.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test src/components/game/crash-flight-scene.test.ts`, `cd frontend &&
+  bun run build`, `bun run test:e2e:browser`, `bun run lint`, `bun run
+  check:types`, `bun run test:coverage && bun run quality:gate`, `docker
+  compose config` e screenshot Playwright em
+  `/tmp/chrono-crash-car-front-right.png` passaram.
+- Status: resolvido.
+
+### 51. E2E browser perdeu a janela de aposta ao validar canvas antes do bet
+
+- Contexto: validacao browser apos corrigir a orientacao do GLB.
+- Sintoma: `bun run test:e2e:browser` falhou aguardando o botao `Apostar`
+  habilitado; a screenshot mostrava a rodada ja em `RUNNING`.
+- Causa: o teste validava carregamento do GLB e pixels do canvas antes de
+  enviar a aposta, consumindo a janela curta de `BETTING`.
+- Correcao: o fluxo E2E passou a apostar primeiro, executar cashout em seguida
+  e validar carregamento do asset/canvas depois do cashout.
+- Regressao: `bun run test:e2e:browser` cobre novamente login, aposta,
+  cashout, carregamento do GLB e canvas renderizado.
+- Validacao: `bun run test:e2e:browser` passou.
+- Status: resolvido.
+
+### 52. Teste de componente React exigiu runner com DOM
+
+- Contexto: Passo 13 do plano de execucao, ao adicionar testes renderizados da
+  dashboard e dos controles de aposta.
+- Sintoma: `cd frontend && bun test
+  src/components/game/game-dashboard-shell.test.tsx` falhou com
+  `ReferenceError: window is not defined` ao inicializar o cliente OIDC.
+- Causa: o runner nativo do Bun nao fornece ambiente DOM/jsdom para testes de
+  componentes React, enquanto os novos testes precisam renderizar a UI e
+  disparar eventos de formulario. O script do pacote frontend ja usa Vitest,
+  que suporta `@vitest-environment jsdom`.
+- Correcao: adicionadas dependencias `@testing-library/react`,
+  `@testing-library/dom` e `jsdom`; o script raiz `test:unit` passou a executar
+  o frontend via `bun run test`, preservando Bun nos testes de backend e
+  scripts.
+- Regressao: os novos testes cobrem renderizacao da tela principal,
+  normalizacao do input de aposta, estados habilitado/desabilitado de apostar e
+  cashout, chamada das mutations e exibicao de erro de saldo insuficiente.
+- Validacao: `cd frontend && bun run test
+  src/components/game/game-dashboard-shell.test.tsx`, `cd frontend && bun run
+  test`, `cd frontend && bun run build`, `bun run lint`, `bun run
+  test:unit`, `bun run check:types`, `bun run test:coverage && bun run
+  quality:gate`, `docker compose config`, `docker compose up -d --build`,
+  `docker compose ps`, `bun scripts/ci/check-kong-health.ts`, `curl -fsS
+  http://localhost:8000/` e `git diff --check` passaram.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -725,6 +972,37 @@ Cada entrada deve conter:
   `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` e validacao
   visual mobile/desktop via Playwright com formula da curva e `overflowX:
   false`.
+- Passo 12 focado:
+  `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend && bun test`,
+  `cd frontend && bun run build`, `git diff --check` e `bun run test:coverage
+  && bun run quality:gate`.
+- Passo 12 browser:
+  `docker compose up -d --build frontend`, `bun run test:e2e:browser` e script
+  Playwright mobile/desktop validando curva, timer, formula e ausencia de
+  overflow horizontal.
+- Passo 12 final:
+  `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` e script
+  Playwright mobile/desktop corrigido validando curva, timer, formula, ritmo e
+  ausencia de overflow horizontal.
+- Redesign Chrono Crash:
+  `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend && bun test`,
+  `cd frontend && bun run build`, `bun run lint`, `bun run test:coverage &&
+  bun run quality:gate`, `docker compose config`, `docker compose up -d
+  --build frontend`, `bun run test:e2e:browser` e script Playwright
+  mobile/desktop validando cockpit, curva, mesa, historico, botoes, formula,
+  `overlapsStage: false` e `overflowX: false`.
+- Redesign Chrono Crash final:
+  `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` e script
+  Playwright final em mobile `390x844` e desktop `1440x900` validando
+  `hasStage`, `hasCurve`, `hasActions`, `hasTables`, `overlapsStage: false`
+  e `overflowX: false`.
+- Passo 13 frontend:
+  `cd frontend && bun run test src/components/game/game-dashboard-shell.test.tsx`,
+  `cd frontend && bun run test`, `cd frontend && bun run build`, `bun run
+  lint`, `bun run test:unit`, `bun run check:types`, `bun run test:coverage
+  && bun run quality:gate`, `docker compose config`, `docker compose up -d
+  --build`, `docker compose ps`, `bun scripts/ci/check-kong-health.ts`, `curl
+  -fsS http://localhost:8000/` e `git diff --check`.
 
 ## Validacoes Docker Ja Executadas
 
@@ -745,4 +1023,4 @@ Cada entrada deve conter:
 
 ## Validacoes Ainda Pendentes
 
-- Proximo passo do plano: Passo 12, construir a UI principal do jogo.
+- Proximo passo do plano: Passo 13, adicionar testes frontend.

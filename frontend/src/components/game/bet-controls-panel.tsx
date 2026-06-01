@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { Gauge, RotateCcw, Sparkles } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 import { useBetSlip } from "../../hooks/use-bet-slip";
 import {
@@ -6,13 +6,16 @@ import {
   usePlaceBetMutation,
 } from "../../hooks/use-game-rest";
 import { getApiErrorMessage } from "../../services/api-errors";
-import type { BetResponse, RoundResponse } from "../../services/game-api";
+import type { BetResponse } from "../../services/game-api";
+import { formatCents } from "../../services/money";
+import { calculatePayoutCents } from "../../services/payout";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import type { DashboardRound } from "./round-formatting";
 
 type BetControlsPanelProps = {
   activeBet: BetResponse | null;
-  currentRound: RoundResponse | null;
+  currentRound: DashboardRound | null;
 };
 
 export function BetControlsPanel({
@@ -37,11 +40,17 @@ export function BetControlsPanel({
     activeBet?.status === "ACCEPTED" &&
     !cashOutMutation.isPending;
   const mutationError = placeBetMutation.error ?? cashOutMutation.error;
+  const potentialPayout = getPotentialPayout(activeBet, currentRound);
 
   return (
-    <section className="rounded-md border border-zinc-800 bg-zinc-900/70 p-4">
+    <section className="chrono-panel rounded-md border border-amber-300/15 p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-zinc-100">Aposta</h2>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200">
+            Command deck
+          </p>
+          <h2 className="mt-1 text-lg font-black text-zinc-50">Aposta</h2>
+        </div>
         <Button
           aria-label="Resetar aposta"
           onClick={resetBetSlip}
@@ -53,11 +62,11 @@ export function BetControlsPanel({
         </Button>
       </div>
 
-      <label className="block text-xs font-medium text-zinc-500" htmlFor="bet">
+      <label className="block text-xs font-medium text-zinc-400" htmlFor="bet">
         Valor em centavos
       </label>
       <Input
-        className="mt-2"
+        className="mt-2 h-12 border-amber-300/20 bg-black/35 font-mono text-lg"
         disabled={placeBetMutation.isPending}
         id="bet"
         inputMode="numeric"
@@ -65,40 +74,59 @@ export function BetControlsPanel({
         value={betAmountCents}
       />
 
-      <div className="mt-3 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-300">
-        {betAmountLabel}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-white/5 bg-black/25 px-3 py-2 text-sm text-zinc-300">
+          <p className="text-xs text-zinc-500">Entrada</p>
+          <p className="font-mono text-zinc-50">{betAmountLabel}</p>
+        </div>
+        <div className="rounded-md border border-cyan-300/10 bg-cyan-300/5 px-3 py-2 text-sm">
+          <p className="text-xs text-zinc-500">Extracao estimada</p>
+          <p className="font-mono text-cyan-100">
+            {potentialPayout ? formatCents(potentialPayout) : "-"}
+          </p>
+        </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Button
           disabled={!canPlaceBet}
           onClick={() =>
             placeBetMutation.mutate({ amountCents: betAmountCents })
           }
           type="button"
+          variant="temporal"
         >
+          <Sparkles className="size-4" aria-hidden="true" />
           {placeBetMutation.isPending ? "Enviando" : "Apostar"}
         </Button>
         <Button
           disabled={!canCashOut}
           onClick={() => cashOutMutation.mutate()}
           type="button"
-          variant="secondary"
+          variant="neon"
         >
-          {cashOutMutation.isPending ? "Sacando" : "Cash Out"}
+          <Gauge className="size-4" aria-hidden="true" />
+          {cashOutMutation.isPending
+            ? "Sacando"
+            : potentialPayout
+              ? `Cash Out ${formatCents(potentialPayout)}`
+              : "Cash Out"}
         </Button>
       </div>
 
       {activeBet ? (
-        <p className="mt-3 text-xs text-zinc-500">
-          Aposta ativa: {activeBet.status}
-        </p>
+        <div className="mt-3 rounded-md border border-cyan-300/15 bg-cyan-300/5 px-3 py-2 text-xs text-zinc-400">
+          <p>Aposta ativa: {activeBet.status}</p>
+          {potentialPayout ? (
+            <p className="mt-1 text-emerald-200">
+              Payout potencial: {formatCents(potentialPayout)}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {mutationError ? (
-        <div className="mt-3 rounded-md border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">
-          {getApiErrorMessage(mutationError)}
-        </div>
+        <ToastNotice message={getApiErrorMessage(mutationError)} />
       ) : null}
 
       {!isAuthenticated ? (
@@ -106,11 +134,40 @@ export function BetControlsPanel({
           className="mt-3 w-full"
           onClick={() => void login()}
           type="button"
-          variant="ghost"
+          variant="neon"
         >
           Entrar para apostar
         </Button>
       ) : null}
     </section>
+  );
+}
+
+function getPotentialPayout(
+  activeBet: BetResponse | null,
+  currentRound: DashboardRound | null,
+): bigint | null {
+  if (!activeBet || !currentRound || activeBet.status !== "ACCEPTED") {
+    return null;
+  }
+
+  const multiplierBp = currentRound.currentMultiplierBp;
+
+  if (typeof multiplierBp !== "number") {
+    return null;
+  }
+
+  return calculatePayoutCents(activeBet.amountCents, multiplierBp);
+}
+
+function ToastNotice({ message }: { message: string }) {
+  return (
+    <div
+      aria-live="polite"
+      className="fixed inset-x-4 bottom-20 z-50 rounded-md border border-rose-400/40 bg-rose-950 px-4 py-3 text-sm text-rose-50 shadow-xl shadow-black/40 sm:left-auto sm:w-96 lg:bottom-4"
+      role="alert"
+    >
+      {message}
+    </div>
   );
 }

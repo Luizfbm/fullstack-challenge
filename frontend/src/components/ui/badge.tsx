@@ -10,6 +10,7 @@ const badgeVariants = cva(
     },
     variants: {
       variant: {
+        chrono: "border-cyan-300/30 bg-cyan-300/10 text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,0.16)]",
         danger: "border-rose-400/30 bg-rose-400/10 text-rose-200",
         neutral: "border-zinc-700 bg-zinc-900 text-zinc-300",
         success: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
