@@ -18,8 +18,11 @@
 - E proibido iniciar o proximo passo com qualquer teste, build, typecheck, healthcheck ou E2E falhando.
 - Todo erro real de instalacao, build, teste, Docker, migration, runtime ou integracao deve ser registrado em `docs/superpowers/specs/2026-05-31-crash-game-implementation-issue-log.md`.
 - Todo bug corrigido exige teste de regressao antes do commit.
+- E proibido deletar, desabilitar ou reduzir testes existentes sem autorizacao explicita do usuario; ajustes de teste devem preservar ou aumentar cobertura comportamental.
+- Antes de qualquer commit, execute todos os testes e gates obrigatorios do escopo; se qualquer teste/gate falhar, nao commite.
 - Toda alteracao que envolver banco, Prisma, RabbitMQ, JWT/auth, API ou fluxo entre servicos exige validacao via Docker/Kong/Keycloak.
 - Toda alteracao que envolver frontend exige build, testes frontend e validacao visual/browser quando a tela existir.
+- Toda tarefa envolvendo GitHub, PRs, CI, Actions, checks, merges ou estado remoto deve seguir `docs/superpowers/specs/2026-06-01-github-tooling-usage-policy.md`.
 - Commits devem ser objetivos e contar a historia da entrega.
 
 ## Portoes de Teste Obrigatorios
