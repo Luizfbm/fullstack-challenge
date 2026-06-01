@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { BadRequestException } from "@nestjs/common";
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import {
+  CurrentRoundNotFoundError,
+  RoundNotFoundError,
+  WalletOperationRejectedError,
+  WalletOperationTimedOutError,
+} from "../../src/application/game.errors";
 import { Bet } from "../../src/domain/bet";
 import { Round } from "../../src/domain/round";
 import { GamesController } from "../../src/presentation/controllers/games.controller";
@@ -121,5 +131,127 @@ describe("GamesController", () => {
     await expect(controller.roundHistory("0")).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  test("lists round history and my bets with parsed limits", async () => {
+    const round = openRound();
+    const bet = acceptedBet();
+    const controller = createController({
+      listMyBetsUseCase: {
+        execute: async (input: { limit?: number; playerId: string }) => {
+          expect(input).toEqual({ playerId: "player-1", limit: 5 });
+
+          return [bet];
+        },
+      },
+      listRoundHistoryUseCase: {
+        execute: async (input: { limit?: number }) => {
+          expect(input).toEqual({ limit: 2 });
+
+          return [round];
+        },
+      },
+    });
+
+    await expect(controller.roundHistory("2")).resolves.toHaveLength(1);
+    await expect(
+      controller.myBets({ playerId: "player-1", username: "player" }, "5"),
+    ).resolves.toMatchObject([{ id: "bet-1", status: "ACCEPTED" }]);
+  });
+
+  test("verifies a round and cashes out the authenticated user", async () => {
+    const controller = createController({
+      cashOutUseCase: {
+        execute: async (input: { playerId: string }) => {
+          expect(input).toEqual({ playerId: "player-1" });
+
+          return { bet: acceptedBet(), balanceCents: 101000n };
+        },
+      },
+      verifyRoundUseCase: {
+        execute: async (input: { roundId: string }) => {
+          expect(input).toEqual({ roundId: "round-1" });
+
+          return { roundId: "round-1", fair: true };
+        },
+      },
+    });
+
+    await expect(controller.verifyRound("round-1")).resolves.toEqual({
+      roundId: "round-1",
+      fair: true,
+    });
+    await expect(
+      controller.cashOut({ playerId: "player-1", username: "player" }),
+    ).resolves.toMatchObject({ id: "bet-1", status: "ACCEPTED" });
+  });
+
+  test("maps game domain errors to documented HTTP exceptions", async () => {
+    const badRequestController = createController({
+      placeBetUseCase: {
+        execute: async () => {
+          throw new WalletOperationRejectedError(
+            "INSUFFICIENT_FUNDS",
+            "Insufficient funds",
+          );
+        },
+      },
+    });
+    const notFoundController = createController({
+      verifyRoundUseCase: {
+        execute: async () => {
+          throw new RoundNotFoundError("round-missing");
+        },
+      },
+    });
+    const walletNotFoundController = createController({
+      placeBetUseCase: {
+        execute: async () => {
+          throw new WalletOperationRejectedError(
+            "WALLET_NOT_FOUND",
+            "Wallet not found",
+          );
+        },
+      },
+    });
+    const timeoutController = createController({
+      cashOutUseCase: {
+        execute: async () => {
+          throw new WalletOperationTimedOutError(250);
+        },
+      },
+    });
+    const currentRoundController = createController({
+      cashOutUseCase: {
+        execute: async () => {
+          throw new CurrentRoundNotFoundError();
+        },
+      },
+    });
+
+    await expect(
+      badRequestController.placeBet(
+        { playerId: "player-1", username: "player" },
+        { amountCents: "1000" },
+      ),
+    ).rejects.toThrow(BadRequestException);
+    await expect(notFoundController.verifyRound("round-missing")).rejects.toThrow(
+      NotFoundException,
+    );
+    await expect(
+      walletNotFoundController.placeBet(
+        { playerId: "player-1", username: "player" },
+        { amountCents: "1000" },
+      ),
+    ).rejects.toThrow(NotFoundException);
+    await expect(
+      timeoutController.cashOut({ playerId: "player-1", username: "player" }),
+    ).rejects.toThrow(ServiceUnavailableException);
+    await expect(
+      currentRoundController.cashOut({
+        playerId: "player-1",
+        username: "player",
+      }),
+    ).rejects.toThrow(NotFoundException);
   });
 });
