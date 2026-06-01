@@ -844,6 +844,66 @@ Cada entrada deve conter:
   validado pelo Playwright local.
 - Status: resolvido.
 
+### 50. Modelo GLB do carro carregava com a dianteira invertida
+
+- Contexto: integracao do asset `time-machine-low-poly.glb` na arena Three.js.
+- Sintoma: o carro aparecia com a traseira apontando para a direcao de voo; a
+  dianteira deveria ficar voltada para a direita da cena.
+- Causa: o GLB importado usa orientacao local diferente da convencao da cena,
+  que move o carro no eixo `+X`.
+- Correcao: o adaptador do modelo passou a aplicar rotacao `Y = Math.PI` antes
+  da normalizacao/centralizacao do GLB.
+- Regressao: adicionado teste unitario garantindo que um marcador de dianteira
+  termina com `x` maior que o marcador traseiro depois da preparacao do asset.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `cd frontend &&
+  bun test src/components/game/crash-flight-scene.test.ts`, `cd frontend &&
+  bun run build`, `bun run test:e2e:browser`, `bun run lint`, `bun run
+  check:types`, `bun run test:coverage && bun run quality:gate`, `docker
+  compose config` e screenshot Playwright em
+  `/tmp/chrono-crash-car-front-right.png` passaram.
+- Status: resolvido.
+
+### 51. E2E browser perdeu a janela de aposta ao validar canvas antes do bet
+
+- Contexto: validacao browser apos corrigir a orientacao do GLB.
+- Sintoma: `bun run test:e2e:browser` falhou aguardando o botao `Apostar`
+  habilitado; a screenshot mostrava a rodada ja em `RUNNING`.
+- Causa: o teste validava carregamento do GLB e pixels do canvas antes de
+  enviar a aposta, consumindo a janela curta de `BETTING`.
+- Correcao: o fluxo E2E passou a apostar primeiro, executar cashout em seguida
+  e validar carregamento do asset/canvas depois do cashout.
+- Regressao: `bun run test:e2e:browser` cobre novamente login, aposta,
+  cashout, carregamento do GLB e canvas renderizado.
+- Validacao: `bun run test:e2e:browser` passou.
+- Status: resolvido.
+
+### 52. Teste de componente React exigiu runner com DOM
+
+- Contexto: Passo 13 do plano de execucao, ao adicionar testes renderizados da
+  dashboard e dos controles de aposta.
+- Sintoma: `cd frontend && bun test
+  src/components/game/game-dashboard-shell.test.tsx` falhou com
+  `ReferenceError: window is not defined` ao inicializar o cliente OIDC.
+- Causa: o runner nativo do Bun nao fornece ambiente DOM/jsdom para testes de
+  componentes React, enquanto os novos testes precisam renderizar a UI e
+  disparar eventos de formulario. O script do pacote frontend ja usa Vitest,
+  que suporta `@vitest-environment jsdom`.
+- Correcao: adicionadas dependencias `@testing-library/react`,
+  `@testing-library/dom` e `jsdom`; o script raiz `test:unit` passou a executar
+  o frontend via `bun run test`, preservando Bun nos testes de backend e
+  scripts.
+- Regressao: os novos testes cobrem renderizacao da tela principal,
+  normalizacao do input de aposta, estados habilitado/desabilitado de apostar e
+  cashout, chamada das mutations e exibicao de erro de saldo insuficiente.
+- Validacao: `cd frontend && bun run test
+  src/components/game/game-dashboard-shell.test.tsx`, `cd frontend && bun run
+  test`, `cd frontend && bun run build`, `bun run lint`, `bun run
+  test:unit`, `bun run check:types`, `bun run test:coverage && bun run
+  quality:gate`, `docker compose config`, `docker compose up -d --build`,
+  `docker compose ps`, `bun scripts/ci/check-kong-health.ts`, `curl -fsS
+  http://localhost:8000/` e `git diff --check` passaram.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -936,6 +996,13 @@ Cada entrada deve conter:
   Playwright final em mobile `390x844` e desktop `1440x900` validando
   `hasStage`, `hasCurve`, `hasActions`, `hasTables`, `overlapsStage: false`
   e `overflowX: false`.
+- Passo 13 frontend:
+  `cd frontend && bun run test src/components/game/game-dashboard-shell.test.tsx`,
+  `cd frontend && bun run test`, `cd frontend && bun run build`, `bun run
+  lint`, `bun run test:unit`, `bun run check:types`, `bun run test:coverage
+  && bun run quality:gate`, `docker compose config`, `docker compose up -d
+  --build`, `docker compose ps`, `bun scripts/ci/check-kong-health.ts`, `curl
+  -fsS http://localhost:8000/` e `git diff --check`.
 
 ## Validacoes Docker Ja Executadas
 

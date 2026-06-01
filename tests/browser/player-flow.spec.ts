@@ -30,7 +30,6 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
   await expect(
     page.getByText("1.00x + 0.10x por segundo").first(),
   ).toBeVisible();
-  await expectCanvasHasPixels(page);
 
   const balanceBeforeBet = await readDisplayedBalance(page);
 
@@ -49,6 +48,8 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
   await page.getByRole("button", { name: "Cash Out" }).click();
 
   await expect(page.getByText("CASHED_OUT")).toBeVisible();
+  await expectTimeCarAssetLoaded(page);
+  await expectCanvasHasPixels(page);
   await expect(page.getByRole("heading", { name: "Chrono Crash" })).toBeVisible();
   await expect(async () => {
     const currentBalance = await readDisplayedBalance(page);
@@ -63,6 +64,18 @@ async function readDisplayedBalance(page: Page): Promise<string> {
   await expect(balance).toBeVisible();
 
   return balance.innerText();
+}
+
+async function expectTimeCarAssetLoaded(page: Page) {
+  await expect(async () => {
+    const assetLoaded = await page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .some((entry) => entry.name.includes("/models/time-machine-low-poly.glb")),
+    );
+
+    expect(assetLoaded).toBe(true);
+  }).toPass();
 }
 
 async function expectCanvasHasPixels(page: Page) {

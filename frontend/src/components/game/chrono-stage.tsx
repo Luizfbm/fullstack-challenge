@@ -62,22 +62,22 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
         </p>
       </div>
 
-      <div className="relative z-20 flex min-h-[34rem] flex-col justify-between px-5 py-16">
-        <div className="mx-auto mt-10 max-w-xl text-center">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.3em] text-cyan-100 shadow-[0_0_30px_rgba(34,211,238,0.18)]">
+      <div className="pointer-events-none relative z-20 flex min-h-[34rem] flex-col justify-between px-5 py-5 pt-24">
+        <div className="max-w-[18rem] rounded-lg border border-cyan-300/20 bg-slate-950/35 p-3 text-left shadow-[0_0_42px_rgba(34,211,238,0.12)] backdrop-blur-sm">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.3em] text-cyan-100 shadow-[0_0_30px_rgba(34,211,238,0.18)]">
             <Gauge className="size-3.5" aria-hidden="true" />
             Chrono drive
           </div>
           <p
             className={cn(
-              "text-[clamp(4.5rem,14vw,8.6rem)] font-black leading-none tracking-normal text-zinc-50 drop-shadow-[0_12px_0_rgba(0,0,0,0.32)]",
+              "text-[clamp(2.9rem,7vw,4.9rem)] font-black leading-none tracking-normal text-zinc-50 drop-shadow-[0_10px_0_rgba(0,0,0,0.36)]",
               running && "chrono-pulse",
               crashed && "text-rose-100",
             )}
           >
             {isLoading ? "..." : formatRoundMultiplier(round)}
           </p>
-          <p className="mx-auto mt-4 max-w-xl font-mono text-xs uppercase tracking-[0.24em] text-zinc-400">
+          <p className="mt-3 font-mono text-xs uppercase tracking-[0.24em] text-zinc-400">
             {running ? "temporal ascent" : crashed ? "timeline rupture" : "launch bay"}
           </p>
         </div>

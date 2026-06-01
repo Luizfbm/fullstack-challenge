@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { getRoundProgress } from "../../services/round-timing";
 import { createFlightStage, disposeObject } from "./crash-flight-stage";
 import { createGrowthTrail, updateGrowthTrail } from "./growth-trail";
-import { createTimeCarModel } from "./time-car-model";
+import { createTimeCarModel, loadTimeCarAsset } from "./time-car-model";
 import type { DashboardRound } from "./round-formatting";
 
 type CrashFlightSceneProps = {
@@ -63,11 +63,17 @@ export function CrashFlightScene({
     const car = createTimeCarModel();
     const trail = createGrowthTrail();
     let frameId = 0;
+    let disposed = false;
 
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.shadowMap.enabled = true;
     scene.add(stage.group, trail.group, car);
+    loadTimeCarAsset(car, () => disposed).catch(() => {
+      if (!disposed) {
+        car.name = "time-car-model-fallback";
+      }
+    });
     camera.position.set(0.2, 1.12, 5.5);
 
     const resize = () => {
@@ -142,6 +148,7 @@ export function CrashFlightScene({
     window.addEventListener("resize", resize);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);
       disposeObject(scene);

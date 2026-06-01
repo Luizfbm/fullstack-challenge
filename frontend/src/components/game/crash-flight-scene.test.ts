@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { createFlightStage, disposeObject } from "./crash-flight-stage";
 import { createGrowthTrail, updateGrowthTrail } from "./growth-trail";
-import { createTimeCarModel } from "./time-car-model";
+import {
+  createTimeCarModel,
+  normalizeTimeCarAssetForScene,
+  TIME_CAR_ASSET_PATH,
+  TIME_CAR_ASSET_ROTATION_Y,
+} from "./time-car-model";
 
 describe("crash flight scene primitives", () => {
   it("builds a procedural time car without external assets", () => {
@@ -13,6 +18,33 @@ describe("crash flight scene primitives", () => {
     expect(car.children.every((child) => child instanceof THREE.Mesh)).toBe(
       true,
     );
+  });
+
+  it("points the runtime scene at the bundled low-poly time-machine asset", () => {
+    expect(TIME_CAR_ASSET_PATH).toBe("/models/time-machine-low-poly.glb");
+  });
+
+  it("orients the imported time car with its front facing right", () => {
+    const model = new THREE.Group();
+    const frontMarker = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1));
+    const rearMarker = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1));
+
+    frontMarker.position.x = -2;
+    rearMarker.position.x = 1;
+    model.add(frontMarker, rearMarker);
+
+    normalizeTimeCarAssetForScene(model);
+    model.updateMatrixWorld(true);
+
+    const frontPosition = new THREE.Vector3().setFromMatrixPosition(
+      frontMarker.matrixWorld,
+    );
+    const rearPosition = new THREE.Vector3().setFromMatrixPosition(
+      rearMarker.matrixWorld,
+    );
+
+    expect(model.rotation.y).toBe(TIME_CAR_ASSET_ROTATION_Y);
+    expect(frontPosition.x).toBeGreaterThan(rearPosition.x);
   });
 
   it("updates the growth trail geometry and crash color", () => {
