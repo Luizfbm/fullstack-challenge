@@ -17,6 +17,18 @@ export type BetStatus =
 
 export type RoundStatus = "BETTING" | "RUNNING" | "CRASHED" | "SETTLED";
 
+export type LeaderboardPeriod = "24h" | "7d";
+
+export type LeaderboardEntry = {
+  rank: number;
+  playerId: string;
+  username: string;
+  profitCents: string;
+  wageredCents: string;
+  payoutCents: string;
+  betsCount: number;
+};
+
 export type BetResponse = {
   id: string;
   roundId: string;
@@ -73,6 +85,11 @@ export type PlaceBetInput = {
   amountCents: string;
 };
 
+export type GetLeaderboardInput = {
+  period?: LeaderboardPeriod;
+  limit?: number;
+};
+
 export class GameApi {
   constructor(private readonly client: RequestClient = apiClient) {}
 
@@ -83,6 +100,18 @@ export class GameApi {
   getRoundHistory(limit = 10): Promise<RoundResponse[]> {
     return this.client.request<RoundResponse[]>(
       withLimit(gameRoutes.history, limit),
+    );
+  }
+
+  getLeaderboard({
+    limit = 10,
+    period = "24h",
+  }: GetLeaderboardInput = {}): Promise<LeaderboardEntry[]> {
+    return this.client.request<LeaderboardEntry[]>(
+      withQuery(gameRoutes.leaderboard, {
+        period,
+        limit: String(limit),
+      }),
     );
   }
 
@@ -120,5 +149,9 @@ export class GameApi {
 export const gameApi = new GameApi();
 
 function withLimit(path: string, limit: number): string {
-  return `${path}?${new URLSearchParams({ limit: String(limit) })}`;
+  return withQuery(path, { limit: String(limit) });
+}
+
+function withQuery(path: string, query: Record<string, string>): string {
+  return `${path}?${new URLSearchParams(query)}`;
 }

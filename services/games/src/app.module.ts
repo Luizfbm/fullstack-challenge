@@ -18,6 +18,7 @@ import { CashOutUseCase } from "./application/use-cases/cash-out.use-case";
 import { AdvanceRoundLifecycleUseCase } from "./application/use-cases/advance-round-lifecycle.use-case";
 import { GetCurrentRoundUseCase } from "./application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "./application/use-cases/list-my-bets.use-case";
+import { ListLeaderboardUseCase } from "./application/use-cases/list-leaderboard.use-case";
 import { ListRoundHistoryUseCase } from "./application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "./application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "./application/use-cases/verify-round.use-case";
@@ -147,6 +148,15 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
       useFactory: (gameRepository: GameRepository): ListMyBetsUseCase =>
         new ListMyBetsUseCase(gameRepository),
       inject: [GAME_REPOSITORY],
+    },
+    {
+      provide: ListLeaderboardUseCase,
+      useFactory: (
+        gameRepository: GameRepository,
+        clock: Clock,
+      ): ListLeaderboardUseCase =>
+        new ListLeaderboardUseCase(gameRepository, clock),
+      inject: [GAME_REPOSITORY, CLOCK],
     },
     {
       provide: PlaceBetUseCase,
