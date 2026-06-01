@@ -35,7 +35,9 @@ export type RealtimeRoundPayload = {
   crashedAt: string | null;
   currentMultiplierBp: number | null;
   crashPointBp: number | null;
-  multiplierGrowthBpPerSecond: number;
+  multiplierBaseBp: number;
+  multiplierCurve: "EXPONENTIAL";
+  multiplierGrowthRateBpPerSecond: number;
   serverSeedHash: string;
   serverSeed: string | null;
   clientSeed: string;

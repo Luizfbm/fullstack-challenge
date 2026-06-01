@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { Bet } from "../../../src/domain/bet";
 import { InvalidBetStateError, InvalidRoundStateError } from "../../../src/domain/game.errors";
-import { calculatePayoutCents } from "../../../src/domain/multiplier";
+import {
+  calculateCurrentMultiplierBp,
+  calculatePayoutCents,
+} from "../../../src/domain/multiplier";
 import { ProvablyFair } from "../../../src/domain/provably-fair";
 import { Round } from "../../../src/domain/round";
 import { HashChainRoundSeedProvider } from "../../../src/infrastructure/provably-fair/hash-chain-round-seed-provider";
@@ -9,6 +12,45 @@ import { HashChainRoundSeedProvider } from "../../../src/infrastructure/provably
 describe("multiplier", () => {
   test("calculates payout in cents with floor rounding", () => {
     expect(calculatePayoutCents(101n, 15000)).toBe(151n);
+  });
+
+  test("calculates a 15 percent exponential crash multiplier", () => {
+    const startedAt = new Date("2026-05-30T10:00:00.000Z");
+
+    expect(calculateCurrentMultiplierBp(startedAt, startedAt)).toBe(10000);
+    expect(
+      calculateCurrentMultiplierBp(
+        startedAt,
+        new Date("2026-05-30T10:00:01.000Z"),
+      ),
+    ).toBe(11618);
+    expect(
+      calculateCurrentMultiplierBp(
+        startedAt,
+        new Date("2026-05-30T10:00:05.000Z"),
+      ),
+    ).toBe(21170);
+    expect(
+      calculateCurrentMultiplierBp(
+        startedAt,
+        new Date("2026-05-30T10:00:10.000Z"),
+      ),
+    ).toBe(44816);
+    expect(
+      calculateCurrentMultiplierBp(
+        startedAt,
+        new Date("2026-05-30T10:00:20.000Z"),
+      ),
+    ).toBe(200855);
+  });
+
+  test("keeps elapsed time before the start at the base multiplier", () => {
+    expect(
+      calculateCurrentMultiplierBp(
+        new Date("2026-05-30T10:00:10.000Z"),
+        new Date("2026-05-30T10:00:05.000Z"),
+      ),
+    ).toBe(10000);
   });
 });
 

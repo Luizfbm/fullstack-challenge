@@ -145,7 +145,10 @@ function StatePanel({
         label="curve"
         value={
           round
-            ? getCrashCurveFormula(round.multiplierGrowthBpPerSecond)
+            ? getCrashCurveFormula(
+                round.multiplierBaseBp,
+                round.multiplierGrowthRateBpPerSecond,
+              )
             : "aguardando rodada"
         }
       />
@@ -153,7 +156,7 @@ function StatePanel({
         label="rate"
         value={
           round
-            ? getCrashCurveHumanRate(round.multiplierGrowthBpPerSecond)
+            ? getCrashCurveHumanRate(round.multiplierGrowthRateBpPerSecond)
             : "aguardando rodada"
         }
       />

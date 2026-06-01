@@ -1,4 +1,4 @@
-import { MULTIPLIER_GROWTH_BP_PER_SECOND } from "../game.constants";
+import { MULTIPLIER_GROWTH_RATE_BP_PER_SECOND } from "../game.constants";
 import { WalletCreditFailedError } from "../game.errors";
 import { Clock } from "../ports/clock";
 import { GameRepository } from "../ports/game.repository";
@@ -110,7 +110,7 @@ export class AdvanceRoundLifecycleUseCase {
     const multiplierBp = calculateCurrentMultiplierBp(
       round.startedAt,
       this.clock.now(),
-      MULTIPLIER_GROWTH_BP_PER_SECOND,
+      MULTIPLIER_GROWTH_RATE_BP_PER_SECOND,
     );
 
     await this.applyAutoCashouts(round, multiplierBp);

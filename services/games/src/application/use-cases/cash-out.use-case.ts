@@ -1,5 +1,5 @@
 import {
-  MULTIPLIER_GROWTH_BP_PER_SECOND,
+  MULTIPLIER_GROWTH_RATE_BP_PER_SECOND,
 } from "../game.constants";
 import {
   CurrentRoundNotFoundError,
@@ -44,7 +44,7 @@ export class CashOutUseCase {
     const multiplierBp = calculateCurrentMultiplierBp(
       round.startedAt,
       this.clock.now(),
-      MULTIPLIER_GROWTH_BP_PER_SECOND,
+      MULTIPLIER_GROWTH_RATE_BP_PER_SECOND,
     );
     const bet = round.cashOut(input.playerId, multiplierBp);
     const payoutCents = bet.payoutCents;

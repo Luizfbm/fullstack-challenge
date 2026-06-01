@@ -1,4 +1,4 @@
-import { MULTIPLIER_GROWTH_BP_PER_SECOND } from "../../application/game.constants";
+import { MULTIPLIER_GROWTH_RATE_BP_PER_SECOND } from "../../application/game.constants";
 import { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
@@ -74,7 +74,7 @@ export class RoundRealtimeSerializer {
     return calculateCurrentMultiplierBp(
       round.startedAt,
       now,
-      MULTIPLIER_GROWTH_BP_PER_SECOND,
+      MULTIPLIER_GROWTH_RATE_BP_PER_SECOND,
     );
   }
 }

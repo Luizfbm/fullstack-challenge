@@ -1,6 +1,16 @@
 import { execFileSync } from "node:child_process";
 import { expect, test, type Page } from "@playwright/test";
 
+type PreparedRound = {
+  chainIndex: number;
+  crashPointBp: number;
+  extendedBettingWindowMs: number | null;
+  multiplier: string;
+  roundId: string;
+  scenario: string;
+  status: string;
+};
+
 test("player can login, bet, cash out, and keep the realtime table visible", async ({
   page,
 }) => {
@@ -14,22 +24,22 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
   await expect(page).toHaveURL("http://localhost:8000/");
   await expect(page.getByRole("banner").getByText("player")).toBeVisible();
 
-  execFileSync("bun", ["run", "e2e:prepare", "cashout"], {
-    stdio: "inherit",
-  });
+  const preparedRound = prepareBrowserCashoutRound();
 
   await page.reload();
 
   await expect(page.getByText("LIVE").first()).toBeVisible();
-  await expect(page.getByText("BETTING").first()).toBeVisible();
+  await expect(page.getByTestId("metric-rodada")).toContainText(
+    `#${preparedRound.chainIndex} BETTING`,
+  );
   await page.getByRole("tab", { name: "Round State" }).click();
   await expect(
     page.getByText(
-      "multiplierBp = 10000 + floor(elapsedMs * 1000 / 1000)",
+      "multiplierBp = floor(10000 * exp(0.15 * elapsedSeconds))",
     ).first(),
   ).toBeVisible();
   await expect(
-    page.getByText("1.00x + 0.10x por segundo").first(),
+    page.getByText("curva exponencial 15.00%/s").first(),
   ).toBeVisible();
 
   const balanceBeforeBet = await readDisplayedBalance(page);
@@ -44,6 +54,8 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
     expect(balanceAfterBet).not.toBe(balanceBeforeBet);
   }).toPass();
   const balanceAfterBet = await readDisplayedBalance(page);
+
+  forceBettingRoundToStart(preparedRound.roundId);
 
   await expect(page.getByRole("button", { name: "Cash Out" })).toBeEnabled();
   await page.getByRole("button", { name: "Cash Out" }).click();
@@ -73,14 +85,14 @@ test("player can use auto cashout preset without manual cashout", async ({
   await expect(page).toHaveURL("http://localhost:8000/");
   await expect(page.getByRole("banner").getByText("player")).toBeVisible();
 
-  execFileSync("bun", ["run", "e2e:prepare", "cashout"], {
-    stdio: "inherit",
-  });
+  const preparedRound = prepareBrowserCashoutRound();
 
   await page.reload();
 
   await expect(page.getByText("LIVE").first()).toBeVisible();
-  await expect(page.getByText("BETTING").first()).toBeVisible();
+  await expect(page.getByTestId("metric-rodada")).toContainText(
+    `#${preparedRound.chainIndex} BETTING`,
+  );
   await expect(page.getByText("Limite: 1.01x a 1000.00x")).toBeVisible();
 
   const balanceBeforeBet = await readDisplayedBalance(page);
@@ -96,6 +108,8 @@ test("player can use auto cashout preset without manual cashout", async ({
     expect(balanceAfterBet).not.toBe(balanceBeforeBet);
   }).toPass();
   const balanceAfterBet = await readDisplayedBalance(page);
+
+  forceBettingRoundToStart(preparedRound.roundId);
 
   await page.getByRole("tab", { name: "Mesa" }).click();
   await expect(
@@ -150,4 +164,48 @@ async function expectCanvasHasPixels(page: Page) {
 
     expect(hasPixels).toBe(true);
   }).toPass();
+}
+
+function prepareBrowserCashoutRound(): PreparedRound {
+  const output = execFileSync("bun", ["run", "e2e:prepare", "cashout"], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      E2E_PREPARE_BETTING_WINDOW_MS: "60000",
+    },
+  });
+
+  process.stdout.write(output);
+
+  return parsePreparedRound(output);
+}
+
+function parsePreparedRound(output: string): PreparedRound {
+  const jsonStart = output.indexOf("{");
+
+  if (jsonStart < 0) {
+    throw new Error(`Could not parse deterministic round output: ${output}`);
+  }
+
+  return JSON.parse(output.slice(jsonStart)) as PreparedRound;
+}
+
+function forceBettingRoundToStart(roundId: string): void {
+  execFileSync(
+    "docker",
+    [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "psql",
+      "-U",
+      "admin",
+      "-d",
+      "games",
+      "-c",
+      `UPDATE rounds SET "bettingEndsAt" = NOW() WHERE id = '${roundId}' AND status = 'BETTING';`,
+    ],
+    { stdio: "inherit" },
+  );
 }

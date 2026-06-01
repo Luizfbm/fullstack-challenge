@@ -1,4 +1,6 @@
 export const BASE_MULTIPLIER_BP = 10000;
+export const MULTIPLIER_CURVE = "EXPONENTIAL";
+export const DEFAULT_MULTIPLIER_GROWTH_RATE_BP_PER_SECOND = 1500;
 
 export function calculatePayoutCents(
   amountCents: bigint,
@@ -18,16 +20,15 @@ export function calculatePayoutCents(
 export function calculateCurrentMultiplierBp(
   startedAt: Date,
   now: Date,
-  growthBpPerSecond = 1000,
+  growthRateBpPerSecond = DEFAULT_MULTIPLIER_GROWTH_RATE_BP_PER_SECOND,
 ): number {
-  if (!Number.isInteger(growthBpPerSecond) || growthBpPerSecond <= 0) {
-    throw new Error("Multiplier growth must be a positive integer");
+  if (!Number.isInteger(growthRateBpPerSecond) || growthRateBpPerSecond <= 0) {
+    throw new Error("Multiplier growth rate must be a positive integer");
   }
 
   const elapsedMs = Math.max(0, now.getTime() - startedAt.getTime());
+  const elapsedSeconds = elapsedMs / 1000;
+  const growthRate = growthRateBpPerSecond / BASE_MULTIPLIER_BP;
 
-  return (
-    BASE_MULTIPLIER_BP +
-    Math.floor((elapsedMs * growthBpPerSecond) / 1000)
-  );
+  return Math.floor(BASE_MULTIPLIER_BP * Math.exp(growthRate * elapsedSeconds));
 }
