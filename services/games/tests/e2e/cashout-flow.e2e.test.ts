@@ -65,4 +65,60 @@ describe("cashout E2E", () => {
     },
     { timeout: 120000 },
   );
+
+  test(
+    "automatically cashes out at the configured target without manual cashout",
+    async () => {
+      await withE2ELock(async () => {
+        await ensureStackIsHealthy();
+        const token = await getAccessToken();
+        const beforeWallet = await getWallet(token);
+        const beforeBalance = BigInt(beforeWallet.balanceCents);
+        const bettingRound = await prepareBettingRound(15000);
+
+        const bet = await placeBet(token, "1000", 15000);
+
+        expect(bet.roundId).toBe(bettingRound.id);
+        expect(bet.status).toBe("ACCEPTED");
+        expect(bet.autoCashoutMultiplierBp).toBe(15000);
+
+        await forceBettingRoundToStart(bettingRound.id);
+        await waitForCurrentStatus("RUNNING");
+
+        let latestBet = bet;
+
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          latestBet = (await listMyBets(token, 1))[0] ?? latestBet;
+
+          if (latestBet.status === "CASHED_OUT") {
+            break;
+          }
+
+          await Bun.sleep(500);
+        }
+
+        expect(latestBet.status).toBe("CASHED_OUT");
+        expect(latestBet.autoCashoutMultiplierBp).toBe(15000);
+        expect(latestBet.cashoutMultiplierBp).toBe(15000);
+        expect(latestBet.payoutCents).toBe("1500");
+
+        const afterWallet = await getWallet(token);
+
+        expect(BigInt(afterWallet.balanceCents)).toBe(
+          beforeBalance - 1000n + 1500n,
+        );
+
+        await forceRunningRoundToCrash(bettingRound.id);
+        await waitForRoundStatus(bettingRound.id, "SETTLED");
+
+        const verification = await verifyRound(bettingRound.id);
+
+        expect(verification.status).toBe("SETTLED");
+        expect(verification.revealed).toBe(true);
+        expect(verification.serverSeedMatchesCommitment).toBe(true);
+        expect(verification.fair).toBe(true);
+      });
+    },
+    { timeout: 120000 },
+  );
 });

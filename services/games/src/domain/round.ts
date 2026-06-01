@@ -28,6 +28,7 @@ type PlaceBetParams = {
   playerId: string;
   username: string;
   amountCents: bigint;
+  autoCashoutMultiplierBp?: number | null;
 };
 
 export class Round {
@@ -119,6 +120,7 @@ export class Round {
       playerId: params.playerId,
       username: params.username,
       amountCents: params.amountCents,
+      autoCashoutMultiplierBp: params.autoCashoutMultiplierBp ?? null,
     });
     this.acceptedBets.set(params.playerId, bet);
 

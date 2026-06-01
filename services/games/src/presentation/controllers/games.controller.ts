@@ -190,6 +190,7 @@ export class GamesController {
         playerId: user.playerId,
         username: user.username,
         amountCents: body.amountCents,
+        autoCashoutMultiplierBp: body.autoCashoutMultiplierBp ?? null,
       });
 
       return toPublicBetFields(result.bet);

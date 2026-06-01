@@ -19,6 +19,7 @@ export type RealtimeBetPayload = {
   username: string;
   amountCents: string;
   status: BetStatus;
+  autoCashoutMultiplierBp: number | null;
   cashoutMultiplierBp: number | null;
   payoutCents: string | null;
   rejectionReason: string | null;

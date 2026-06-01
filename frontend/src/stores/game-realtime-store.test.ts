@@ -110,6 +110,7 @@ function realtimeRound(
 function betEvent(status: BetRealtimePayload["status"]): BetRealtimePayload {
   return {
     amountCents: "1000",
+    autoCashoutMultiplierBp: null,
     betId: "bet-1",
     cashoutMultiplierBp: status === "CASHED_OUT" ? 12000 : null,
     emittedAt: "2026-05-31T10:00:02.000Z",

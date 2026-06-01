@@ -46,6 +46,31 @@ describe("Bet", () => {
 
     expect(() => bet.cashOut(20000)).toThrow(InvalidBetStateError);
   });
+
+  test("stores an optional auto cashout target", () => {
+    const bet = Bet.accepted({
+      id: "bet-1",
+      roundId: "round-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 20000,
+    });
+
+    expect(bet.autoCashoutMultiplierBp).toBe(20000);
+
+    const restored = Bet.restore({
+      id: "bet-2",
+      roundId: "round-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      status: "ACCEPTED",
+      autoCashoutMultiplierBp: 15000,
+    });
+
+    expect(restored.autoCashoutMultiplierBp).toBe(15000);
+  });
 });
 
 describe("Round", () => {
@@ -135,6 +160,33 @@ describe("Round", () => {
     round.completeCashOut("player-1");
 
     expect(bet.status).toBe("CASHED_OUT");
+  });
+
+  test("manual cashout still works for a bet with a future auto target", () => {
+    const round = Round.openBetting({
+      id: "round-1",
+      bettingStartsAt,
+      bettingEndsAt,
+      crashPointBp: 30000,
+      serverSeedHash: "seed-hash",
+      clientSeed: "client",
+      nonce: 1,
+      chainIndex: 1,
+    });
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 25000,
+    });
+    round.start(new Date("2026-05-30T10:00:11.000Z"));
+
+    const bet = round.cashOut("player-1", 15000);
+
+    expect(bet.autoCashoutMultiplierBp).toBe(25000);
+    expect(bet.cashoutMultiplierBp).toBe(15000);
+    expect(bet.payoutCents).toBe(1500n);
   });
 
   test("does not allow cashout at or after crash point", () => {

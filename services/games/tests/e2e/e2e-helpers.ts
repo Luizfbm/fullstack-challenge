@@ -40,6 +40,7 @@ export type BetResponse = {
     | "CASHOUT_PENDING_CREDIT"
     | "CASHED_OUT"
     | "LOST";
+  autoCashoutMultiplierBp: number | null;
   cashoutMultiplierBp: number | null;
   payoutCents: string | null;
   rejectionReason: string | null;
@@ -197,14 +198,20 @@ export async function getWallet(token: string): Promise<WalletResponse> {
 export async function placeBet(
   token: string,
   amountCents: string,
+  autoCashoutMultiplierBp?: number | null,
 ): Promise<BetResponse> {
+  const body =
+    autoCashoutMultiplierBp === undefined
+      ? { amountCents }
+      : { amountCents, autoCashoutMultiplierBp };
+
   return apiJson<BetResponse>("/games/bet", {
     method: "POST",
     token,
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ amountCents }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -264,38 +271,45 @@ export async function prepareDeterministicRound(
 ): Promise<RoundResponse> {
   const fixture = DETERMINISTIC_ROUND_FIXTURES[scenario];
 
-  await resetE2EGameState();
-  await setWalletBalance(DEFAULT_E2E_BALANCE_CENTS);
+  for (let resetAttempt = 0; resetAttempt < 5; resetAttempt += 1) {
+    await resetE2EGameState();
+    await setWalletBalance(DEFAULT_E2E_BALANCE_CENTS);
 
-  let round = await waitForCurrentRound();
+    let round = await waitForCurrentRound();
 
-  while (round.chainIndex < fixture.chainIndex) {
-    await forceBettingRoundToStart(round.id);
-    const runningRound = await waitForCurrentStatus("RUNNING");
-    await forceRunningRoundToCrash(runningRound.id);
-    await waitForRoundStatus(runningRound.id, "SETTLED");
-    round = await waitForCurrentRound();
+    while (round.chainIndex < fixture.chainIndex) {
+      await forceBettingRoundToStart(round.id);
+      const runningRound = await waitForCurrentStatus("RUNNING");
+      await forceRunningRoundToCrash(runningRound.id);
+      await waitForRoundStatus(runningRound.id, "SETTLED");
+      round = await waitForCurrentRound();
+    }
+
+    if (round.chainIndex !== fixture.chainIndex || round.status !== "BETTING") {
+      await Bun.sleep(250);
+      continue;
+    }
+
+    const crashPointBp = await getRoundCrashPointBp(round.id);
+
+    if (crashPointBp !== fixture.crashPointBp) {
+      throw new Error(
+        `Expected deterministic ${scenario} crash point ${fixture.crashPointBp}, got ${crashPointBp}`,
+      );
+    }
+
+    if (round.bets.length > 0) {
+      throw new Error(`Expected deterministic ${scenario} round without bets`);
+    }
+
+    return round;
   }
 
-  if (round.chainIndex !== fixture.chainIndex || round.status !== "BETTING") {
-    throw new Error(
-      `Expected deterministic ${scenario} round at chain index ${fixture.chainIndex}, got ${round.status} #${round.chainIndex}`,
-    );
-  }
+  const round = await waitForCurrentRound();
 
-  const crashPointBp = await getRoundCrashPointBp(round.id);
-
-  if (crashPointBp !== fixture.crashPointBp) {
-    throw new Error(
-      `Expected deterministic ${scenario} crash point ${fixture.crashPointBp}, got ${crashPointBp}`,
-    );
-  }
-
-  if (round.bets.length > 0) {
-    throw new Error(`Expected deterministic ${scenario} round without bets`);
-  }
-
-  return round;
+  throw new Error(
+    `Expected deterministic ${scenario} round at chain index ${fixture.chainIndex}, got ${round.status} #${round.chainIndex}`,
+  );
 }
 
 export async function forceBettingRoundToStart(roundId: string): Promise<void> {

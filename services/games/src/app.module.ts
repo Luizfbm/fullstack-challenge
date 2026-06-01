@@ -85,6 +85,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         clock: Clock,
         roundSeedProvider: HashChainRoundSeedProvider,
         walletClient: WalletClient,
+        roundEventsPublisher: RoundEventsPublisher,
       ): AdvanceRoundLifecycleUseCase =>
         new AdvanceRoundLifecycleUseCase(
           gameRepository,
@@ -95,6 +96,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
           {
             bettingWindowMs: Number(process.env.ROUND_BETTING_WINDOW_MS ?? 10000),
           },
+          roundEventsPublisher,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -102,6 +104,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         CLOCK,
         HashChainRoundSeedProvider,
         WALLET_CLIENT,
+        ROUND_EVENTS_PUBLISHER,
       ],
     },
     {

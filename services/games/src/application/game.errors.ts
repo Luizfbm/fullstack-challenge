@@ -19,6 +19,13 @@ export class BetAmountOutOfRangeError extends Error {
   }
 }
 
+export class AutoCashoutMultiplierOutOfRangeError extends Error {
+  constructor() {
+    super("Auto cashout multiplier must be between 1.01x and 1000.00x");
+    this.name = "AutoCashoutMultiplierOutOfRangeError";
+  }
+}
+
 export class WalletCreditFailedError extends Error {
   public readonly originalCause?: unknown;
 

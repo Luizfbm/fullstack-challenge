@@ -29,6 +29,7 @@ export function toPublicBetFields(bet: Bet) {
     username: bet.username,
     amountCents: bet.amountCents.toString(),
     status: bet.status,
+    autoCashoutMultiplierBp: bet.autoCashoutMultiplierBp,
     cashoutMultiplierBp: bet.cashoutMultiplierBp,
     payoutCents: bet.payoutCents?.toString() ?? null,
     rejectionReason: bet.rejectionReason,

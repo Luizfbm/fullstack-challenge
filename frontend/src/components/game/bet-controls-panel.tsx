@@ -1,4 +1,5 @@
 import { Gauge, RotateCcw, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { useAuth } from "../../hooks/use-auth";
 import { useBetSlip } from "../../hooks/use-bet-slip";
 import {
@@ -7,11 +8,16 @@ import {
 } from "../../hooks/use-game-rest";
 import { cn } from "../../lib/utils";
 import { getApiErrorMessage } from "../../services/api-errors";
+import {
+  formatMultiplierBp,
+  parseAutoCashoutMultiplierInput,
+} from "../../services/auto-cashout";
 import type { BetResponse } from "../../services/game-api";
 import { formatCents } from "../../services/money";
 import { calculatePayoutCents } from "../../services/payout";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { AutoCashoutControl } from "./auto-cashout-control";
 import type { DashboardRound } from "./round-formatting";
 
 type BetControlsPanelProps = {
@@ -30,10 +36,17 @@ export function BetControlsPanel({
     useBetSlip();
   const placeBetMutation = usePlaceBetMutation();
   const cashOutMutation = useCashOutMutation();
+  const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false);
+  const [autoCashoutTarget, setAutoCashoutTarget] = useState("2.00");
+  const autoCashoutParseResult =
+    parseAutoCashoutMultiplierInput(autoCashoutTarget);
+  const autoCashoutIsValid =
+    !autoCashoutEnabled || autoCashoutParseResult.valid;
   const amountIsValid = BigInt(betAmountCents) > 0n;
   const canPlaceBet =
     isAuthenticated &&
     amountIsValid &&
+    autoCashoutIsValid &&
     currentRound?.status === "BETTING" &&
     !activeBet &&
     !placeBetMutation.isPending;
@@ -95,11 +108,27 @@ export function BetControlsPanel({
         </div>
       </div>
 
+      <AutoCashoutControl
+        enabled={autoCashoutEnabled}
+        onEnabledChange={setAutoCashoutEnabled}
+        onTargetChange={setAutoCashoutTarget}
+        parseResult={autoCashoutParseResult}
+        target={autoCashoutTarget}
+      />
+
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Button
           disabled={!canPlaceBet}
           onClick={() =>
-            placeBetMutation.mutate({ amountCents: betAmountCents })
+            placeBetMutation.mutate(
+              autoCashoutEnabled
+                ? {
+                    amountCents: betAmountCents,
+                    autoCashoutMultiplierBp:
+                      autoCashoutParseResult.multiplierBp,
+                  }
+                : { amountCents: betAmountCents },
+            )
           }
           type="button"
           variant="temporal"
@@ -125,6 +154,12 @@ export function BetControlsPanel({
       {activeBet ? (
         <div className="mt-3 rounded-md border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs text-zinc-300">
           <p>Aposta ativa: {activeBet.status}</p>
+          {activeBet.autoCashoutMultiplierBp ? (
+            <p className="mt-1 text-cyan-200">
+              Auto cashout em{" "}
+              {formatMultiplierBp(activeBet.autoCashoutMultiplierBp)}
+            </p>
+          ) : null}
           {potentialPayout ? (
             <p className="mt-1 text-emerald-200">
               Payout potencial: {formatCents(potentialPayout)}

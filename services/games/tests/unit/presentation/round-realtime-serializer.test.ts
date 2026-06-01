@@ -64,6 +64,7 @@ describe("RoundRealtimeSerializer", () => {
       playerId: "player-1",
       username: "player",
       amountCents: 1000n,
+      autoCashoutMultiplierBp: 20000,
     });
 
     const payload = serializer.toBetRealtimePayload(
@@ -79,6 +80,7 @@ describe("RoundRealtimeSerializer", () => {
       username: "player",
       amountCents: "1000",
       status: "ACCEPTED",
+      autoCashoutMultiplierBp: 20000,
       cashoutMultiplierBp: null,
       payoutCents: null,
       rejectionReason: null,

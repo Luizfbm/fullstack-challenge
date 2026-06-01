@@ -14,6 +14,7 @@ type AcceptedBetParams = {
   playerId: string;
   username: string;
   amountCents: bigint;
+  autoCashoutMultiplierBp?: number | null;
 };
 
 type RestoreBetParams = AcceptedBetParams & {
@@ -35,6 +36,7 @@ export class Bet {
     public readonly playerId: string,
     public readonly username: string,
     public readonly amountCents: bigint,
+    public readonly autoCashoutMultiplierBp: number | null,
     status: BetStatus,
   ) {
     this.currentStatus = status;
@@ -51,6 +53,7 @@ export class Bet {
       params.playerId,
       params.username,
       params.amountCents,
+      params.autoCashoutMultiplierBp ?? null,
       "ACCEPTED",
     );
   }
@@ -62,6 +65,7 @@ export class Bet {
       params.playerId,
       params.username,
       params.amountCents,
+      params.autoCashoutMultiplierBp ?? null,
       params.status,
     );
 

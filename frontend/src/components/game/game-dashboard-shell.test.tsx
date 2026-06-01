@@ -112,6 +112,7 @@ describe("game dashboard helpers", () => {
   it("returns the current round bets when present", () => {
     const bet: BetResponse = {
       amountCents: "1000",
+      autoCashoutMultiplierBp: null,
       cashoutMultiplierBp: null,
       id: "bet-1",
       payoutCents: null,
@@ -186,6 +187,46 @@ describe("game dashboard helpers", () => {
       "disabled",
       true,
     );
+  });
+
+  it("configures auto cashout with visible limits and presets", () => {
+    render(<BetControlsPanel activeBet={null} currentRound={createRound()} />);
+
+    expect(screen.getByText("Limite: 1.01x a 1000.00x")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Auto cashout/ }));
+    fireEvent.click(screen.getByRole("button", { name: "2.00x" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apostar" }));
+
+    expect(hookMocks.placeBetMutation.mutate).toHaveBeenCalledWith({
+      amountCents: "1000",
+      autoCashoutMultiplierBp: 20000,
+    });
+  });
+
+  it("disables betting when auto cashout target is outside limits", () => {
+    render(<BetControlsPanel activeBet={null} currentRound={createRound()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Auto cashout/ }));
+    fireEvent.change(screen.getByLabelText("Multiplicador alvo"), {
+      target: { value: "1.00" },
+    });
+
+    expect(screen.getByRole("button", { name: "Apostar" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  it("shows the active bet auto cashout target", () => {
+    render(
+      <BetControlsPanel
+        activeBet={createBet({ autoCashoutMultiplierBp: 20000 })}
+        currentRound={createRound({ status: "RUNNING" })}
+      />,
+    );
+
+    expect(screen.getByText("Auto cashout em 2.00x")).toBeTruthy();
   });
 
   it("only enables cashout during RUNNING with an accepted active bet", () => {
@@ -286,6 +327,7 @@ function createRound(
 function createBet(overrides: Partial<BetResponse> = {}): BetResponse {
   return {
     amountCents: "1000",
+    autoCashoutMultiplierBp: null,
     cashoutMultiplierBp: null,
     id: "bet-1",
     payoutCents: null,
