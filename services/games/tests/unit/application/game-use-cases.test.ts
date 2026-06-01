@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { Bet } from "../../../src/domain/bet";
 import { InvalidRoundStateError } from "../../../src/domain/game.errors";
 import { Round } from "../../../src/domain/round";
-import { BetAmountOutOfRangeError, WalletCreditFailedError } from "../../../src/application/game.errors";
+import {
+  AutoCashoutMultiplierOutOfRangeError,
+  BetAmountOutOfRangeError,
+  WalletCreditFailedError,
+} from "../../../src/application/game.errors";
 import { Clock } from "../../../src/application/ports/clock";
 import {
   GameRepository,
@@ -424,6 +428,159 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     expect(result.round?.serverSeed).toBe("server-seed-1");
   });
 
+  test("automatically cashes out accepted bets at the configured target", async () => {
+    const round = openRound(30000);
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 15000,
+    });
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const repository = new InMemoryGameRepository(round);
+    const walletClient = new FakeWalletClient();
+    const events = new FakeRoundEventsPublisher();
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      new FakeRoundSeedProvider(),
+      walletClient,
+      { bettingWindowMs: 10000 },
+      events,
+    );
+
+    const result = await useCase.execute();
+    const bet = result.round?.bets[0];
+
+    expect(result.action).toBe("NOOP");
+    expect(bet?.status).toBe("CASHED_OUT");
+    expect(bet?.cashoutMultiplierBp).toBe(15000);
+    expect(bet?.payoutCents).toBe(1500n);
+    expect(walletClient.credits[0]).toMatchObject({
+      amountCents: 1500n,
+      playerId: "player-1",
+      referenceId: "round:round-1:player:player-1:cashout-credit",
+      reason: "CASHOUT_PAYOUT",
+    });
+    expect(events.betCashedOutEvents[0]?.cashoutMultiplierBp).toBe(15000);
+  });
+
+  test("auto cashout wins when a tick passes target and crash point", async () => {
+    const round = openRound(20400);
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 20000,
+    });
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const repository = new InMemoryGameRepository(round);
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:21.000Z")),
+      new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
+      { bettingWindowMs: 10000 },
+      new FakeRoundEventsPublisher(),
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.action).toBe("ROUND_CRASHED");
+    expect(result.round?.bets[0]?.status).toBe("CASHED_OUT");
+    expect(result.round?.bets[0]?.cashoutMultiplierBp).toBe(20000);
+  });
+
+  test("does not auto cashout when target is at or above crash point", async () => {
+    const round = openRound(20000);
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 20000,
+    });
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const repository = new InMemoryGameRepository(round);
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:20.000Z")),
+      new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
+      { bettingWindowMs: 10000 },
+      new FakeRoundEventsPublisher(),
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.action).toBe("ROUND_CRASHED");
+    expect(result.round?.bets[0]?.status).toBe("LOST");
+  });
+
+  test("retries a pending auto cashout credit before settlement", async () => {
+    const round = openRound(16000);
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 15000,
+    });
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const repository = new InMemoryGameRepository(round);
+    const walletClient = new FakeWalletClient();
+    walletClient.creditError = new Error("wallet unavailable");
+    const autoCashoutAttempt = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      new FakeRoundSeedProvider(),
+      walletClient,
+      { bettingWindowMs: 10000 },
+      new FakeRoundEventsPublisher(),
+    );
+
+    await expect(autoCashoutAttempt.execute()).rejects.toThrow(
+      WalletCreditFailedError,
+    );
+    expect(repository.currentRound?.status).toBe("RUNNING");
+    expect(repository.currentRound?.bets[0]?.status).toBe(
+      "CASHOUT_PENDING_CREDIT",
+    );
+
+    walletClient.creditError = null;
+    const crashRound = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:16.000Z")),
+      new FakeRoundSeedProvider(),
+      walletClient,
+      { bettingWindowMs: 10000 },
+      new FakeRoundEventsPublisher(),
+    );
+    const settleRound = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:17.000Z")),
+      new FakeRoundSeedProvider(),
+      walletClient,
+      { bettingWindowMs: 10000 },
+      new FakeRoundEventsPublisher(),
+    );
+
+    expect((await crashRound.execute()).action).toBe("ROUND_CRASHED");
+    const result = await settleRound.execute();
+
+    expect(result.action).toBe("ROUND_SETTLED");
+    expect(result.round?.bets[0]?.status).toBe("CASHED_OUT");
+    expect(walletClient.credits).toHaveLength(2);
+  });
+
   test("settles a crashed round before opening the next round", async () => {
     const crashedRound = openRound(10000);
     crashedRound.start(new Date("2026-05-30T10:00:10.000Z"));
@@ -557,6 +714,59 @@ describe("PlaceBetUseCase", () => {
     expect(roundEventsPublisher.betPlacedEvents.map((bet) => bet.id)).toEqual([
       "bet-1",
     ]);
+  });
+
+  test("saves an accepted bet with an auto cashout target", async () => {
+    const round = openRound();
+    const repository = new InMemoryGameRepository(round);
+    const walletClient = new FakeWalletClient();
+    const events = new FakeRoundEventsPublisher();
+    const useCase = new PlaceBetUseCase(
+      repository,
+      walletClient,
+      new FixedIdGenerator("bet-1"),
+      events,
+    );
+
+    const result = await useCase.execute({
+      playerId: "player-1",
+      username: "player",
+      amountCents: "1000",
+      autoCashoutMultiplierBp: 20000,
+    });
+
+    expect(result.bet.autoCashoutMultiplierBp).toBe(20000);
+    expect(repository.savedRounds.at(-1)?.bets[0]?.autoCashoutMultiplierBp).toBe(
+      20000,
+    );
+    expect(events.betPlacedEvents[0]?.autoCashoutMultiplierBp).toBe(20000);
+  });
+
+  test("rejects auto cashout targets outside the allowed range", async () => {
+    const useCase = new PlaceBetUseCase(
+      new InMemoryGameRepository(openRound()),
+      new FakeWalletClient(),
+      new FixedIdGenerator("bet-1"),
+      new FakeRoundEventsPublisher(),
+    );
+
+    await expect(
+      useCase.execute({
+        playerId: "player-1",
+        username: "player",
+        amountCents: "1000",
+        autoCashoutMultiplierBp: 10099,
+      }),
+    ).rejects.toThrow(AutoCashoutMultiplierOutOfRangeError);
+
+    await expect(
+      useCase.execute({
+        playerId: "player-2",
+        username: "player-2",
+        amountCents: "1000",
+        autoCashoutMultiplierBp: 10000001,
+      }),
+    ).rejects.toThrow(AutoCashoutMultiplierOutOfRangeError);
   });
 
   test("rejects out-of-range amounts before debiting the wallet", async () => {

@@ -6,6 +6,7 @@ import {
   BetAmountOutOfRangeError,
   CurrentRoundNotFoundError,
 } from "../game.errors";
+import { parseAutoCashoutMultiplierBp } from "../auto-cashout";
 import { toCents } from "../cents";
 import { GameRepository } from "../ports/game.repository";
 import { IdGenerator } from "../ports/id-generator";
@@ -17,6 +18,7 @@ type PlaceBetInput = {
   playerId: string;
   username: string;
   amountCents: bigint | number | string;
+  autoCashoutMultiplierBp?: number | null;
 };
 
 type PlaceBetResult = {
@@ -42,6 +44,10 @@ export class PlaceBetUseCase {
       throw new BetAmountOutOfRangeError();
     }
 
+    const autoCashoutMultiplierBp = parseAutoCashoutMultiplierBp(
+      input.autoCashoutMultiplierBp,
+    );
+
     const round = await this.gameRepository.findCurrentRound();
 
     if (!round) {
@@ -54,6 +60,7 @@ export class PlaceBetUseCase {
       playerId: input.playerId,
       username: input.username,
       amountCents,
+      autoCashoutMultiplierBp,
     });
     const debitResult = await this.walletClient.debit({
       playerId: input.playerId,

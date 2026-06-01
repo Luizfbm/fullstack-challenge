@@ -4,6 +4,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  AutoCashoutMultiplierOutOfRangeError,
   BetAmountOutOfRangeError,
   CurrentRoundNotFoundError,
   RoundNotFoundError,
@@ -18,6 +19,7 @@ import {
 
 export const toGameHttpError = (error: unknown): Error => {
   if (
+    error instanceof AutoCashoutMultiplierOutOfRangeError ||
     error instanceof BetAmountOutOfRangeError ||
     error instanceof InvalidBetStateError ||
     error instanceof InvalidRoundStateError

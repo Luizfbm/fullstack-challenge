@@ -1,7 +1,9 @@
 import { MULTIPLIER_GROWTH_BP_PER_SECOND } from "../game.constants";
+import { WalletCreditFailedError } from "../game.errors";
 import { Clock } from "../ports/clock";
 import { GameRepository } from "../ports/game.repository";
 import { IdGenerator } from "../ports/id-generator";
+import type { RoundEventsPublisher } from "../ports/round-events.publisher";
 import { RoundSeedProvider } from "../ports/round-seed-provider";
 import type { WalletClient } from "../ports/wallet.client";
 import type { Bet } from "../../domain/bet";
@@ -32,6 +34,7 @@ export class AdvanceRoundLifecycleUseCase {
     private readonly roundSeedProvider: RoundSeedProvider,
     private readonly walletClient: WalletClient,
     private readonly config: AdvanceRoundLifecycleConfig,
+    private readonly roundEventsPublisher?: RoundEventsPublisher,
   ) {
     if (
       !Number.isInteger(config.bettingWindowMs) ||
@@ -110,6 +113,8 @@ export class AdvanceRoundLifecycleUseCase {
       MULTIPLIER_GROWTH_BP_PER_SECOND,
     );
 
+    await this.applyAutoCashouts(round, multiplierBp);
+
     if (multiplierBp < round.crashPointBp) {
       return { action: "NOOP", round };
     }
@@ -121,6 +126,50 @@ export class AdvanceRoundLifecycleUseCase {
     await this.gameRepository.saveRound(round);
 
     return { action: "ROUND_CRASHED", round };
+  }
+
+  private async applyAutoCashouts(
+    round: Round,
+    currentMultiplierBp: number,
+  ): Promise<void> {
+    const eligibleBets = round.bets.filter(
+      (bet) =>
+        bet.status === "ACCEPTED" &&
+        bet.autoCashoutMultiplierBp !== null &&
+        bet.autoCashoutMultiplierBp < round.crashPointBp &&
+        currentMultiplierBp >= bet.autoCashoutMultiplierBp,
+    );
+
+    for (const bet of eligibleBets) {
+      const targetMultiplierBp = bet.autoCashoutMultiplierBp;
+
+      if (targetMultiplierBp === null) {
+        continue;
+      }
+
+      round.cashOut(bet.playerId, targetMultiplierBp);
+
+      if (bet.payoutCents === null) {
+        throw new Error("Auto cashout payout was not calculated");
+      }
+
+      await this.gameRepository.saveRound(round);
+
+      try {
+        await this.walletClient.credit({
+          playerId: bet.playerId,
+          amountCents: bet.payoutCents,
+          referenceId: `round:${round.id}:player:${bet.playerId}:cashout-credit`,
+          reason: "CASHOUT_PAYOUT",
+        });
+      } catch (error) {
+        throw new WalletCreditFailedError(error);
+      }
+
+      round.completeCashOut(bet.playerId);
+      await this.gameRepository.saveRound(round);
+      await this.roundEventsPublisher?.publishBetCashedOut(bet);
+    }
   }
 
   private async settleCrashedRound(

@@ -47,18 +47,19 @@ model Round {
 }
 
 model Bet {
-  id                  String    @id @default(uuid())
-  roundId             String
-  playerId            String
-  username            String
-  amountCents         BigInt
-  status              BetStatus
-  cashoutMultiplierBp Int?
-  payoutCents         BigInt?
-  rejectionReason     String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  round               Round     @relation(fields: [roundId], references: [id], onDelete: Restrict)
+  id                      String    @id @default(uuid())
+  roundId                 String
+  playerId                String
+  username                String
+  amountCents             BigInt
+  status                  BetStatus
+  autoCashoutMultiplierBp Int?
+  cashoutMultiplierBp     Int?
+  payoutCents             BigInt?
+  rejectionReason         String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  round                   Round     @relation(fields: [roundId], references: [id], onDelete: Restrict)
 
   @@unique([roundId, playerId])
   @@index([playerId, createdAt])

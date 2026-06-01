@@ -36,7 +36,10 @@ describe("GameApi", () => {
     const client = createClient({ id: "bet-1" });
     const api = new GameApi(client);
 
-    await api.placeBet({ amountCents: "1000" });
+    await api.placeBet({
+      amountCents: "1000",
+      autoCashoutMultiplierBp: 20000,
+    });
     await api.cashOut();
 
     expect(client.requests).toEqual([
@@ -44,7 +47,10 @@ describe("GameApi", () => {
         path: "/games/bet",
         options: {
           auth: true,
-          body: JSON.stringify({ amountCents: "1000" }),
+          body: JSON.stringify({
+            amountCents: "1000",
+            autoCashoutMultiplierBp: 20000,
+          }),
           method: "POST",
         },
       },

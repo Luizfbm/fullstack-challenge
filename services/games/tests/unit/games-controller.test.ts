@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  AutoCashoutMultiplierOutOfRangeError,
   CurrentRoundNotFoundError,
   RoundNotFoundError,
   WalletOperationRejectedError,
@@ -28,13 +29,16 @@ function openRound(): Round {
   });
 }
 
-function acceptedBet(): Bet {
+function acceptedBet(
+  overrides: { autoCashoutMultiplierBp?: number | null } = {},
+): Bet {
   return Bet.accepted({
     id: "bet-1",
     roundId: "round-1",
     playerId: "player-1",
     username: "player",
     amountCents: 1000n,
+    autoCashoutMultiplierBp: overrides.autoCashoutMultiplierBp ?? null,
   });
 }
 
@@ -106,24 +110,56 @@ describe("GamesController", () => {
   test("places a bet for the authenticated user", async () => {
     const controller = createController({
       placeBetUseCase: {
-        execute: async (input: { playerId: string; amountCents: string }) => {
+        execute: async (input: {
+          playerId: string;
+          amountCents: string;
+          autoCashoutMultiplierBp?: number | null;
+        }) => {
           expect(input).toMatchObject({
             playerId: "player-1",
             amountCents: "1000",
+            autoCashoutMultiplierBp: 20000,
           });
 
-          return { bet: acceptedBet(), balanceCents: 99000n };
+          return {
+            bet: acceptedBet({ autoCashoutMultiplierBp: 20000 }),
+            balanceCents: 99000n,
+          };
         },
       },
     });
 
     const response = await controller.placeBet(
       { playerId: "player-1", username: "player" },
-      { amountCents: "1000" },
+      { amountCents: "1000", autoCashoutMultiplierBp: 20000 },
     );
 
     expect(response.amountCents).toBe("1000");
     expect(response.status).toBe("ACCEPTED");
+    expect(response.autoCashoutMultiplierBp).toBe(20000);
+  });
+
+  test("rejects invalid auto cashout targets", async () => {
+    const controller = createController({
+      placeBetUseCase: {
+        execute: async () => {
+          throw new AutoCashoutMultiplierOutOfRangeError();
+        },
+      },
+    });
+
+    try {
+      await controller.placeBet(
+        { playerId: "player-1", username: "player" },
+        { amountCents: "1000", autoCashoutMultiplierBp: 10099 },
+      );
+      throw new Error("Expected invalid auto cashout target to reject");
+    } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toMatchObject({
+        message: "Auto cashout multiplier must be between 1.01x and 1000.00x",
+      });
+    }
   });
 
   test("rejects invalid pagination limits", async () => {

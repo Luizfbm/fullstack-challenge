@@ -36,6 +36,7 @@ export type BetResponse = {
   username: string;
   amountCents: string;
   status: BetStatus;
+  autoCashoutMultiplierBp: number | null;
   cashoutMultiplierBp: number | null;
   payoutCents: string | null;
   rejectionReason: string | null;
@@ -83,6 +84,7 @@ export type VerifyRoundResponse = RoundVerificationSeedFields & {
 
 export type PlaceBetInput = {
   amountCents: string;
+  autoCashoutMultiplierBp?: number | null;
 };
 
 export type GetLeaderboardInput = {

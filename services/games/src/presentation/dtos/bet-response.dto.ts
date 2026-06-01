@@ -28,6 +28,9 @@ export class BetResponseDto {
   })
   status!: BetStatus;
 
+  @ApiProperty({ nullable: true, example: 20000 })
+  autoCashoutMultiplierBp!: number | null;
+
   @ApiProperty({ nullable: true, example: 15000 })
   cashoutMultiplierBp!: number | null;
 

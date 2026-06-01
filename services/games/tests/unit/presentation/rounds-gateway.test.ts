@@ -98,6 +98,7 @@ describe("RoundsGateway", () => {
         username: "player",
         amountCents: "1000",
         status: "ACCEPTED",
+        autoCashoutMultiplierBp: null,
         cashoutMultiplierBp: null,
         payoutCents: null,
         rejectionReason: null,
@@ -151,6 +152,7 @@ describe("RoundsGateway", () => {
       username: "player",
       amountCents: "1000",
       status: "ACCEPTED",
+      autoCashoutMultiplierBp: null,
       payoutCents: null,
     });
     expect(placedPayload.emittedAt).toBeString();
