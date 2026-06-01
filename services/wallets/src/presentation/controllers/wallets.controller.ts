@@ -3,7 +3,9 @@ import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { CreateWalletUseCase } from "../../application/use-cases/create-wallet.use-case";
 import { GetWalletUseCase } from "../../application/use-cases/get-wallet.use-case";
@@ -25,6 +27,7 @@ export class WalletsController {
   ) {}
 
   @Get("health")
+  @ApiOperation({ summary: "Check Wallet Service health" })
   @ApiOkResponse({ type: HealthCheckResponseDto })
   check(): HealthCheckResponseDto {
     return { status: "ok", service: "wallets" };
@@ -33,7 +36,9 @@ export class WalletsController {
   @Post()
   @UseGuards(KeycloakJwtGuard)
   @ApiBearerAuth()
+  @ApiOperation({ summary: "Create the authenticated player's wallet" })
   @ApiCreatedResponse({ type: CreateWalletResponseDto })
+  @ApiUnauthorizedResponse({ description: "Missing or invalid bearer token" })
   async create(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<CreateWalletResponseDto> {
@@ -54,7 +59,9 @@ export class WalletsController {
   @Get("me")
   @UseGuards(KeycloakJwtGuard)
   @ApiBearerAuth()
+  @ApiOperation({ summary: "Get the authenticated player's wallet" })
   @ApiOkResponse({ type: WalletResponseDto })
+  @ApiUnauthorizedResponse({ description: "Missing or invalid bearer token" })
   async me(@CurrentUser() user: AuthenticatedUser): Promise<WalletResponseDto> {
     const wallet = await this.getWalletUseCase.execute({
       playerId: user.playerId,
