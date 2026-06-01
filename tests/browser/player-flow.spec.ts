@@ -22,6 +22,7 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
 
   await expect(page.getByText("LIVE").first()).toBeVisible();
   await expect(page.getByText("BETTING").first()).toBeVisible();
+  await page.getByRole("tab", { name: "Round State" }).click();
   await expect(
     page.getByText(
       "multiplierBp = 10000 + floor(elapsedMs * 1000 / 1000)",
@@ -47,6 +48,7 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
   await expect(page.getByRole("button", { name: "Cash Out" })).toBeEnabled();
   await page.getByRole("button", { name: "Cash Out" }).click();
 
+  await page.getByRole("tab", { name: "Mesa" }).click();
   await expect(page.getByText("CASHED_OUT")).toBeVisible();
   await expectTimeCarAssetLoaded(page);
   await expectCanvasHasPixels(page);

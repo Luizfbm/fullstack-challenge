@@ -5,6 +5,7 @@ import {
   useCashOutMutation,
   usePlaceBetMutation,
 } from "../../hooks/use-game-rest";
+import { cn } from "../../lib/utils";
 import { getApiErrorMessage } from "../../services/api-errors";
 import type { BetResponse } from "../../services/game-api";
 import { formatCents } from "../../services/money";
@@ -15,11 +16,13 @@ import type { DashboardRound } from "./round-formatting";
 
 type BetControlsPanelProps = {
   activeBet: BetResponse | null;
+  className?: string;
   currentRound: DashboardRound | null;
 };
 
 export function BetControlsPanel({
   activeBet,
+  className,
   currentRound,
 }: BetControlsPanelProps) {
   const { isAuthenticated, login } = useAuth();
@@ -43,11 +46,16 @@ export function BetControlsPanel({
   const potentialPayout = getPotentialPayout(activeBet, currentRound);
 
   return (
-    <section className="chrono-panel rounded-md border border-amber-300/15 p-4">
+    <section
+      className={cn(
+        "casino-action-dock rounded-lg border border-rose-300/25 p-4",
+        className,
+      )}
+    >
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200">
-            Command deck
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-200">
+            Cashier rail
           </p>
           <h2 className="mt-1 text-lg font-black text-zinc-50">Aposta</h2>
         </div>
@@ -66,7 +74,7 @@ export function BetControlsPanel({
         Valor em centavos
       </label>
       <Input
-        className="mt-2 h-12 border-amber-300/20 bg-black/35 font-mono text-lg"
+        className="mt-2 h-12 border-rose-300/25 bg-black/45 font-mono text-lg"
         disabled={placeBetMutation.isPending}
         id="bet"
         inputMode="numeric"
@@ -75,13 +83,13 @@ export function BetControlsPanel({
       />
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-md border border-white/5 bg-black/25 px-3 py-2 text-sm text-zinc-300">
+        <div className="rounded-md border border-white/5 bg-black/35 px-3 py-2 text-sm text-zinc-300">
           <p className="text-xs text-zinc-500">Entrada</p>
           <p className="font-mono text-zinc-50">{betAmountLabel}</p>
         </div>
-        <div className="rounded-md border border-cyan-300/10 bg-cyan-300/5 px-3 py-2 text-sm">
+        <div className="rounded-md border border-emerald-300/15 bg-emerald-300/10 px-3 py-2 text-sm">
           <p className="text-xs text-zinc-500">Extracao estimada</p>
-          <p className="font-mono text-cyan-100">
+          <p className="font-mono text-emerald-100">
             {potentialPayout ? formatCents(potentialPayout) : "-"}
           </p>
         </div>
@@ -103,7 +111,7 @@ export function BetControlsPanel({
           disabled={!canCashOut}
           onClick={() => cashOutMutation.mutate()}
           type="button"
-          variant="neon"
+          variant="cash"
         >
           <Gauge className="size-4" aria-hidden="true" />
           {cashOutMutation.isPending
@@ -115,7 +123,7 @@ export function BetControlsPanel({
       </div>
 
       {activeBet ? (
-        <div className="mt-3 rounded-md border border-cyan-300/15 bg-cyan-300/5 px-3 py-2 text-xs text-zinc-400">
+        <div className="mt-3 rounded-md border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs text-zinc-300">
           <p>Aposta ativa: {activeBet.status}</p>
           {potentialPayout ? (
             <p className="mt-1 text-emerald-200">
@@ -164,7 +172,7 @@ function ToastNotice({ message }: { message: string }) {
   return (
     <div
       aria-live="polite"
-      className="fixed inset-x-4 bottom-20 z-50 rounded-md border border-rose-400/40 bg-rose-950 px-4 py-3 text-sm text-rose-50 shadow-xl shadow-black/40 sm:left-auto sm:w-96 lg:bottom-4"
+      className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+15rem)] z-50 rounded-md border border-rose-400/40 bg-rose-950 px-4 py-3 text-sm text-rose-50 shadow-xl shadow-black/40 sm:left-auto sm:w-96 lg:bottom-4"
       role="alert"
     >
       {message}

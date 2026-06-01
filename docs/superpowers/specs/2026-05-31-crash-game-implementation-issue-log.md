@@ -904,6 +904,24 @@ Cada entrada deve conter:
   http://localhost:8000/` e `git diff --check` passaram.
 - Status: resolvido.
 
+### 53. Quality gate falhou apos redesign da arena 3D
+
+- Contexto: fechamento do PR de refinamento visual da arena, assets GLB e
+  animacao do fogo do carro.
+- Sintoma: `bun run test:coverage && bun run quality:gate` falhou com queda de
+  cobertura frontend e aumento do maior arquivo acima da baseline da catraca.
+- Causa: a coreografia Three.js ficou concentrada em
+  `crash-flight-scene.tsx`, e helpers novos estavam pouco cobertos.
+- Correcao: extraidos `crash-flight-motion.ts`, `crash-flight-fallback.tsx` e
+  `time-car-fire.ts`; adicionados testes unitarios para fases, easing,
+  progresso, FOV, shake e pulsacao do fogo.
+- Regressao: a catraca agora valida cobertura frontend, tamanho maximo de
+  arquivo, duplicacao e auditoria antes do PR.
+- Validacao: `bun run test:coverage && bun run quality:gate` passou com
+  cobertura global `77.17%`, cobertura frontend `74.88%`, maior arquivo em
+  `269` linhas e sem falhas.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -1003,6 +1021,11 @@ Cada entrada deve conter:
   && bun run quality:gate`, `docker compose config`, `docker compose up -d
   --build`, `docker compose ps`, `bun scripts/ci/check-kong-health.ts`, `curl
   -fsS http://localhost:8000/` e `git diff --check`.
+- Refinamento visual da arena:
+  `bun run lint`, `bun run check:types`, `bun run test:unit`, `cd frontend &&
+  bun run build`, `bun run test:coverage && bun run quality:gate`, `docker
+  compose config`, `git diff --check`, `docker compose up -d --build`, `curl
+  -fsS http://localhost:8000/` e `bun run test:e2e:browser`.
 
 ## Validacoes Docker Ja Executadas
 
@@ -1023,4 +1046,4 @@ Cada entrada deve conter:
 
 ## Validacoes Ainda Pendentes
 
-- Proximo passo do plano: Passo 13, adicionar testes frontend.
+- Proximo passo do plano: Passo 14, adicionar E2E browser se viavel.
