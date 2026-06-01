@@ -1026,6 +1026,13 @@ Cada entrada deve conter:
   bun run build`, `bun run test:coverage && bun run quality:gate`, `docker
   compose config`, `git diff --check`, `docker compose up -d --build`, `curl
   -fsS http://localhost:8000/` e `bun run test:e2e:browser`.
+- Passo 15 OpenAPI:
+  `bun run lint`, `bun run check:types`, `bun run test:unit`, `docker compose
+  config`, `git diff --check`, `docker compose up -d --build`, `bun
+  scripts/ci/check-kong-health.ts`, `cd services/games && bun test tests/e2e`,
+  `curl -fsS http://localhost:4001/docs`, `curl -fsS
+  http://localhost:4002/docs`, `curl -fsS http://localhost:4001/docs-json` e
+  `curl -fsS http://localhost:4002/docs-json`.
 
 ## Validacoes Docker Ja Executadas
 

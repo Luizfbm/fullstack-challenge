@@ -11,11 +11,18 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiServiceUnavailableResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import {
   BetAmountOutOfRangeError,
@@ -61,12 +68,14 @@ export class GamesController {
   ) {}
 
   @Get("health")
+  @ApiOperation({ summary: "Check Game Service health" })
   @ApiOkResponse({ type: HealthCheckResponseDto })
   check(): HealthCheckResponseDto {
     return { status: "ok", service: "games" };
   }
 
   @Get("rounds/current")
+  @ApiOperation({ summary: "Get the current crash round" })
   @ApiOkResponse({ type: RoundResponseDto })
   async currentRound(): Promise<RoundResponseDto | null> {
     const round = await this.getCurrentRoundUseCase.execute();
@@ -75,6 +84,15 @@ export class GamesController {
   }
 
   @Get("rounds/history")
+  @ApiOperation({ summary: "List recent crash rounds" })
+  @ApiQuery({
+    description: "Maximum number of rounds to return.",
+    example: 20,
+    name: "limit",
+    required: false,
+    type: Number,
+  })
+  @ApiBadRequestResponse({ description: "limit must be a positive integer" })
   @ApiOkResponse({ type: [RoundResponseDto] })
   async roundHistory(
     @Query("limit") limit?: string,
@@ -87,6 +105,12 @@ export class GamesController {
   }
 
   @Get("rounds/:roundId/verify")
+  @ApiOperation({ summary: "Verify provably fair data for a round" })
+  @ApiParam({
+    description: "Round identifier returned by current/history endpoints.",
+    name: "roundId",
+  })
+  @ApiNotFoundResponse({ description: "Round not found" })
   @ApiOkResponse({ type: VerifyRoundResponseDto })
   async verifyRound(
     @Param("roundId") roundId: string,
@@ -101,7 +125,17 @@ export class GamesController {
   @Get("bets/me")
   @UseGuards(KeycloakJwtGuard)
   @ApiBearerAuth()
+  @ApiOperation({ summary: "List bets for the authenticated player" })
+  @ApiQuery({
+    description: "Maximum number of bets to return.",
+    example: 20,
+    name: "limit",
+    required: false,
+    type: Number,
+  })
+  @ApiBadRequestResponse({ description: "limit must be a positive integer" })
   @ApiOkResponse({ type: [BetResponseDto] })
+  @ApiUnauthorizedResponse({ description: "Missing or invalid bearer token" })
   async myBets(
     @CurrentUser() user: AuthenticatedUser,
     @Query("limit") limit?: string,
@@ -118,7 +152,17 @@ export class GamesController {
   @UseGuards(KeycloakJwtGuard)
   @ApiBearerAuth()
   @ApiBody({ type: PlaceBetRequestDto })
+  @ApiOperation({ summary: "Place one bet in the current betting round" })
+  @ApiBadRequestResponse({
+    description:
+      "Invalid amount, duplicate bet, invalid round state, or wallet rejection",
+  })
   @ApiCreatedResponse({ type: BetResponseDto })
+  @ApiNotFoundResponse({ description: "Current round or wallet not found" })
+  @ApiServiceUnavailableResponse({
+    description: "Wallet operation timed out or could not be completed",
+  })
+  @ApiUnauthorizedResponse({ description: "Missing or invalid bearer token" })
   async placeBet(
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: PlaceBetRequestDto,
@@ -139,7 +183,16 @@ export class GamesController {
   @Post("bet/cashout")
   @UseGuards(KeycloakJwtGuard)
   @ApiBearerAuth()
+  @ApiOperation({ summary: "Cash out the authenticated player's active bet" })
+  @ApiBadRequestResponse({
+    description: "No accepted bet, invalid round state, or crash already hit",
+  })
   @ApiCreatedResponse({ type: BetResponseDto })
+  @ApiNotFoundResponse({ description: "Current round not found" })
+  @ApiServiceUnavailableResponse({
+    description: "Wallet credit timed out or could not be completed",
+  })
+  @ApiUnauthorizedResponse({ description: "Missing or invalid bearer token" })
   async cashOut(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<BetResponseDto> {
