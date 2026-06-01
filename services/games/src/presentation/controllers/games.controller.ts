@@ -1,15 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  Post,
-  Query,
-  ServiceUnavailableException,
-  UseGuards,
-} from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -24,36 +13,33 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
-import {
-  BetAmountOutOfRangeError,
-  CurrentRoundNotFoundError,
-  RoundNotFoundError,
-  WalletCreditFailedError,
-  WalletOperationRejectedError,
-  WalletOperationTimedOutError,
-} from "../../application/game.errors";
 import { CashOutUseCase } from "../../application/use-cases/cash-out.use-case";
 import { GetCurrentRoundUseCase } from "../../application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "../../application/use-cases/list-my-bets.use-case";
+import { ListLeaderboardUseCase } from "../../application/use-cases/list-leaderboard.use-case";
 import { ListRoundHistoryUseCase } from "../../application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "../../application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "../../application/use-cases/verify-round.use-case";
-import {
-  InvalidBetStateError,
-  InvalidRoundStateError,
-} from "../../domain/game.errors";
 import { Round } from "../../domain/round";
 import { CurrentUser } from "../../infrastructure/auth/current-user.decorator";
 import type { AuthenticatedUser } from "../../infrastructure/auth/authenticated-user";
 import { KeycloakJwtGuard } from "../../infrastructure/auth/keycloak-jwt.guard";
 import { BetResponseDto } from "../dtos/bet-response.dto";
 import { HealthCheckResponseDto } from "../dtos/health-check-response.dto";
+import { LeaderboardEntryDto } from "../dtos/leaderboard-response.dto";
 import { PlaceBetRequestDto } from "../dtos/place-bet-request.dto";
 import {
   RoundResponseDto,
   VerifyRoundResponseDto,
 } from "../dtos/round-response.dto";
 import { toPublicBetFields, toPublicRoundFields } from "../round-response.mapper";
+import {
+  parseLeaderboardLimit,
+  parseLeaderboardPeriod,
+} from "../leaderboard-query";
+import { toLeaderboardEntryResponse } from "../leaderboard-response.mapper";
+import { parsePositiveLimit } from "../pagination-query";
+import { toGameHttpError } from "../game-http-errors";
 
 @ApiTags("games")
 @Controller()
@@ -63,6 +49,7 @@ export class GamesController {
     private readonly listRoundHistoryUseCase: ListRoundHistoryUseCase,
     private readonly verifyRoundUseCase: VerifyRoundUseCase,
     private readonly listMyBetsUseCase: ListMyBetsUseCase,
+    private readonly listLeaderboardUseCase: ListLeaderboardUseCase,
     private readonly placeBetUseCase: PlaceBetUseCase,
     private readonly cashOutUseCase: CashOutUseCase,
   ) {}
@@ -98,7 +85,7 @@ export class GamesController {
     @Query("limit") limit?: string,
   ): Promise<RoundResponseDto[]> {
     const rounds = await this.listRoundHistoryUseCase.execute({
-      limit: this.parseLimit(limit),
+      limit: parsePositiveLimit(limit),
     });
 
     return rounds.map((round) => this.toRoundResponse(round));
@@ -118,7 +105,7 @@ export class GamesController {
     try {
       return await this.verifyRoundUseCase.execute({ roundId });
     } catch (error) {
-      throw this.toHttpError(error);
+      throw toGameHttpError(error);
     }
   }
 
@@ -142,10 +129,41 @@ export class GamesController {
   ): Promise<BetResponseDto[]> {
     const bets = await this.listMyBetsUseCase.execute({
       playerId: user.playerId,
-      limit: this.parseLimit(limit),
+      limit: parsePositiveLimit(limit),
     });
 
     return bets.map(toPublicBetFields);
+  }
+
+  @Get("leaderboard")
+  @ApiOperation({ summary: "List top players by net profit" })
+  @ApiQuery({
+    description: "Ranking period. Defaults to 24h.",
+    enum: ["24h", "7d"],
+    name: "period",
+    required: false,
+  })
+  @ApiQuery({
+    description: "Maximum number of leaderboard entries, from 1 to 50.",
+    example: 10,
+    name: "limit",
+    required: false,
+    type: Number,
+  })
+  @ApiBadRequestResponse({
+    description: "period must be 24h or 7d; limit must be between 1 and 50",
+  })
+  @ApiOkResponse({ type: [LeaderboardEntryDto] })
+  async leaderboard(
+    @Query("period") period?: string,
+    @Query("limit") limit?: string,
+  ): Promise<LeaderboardEntryDto[]> {
+    const entries = await this.listLeaderboardUseCase.execute({
+      limit: parseLeaderboardLimit(limit),
+      period: parseLeaderboardPeriod(period),
+    });
+
+    return entries.map(toLeaderboardEntryResponse);
   }
 
   @Post("bet")
@@ -176,7 +194,7 @@ export class GamesController {
 
       return toPublicBetFields(result.bet);
     } catch (error) {
-      throw this.toHttpError(error);
+      throw toGameHttpError(error);
     }
   }
 
@@ -203,22 +221,8 @@ export class GamesController {
 
       return toPublicBetFields(result.bet);
     } catch (error) {
-      throw this.toHttpError(error);
+      throw toGameHttpError(error);
     }
-  }
-
-  private parseLimit(limit?: string): number | undefined {
-    if (!limit) {
-      return undefined;
-    }
-
-    const parsed = Number(limit);
-
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      throw new BadRequestException("limit must be a positive integer");
-    }
-
-    return parsed;
   }
 
   private toRoundResponse(round: Round): RoundResponseDto {
@@ -228,37 +232,4 @@ export class GamesController {
     };
   }
 
-  private toHttpError(error: unknown): Error {
-    if (
-      error instanceof BetAmountOutOfRangeError ||
-      error instanceof InvalidBetStateError ||
-      error instanceof InvalidRoundStateError
-    ) {
-      return new BadRequestException(error.message);
-    }
-
-    if (
-      error instanceof CurrentRoundNotFoundError ||
-      error instanceof RoundNotFoundError
-    ) {
-      return new NotFoundException(error.message);
-    }
-
-    if (
-      error instanceof WalletCreditFailedError ||
-      error instanceof WalletOperationTimedOutError
-    ) {
-      return new ServiceUnavailableException(error.message);
-    }
-
-    if (error instanceof WalletOperationRejectedError) {
-      if (error.code === "WALLET_NOT_FOUND") {
-        return new NotFoundException(error.message);
-      }
-
-      return new BadRequestException(error.message);
-    }
-
-    return error instanceof Error ? error : new Error("Unexpected game error");
-  }
 }

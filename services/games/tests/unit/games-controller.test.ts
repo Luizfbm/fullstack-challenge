@@ -44,6 +44,7 @@ function createController(overrides: Record<string, unknown> = {}): GamesControl
     (overrides.listRoundHistoryUseCase ?? { execute: async () => [] }) as never,
     (overrides.verifyRoundUseCase ?? { execute: async () => ({}) }) as never,
     (overrides.listMyBetsUseCase ?? { execute: async () => [] }) as never,
+    (overrides.listLeaderboardUseCase ?? { execute: async () => [] }) as never,
     (overrides.placeBetUseCase ?? {
       execute: async () => ({ bet: acceptedBet(), balanceCents: 99000n }),
     }) as never,
@@ -157,6 +158,60 @@ describe("GamesController", () => {
     await expect(
       controller.myBets({ playerId: "player-1", username: "player" }, "5"),
     ).resolves.toMatchObject([{ id: "bet-1", status: "ACCEPTED" }]);
+  });
+
+  test("lists public leaderboard with default and explicit query values", async () => {
+    const calls: unknown[] = [];
+    const controller = createController({
+      listLeaderboardUseCase: {
+        execute: async (input: unknown) => {
+          calls.push(input);
+
+          return [
+            {
+              betsCount: 2,
+              payoutCents: 3000n,
+              playerId: "player-1",
+              profitCents: 1000n,
+              rank: 1,
+              username: "player",
+              wageredCents: 2000n,
+            },
+          ];
+        },
+      },
+    });
+
+    await expect(controller.leaderboard(undefined, undefined)).resolves.toEqual([
+      {
+        betsCount: 2,
+        payoutCents: "3000",
+        playerId: "player-1",
+        profitCents: "1000",
+        rank: 1,
+        username: "player",
+        wageredCents: "2000",
+      },
+    ]);
+    await expect(controller.leaderboard("7d", "5")).resolves.toHaveLength(1);
+    expect(calls).toEqual([
+      { limit: 10, period: "24h" },
+      { limit: 5, period: "7d" },
+    ]);
+  });
+
+  test("rejects invalid leaderboard query values", async () => {
+    const controller = createController();
+
+    await expect(controller.leaderboard("bad", "10")).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(controller.leaderboard("24h", "51")).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(controller.leaderboard("24h", "0")).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   test("verifies a round and cashes out the authenticated user", async () => {

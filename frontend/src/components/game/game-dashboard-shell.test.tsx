@@ -3,7 +3,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../services/http-client";
-import type { BetResponse, RoundResponse } from "../../services/game-api";
+import type {
+  BetResponse,
+  LeaderboardEntry,
+  RoundResponse,
+} from "../../services/game-api";
 import { useGameUiStore } from "../../stores/game-ui-store";
 import { BetControlsPanel } from "./bet-controls-panel";
 import { GameDashboardShell } from "./game-dashboard-shell";
@@ -32,6 +36,11 @@ const hookMocks = vi.hoisted(() => ({
   },
   historyQuery: {
     data: [] as RoundResponse[],
+    error: null as Error | null,
+    isLoading: false,
+  },
+  leaderboardQuery: {
+    data: [] as LeaderboardEntry[],
     error: null as Error | null,
     isLoading: false,
   },
@@ -67,6 +76,7 @@ vi.mock("../../hooks/use-game-realtime", () => ({
 vi.mock("../../hooks/use-game-rest", () => ({
   useCashOutMutation: () => hookMocks.cashOutMutation,
   useCurrentRoundQuery: () => hookMocks.currentRoundQuery,
+  useLeaderboardQuery: () => hookMocks.leaderboardQuery,
   useMyBetsQuery: () => hookMocks.myBetsQuery,
   usePlaceBetMutation: () => hookMocks.placeBetMutation,
   useRoundHistoryQuery: () => hookMocks.historyQuery,
@@ -120,6 +130,17 @@ describe("game dashboard helpers", () => {
     hookMocks.historyQuery.data = [
       createRound({ crashPointBp: 25000, id: "round-history" }),
     ];
+    hookMocks.leaderboardQuery.data = [
+      {
+        betsCount: 3,
+        payoutCents: "9000",
+        playerId: "player-1",
+        profitCents: "4000",
+        rank: 1,
+        username: "player",
+        wageredCents: "5000",
+      },
+    ];
 
     render(<GameDashboardShell />);
 
@@ -132,6 +153,8 @@ describe("game dashboard helpers", () => {
     expect(screen.getByText("Histórico")).toBeTruthy();
     expect(screen.getByText("Mesa")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Apostar" })).toBeTruthy();
+    expect(screen.getAllByText("Leaderboard").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("R$ 40,00").length).toBeGreaterThan(0);
   });
 
   it("normalizes the bet amount field and disables betting for invalid value", () => {
@@ -217,6 +240,9 @@ function resetMocks() {
   hookMocks.historyQuery.data = [];
   hookMocks.historyQuery.error = null;
   hookMocks.historyQuery.isLoading = false;
+  hookMocks.leaderboardQuery.data = [];
+  hookMocks.leaderboardQuery.error = null;
+  hookMocks.leaderboardQuery.isLoading = false;
   hookMocks.myBetsQuery.data = [];
   hookMocks.myBetsQuery.error = null;
   hookMocks.myBetsQuery.isLoading = false;

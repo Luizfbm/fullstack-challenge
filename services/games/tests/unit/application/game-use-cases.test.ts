@@ -4,7 +4,11 @@ import { InvalidRoundStateError } from "../../../src/domain/game.errors";
 import { Round } from "../../../src/domain/round";
 import { BetAmountOutOfRangeError, WalletCreditFailedError } from "../../../src/application/game.errors";
 import { Clock } from "../../../src/application/ports/clock";
-import { GameRepository } from "../../../src/application/ports/game.repository";
+import {
+  GameRepository,
+  LeaderboardEntry,
+  ListLeaderboardInput,
+} from "../../../src/application/ports/game.repository";
 import { IdGenerator } from "../../../src/application/ports/id-generator";
 import type { RoundEventsPublisher } from "../../../src/application/ports/round-events.publisher";
 import {
@@ -16,6 +20,7 @@ import { AdvanceRoundLifecycleUseCase } from "../../../src/application/use-cases
 import { CashOutUseCase } from "../../../src/application/use-cases/cash-out.use-case";
 import { GetCurrentRoundUseCase } from "../../../src/application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "../../../src/application/use-cases/list-my-bets.use-case";
+import { ListLeaderboardUseCase } from "../../../src/application/use-cases/list-leaderboard.use-case";
 import { ListRoundHistoryUseCase } from "../../../src/application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "../../../src/application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "../../../src/application/use-cases/verify-round.use-case";
@@ -24,8 +29,11 @@ import {
   DEFAULT_ROUND_HISTORY_LIMIT,
   HOUSE_EDGE_BP,
 } from "../../../src/application/game.constants";
+import { rankLeaderboardBets } from "../../../src/application/leaderboard";
 
 class InMemoryGameRepository implements GameRepository {
+  public leaderboardEntries: LeaderboardEntry[] = [];
+  public lastLeaderboardInput: ListLeaderboardInput | null = null;
   public savedRounds: Round[] = [];
   public lastBetsByPlayerIdInput: { playerId: string; limit: number } | null =
     null;
@@ -72,6 +80,14 @@ class InMemoryGameRepository implements GameRepository {
     return [...this.rounds.values()].flatMap((round) =>
       round.bets.filter((bet) => bet.playerId === playerId),
     );
+  }
+
+  async listLeaderboard(
+    input: ListLeaderboardInput,
+  ): Promise<LeaderboardEntry[]> {
+    this.lastLeaderboardInput = input;
+
+    return this.leaderboardEntries.slice(0, input.limit);
   }
 
   async saveRound(round: Round): Promise<void> {
@@ -172,6 +188,24 @@ function openRound(crashPointBp = 30000): Round {
   });
 }
 
+function leaderboardBet(
+  overrides: {
+    amountCents: bigint;
+    payoutCents?: bigint | null;
+    playerId: string;
+    status?: "ACCEPTED" | "CASHED_OUT" | "LOST";
+    username: string;
+  },
+) {
+  return {
+    amountCents: overrides.amountCents,
+    payoutCents: overrides.payoutCents === undefined ? 0n : overrides.payoutCents,
+    playerId: overrides.playerId,
+    status: overrides.status ?? "CASHED_OUT",
+    username: overrides.username,
+  };
+}
+
 describe("read game use cases", () => {
   test("loads the current round from the repository", async () => {
     const round = openRound();
@@ -200,6 +234,130 @@ describe("read game use cases", () => {
       playerId: "player-1",
       limit: 3,
     });
+  });
+
+  test("lists 24h leaderboard entries by net profit", async () => {
+    const repository = new InMemoryGameRepository(openRound());
+    repository.leaderboardEntries = [
+      {
+        betsCount: 2,
+        payoutCents: 3000n,
+        playerId: "player-1",
+        profitCents: 1000n,
+        rank: 1,
+        username: "alpha",
+        wageredCents: 2000n,
+      },
+    ];
+    const useCase = new ListLeaderboardUseCase(
+      repository,
+      new FixedClock(new Date("2026-06-01T12:00:00.000Z")),
+    );
+
+    await expect(
+      useCase.execute({ period: "24h", limit: 10 }),
+    ).resolves.toEqual(repository.leaderboardEntries);
+    expect(repository.lastLeaderboardInput).toEqual({
+      limit: 10,
+      since: new Date("2026-05-31T12:00:00.000Z"),
+    });
+  });
+
+  test("lists 7d leaderboard entries from the last seven days", async () => {
+    const repository = new InMemoryGameRepository(openRound());
+    const useCase = new ListLeaderboardUseCase(
+      repository,
+      new FixedClock(new Date("2026-06-01T12:00:00.000Z")),
+    );
+
+    await useCase.execute({ period: "7d", limit: 25 });
+
+    expect(repository.lastLeaderboardInput).toEqual({
+      limit: 25,
+      since: new Date("2026-05-25T12:00:00.000Z"),
+    });
+  });
+});
+
+describe("leaderboard ranking", () => {
+  test("aggregates only resolved bets by net profit", () => {
+    const entries = rankLeaderboardBets(
+      [
+        leaderboardBet({
+          amountCents: 1000n,
+          payoutCents: 2500n,
+          playerId: "player-1",
+          status: "CASHED_OUT",
+          username: "alpha",
+        }),
+        leaderboardBet({
+          amountCents: 500n,
+          payoutCents: null,
+          playerId: "player-1",
+          status: "LOST",
+          username: "alpha",
+        }),
+        leaderboardBet({
+          amountCents: 900n,
+          payoutCents: null,
+          playerId: "player-2",
+          status: "ACCEPTED",
+          username: "beta",
+        }),
+        leaderboardBet({
+          amountCents: 900n,
+          payoutCents: null,
+          playerId: "player-3",
+          status: "CASHED_OUT",
+          username: "gamma",
+        }),
+      ],
+      10,
+    );
+
+    expect(entries).toEqual([
+      {
+        betsCount: 2,
+        payoutCents: 2500n,
+        playerId: "player-1",
+        profitCents: 1000n,
+        rank: 1,
+        username: "alpha",
+        wageredCents: 1500n,
+      },
+    ]);
+  });
+
+  test("uses deterministic tie-breaks and applies the requested limit", () => {
+    const entries = rankLeaderboardBets(
+      [
+        leaderboardBet({
+          amountCents: 1000n,
+          payoutCents: 3000n,
+          playerId: "player-2",
+          username: "zulu",
+        }),
+        leaderboardBet({
+          amountCents: 2000n,
+          payoutCents: 4000n,
+          playerId: "player-1",
+          username: "alpha",
+        }),
+        leaderboardBet({
+          amountCents: 2000n,
+          payoutCents: 4000n,
+          playerId: "player-3",
+          username: "bravo",
+        }),
+      ],
+      2,
+    );
+
+    expect(entries.map((entry) => entry.playerId)).toEqual([
+      "player-1",
+      "player-3",
+    ]);
+    expect(entries.map((entry) => entry.rank)).toEqual([1, 2]);
   });
 });
 

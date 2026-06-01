@@ -3,13 +3,19 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { gameApi, type PlaceBetInput } from "../services/game-api";
+import {
+  gameApi,
+  type LeaderboardPeriod,
+  type PlaceBetInput,
+} from "../services/game-api";
 import { walletApi } from "../services/wallet-api";
 
 export const gameQueryKeys = {
   all: ["game"] as const,
   currentRound: () => [...gameQueryKeys.all, "current-round"] as const,
   history: (limit: number) => [...gameQueryKeys.all, "history", limit] as const,
+  leaderboard: (period: LeaderboardPeriod, limit: number) =>
+    [...gameQueryKeys.all, "leaderboard", period, limit] as const,
   myBets: (limit: number) => [...gameQueryKeys.all, "my-bets", limit] as const,
   verifyRound: (roundId: string) =>
     [...gameQueryKeys.all, "verify-round", roundId] as const,
@@ -33,6 +39,14 @@ export function useRoundHistoryQuery(limit = 10) {
     queryFn: () => gameApi.getRoundHistory(limit),
     queryKey: gameQueryKeys.history(limit),
     refetchInterval: 3000,
+  });
+}
+
+export function useLeaderboardQuery(period: LeaderboardPeriod, limit = 10) {
+  return useQuery({
+    queryFn: () => gameApi.getLeaderboard({ limit, period }),
+    queryKey: gameQueryKeys.leaderboard(period, limit),
+    refetchInterval: 5000,
   });
 }
 

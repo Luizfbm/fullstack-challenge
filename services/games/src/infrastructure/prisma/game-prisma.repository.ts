@@ -1,5 +1,10 @@
 import { PrismaClient } from "../../../prisma/generated/client";
-import { GameRepository } from "../../application/ports/game.repository";
+import { rankLeaderboardBets } from "../../application/leaderboard";
+import {
+  GameRepository,
+  LeaderboardEntry,
+  ListLeaderboardInput,
+} from "../../application/ports/game.repository";
 import { Bet, BetStatus } from "../../domain/bet";
 import { Round, RoundStatus } from "../../domain/round";
 
@@ -84,6 +89,33 @@ export class GamePrismaRepository implements GameRepository {
     });
 
     return bets.map((bet) => this.toBet(bet));
+  }
+
+  async listLeaderboard(
+    input: ListLeaderboardInput,
+  ): Promise<LeaderboardEntry[]> {
+    const bets = await this.prisma.bet.findMany({
+      where: {
+        createdAt: {
+          gte: input.since,
+        },
+        status: {
+          in: ["CASHED_OUT", "LOST"],
+        },
+      },
+      orderBy: [{ username: "asc" }, { playerId: "asc" }],
+    });
+
+    return rankLeaderboardBets(
+      bets.map((bet) => ({
+        amountCents: bet.amountCents,
+        payoutCents: bet.payoutCents,
+        playerId: bet.playerId,
+        status: bet.status,
+        username: bet.username,
+      })),
+      input.limit,
+    );
   }
 
   async saveRound(round: Round): Promise<void> {

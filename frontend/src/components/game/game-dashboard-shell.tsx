@@ -4,6 +4,7 @@ import { useAuth } from "../../hooks/use-auth";
 import { useGameRealtime } from "../../hooks/use-game-realtime";
 import {
   useCurrentRoundQuery,
+  useLeaderboardQuery,
   useMyBetsQuery,
   useRoundHistoryQuery,
   useWalletQuery,
@@ -20,13 +21,19 @@ import {
 import { BetControlsPanel } from "./bet-controls-panel";
 import { CrashRoundPanel } from "./crash-round-panel";
 import { getRoundBets } from "./game-dashboard-view-model";
+import { LeaderboardPanel } from "./leaderboard-panel";
+import type { LeaderboardPeriod } from "../../services/game-api";
 
 export function GameDashboardShell() {
   const { errorMessage, isAuthenticated, username } = useAuth();
   const [activeTab, setActiveTab] = useState<ArcadeTab>("proof");
+  const [leaderboardPeriod, setLeaderboardPeriod] =
+    useState<LeaderboardPeriod>("24h");
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const now = useNow();
   const currentRoundQuery = useCurrentRoundQuery();
   const historyQuery = useRoundHistoryQuery(20);
+  const leaderboardQuery = useLeaderboardQuery(leaderboardPeriod, 10);
   const myBetsQuery = useMyBetsQuery(isAuthenticated, 10);
   const walletQuery = useWalletQuery(isAuthenticated);
   const realtime = useGameRealtime(currentRoundQuery.data ?? null);
@@ -47,55 +54,109 @@ export function GameDashboardShell() {
   ].find(Boolean);
 
   return (
-    <div className="arcade-dashboard min-w-0 space-y-4 pb-36 lg:pb-0">
-      <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
-        <MetricCard
-          icon={RadioTower}
-          label="Realtime"
-          tone="green"
-          value={realtime.connectionStatus === "connected" ? "LIVE" : "REST"}
-        />
-        <MetricCard icon={Coins} label="Saldo" value={balanceLabel ?? "-"} />
-        <MetricCard
-          icon={Users}
-          label="Jogador"
-          value={isAuthenticated ? username ?? "-" : "-"}
-        />
-        <MetricCard
-          icon={Activity}
-          label="Rodada"
-          tone="rose"
-          value={currentRound ? `#${currentRound.chainIndex} ${currentRound.status}` : "SYNC"}
-        />
-      </section>
+    <div className="arcade-dashboard min-w-0 pb-36 lg:pb-0">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+        <div className="order-1 min-w-0 space-y-4 xl:order-2">
+          <LeaderboardPanel
+            className="block md:hidden"
+            currentPlayerUsername={username}
+            entries={leaderboardQuery.data ?? []}
+            errorMessage={
+              leaderboardQuery.error
+                ? getApiErrorMessage(leaderboardQuery.error)
+                : null
+            }
+            isLoading={leaderboardQuery.isLoading}
+            onPeriodChange={setLeaderboardPeriod}
+            period={leaderboardPeriod}
+          />
 
-      {errorMessage ? <AuthError message={errorMessage} /> : null}
-      {apiError ? <AuthError message={getApiErrorMessage(apiError)} /> : null}
+          <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
+            <MetricCard
+              icon={RadioTower}
+              label="Realtime"
+              tone="green"
+              value={
+                realtime.connectionStatus === "connected" ? "LIVE" : "REST"
+              }
+            />
+            <MetricCard icon={Coins} label="Saldo" value={balanceLabel ?? "-"} />
+            <MetricCard
+              icon={Users}
+              label="Jogador"
+              value={isAuthenticated ? username ?? "-" : "-"}
+            />
+            <MetricCard
+              icon={Activity}
+              label="Rodada"
+              tone="rose"
+              value={
+                currentRound
+                  ? `#${currentRound.chainIndex} ${currentRound.status}`
+                  : "SYNC"
+              }
+            />
+          </section>
 
-      <main className="min-w-0">
-        <CrashRoundPanel
-          connectionStatus={realtime.connectionStatus}
-          isLoading={currentRoundQuery.isLoading}
-          round={currentRound}
+          <LeaderboardPanel
+            className="hidden md:block xl:hidden"
+            currentPlayerUsername={username}
+            entries={leaderboardQuery.data ?? []}
+            errorMessage={
+              leaderboardQuery.error
+                ? getApiErrorMessage(leaderboardQuery.error)
+                : null
+            }
+            isCollapsed={!leaderboardOpen}
+            isLoading={leaderboardQuery.isLoading}
+            onPeriodChange={setLeaderboardPeriod}
+            onToggleCollapse={() => setLeaderboardOpen((open) => !open)}
+            period={leaderboardPeriod}
+          />
+
+          {errorMessage ? <AuthError message={errorMessage} /> : null}
+          {apiError ? <AuthError message={getApiErrorMessage(apiError)} /> : null}
+
+          <main className="min-w-0">
+            <CrashRoundPanel
+              connectionStatus={realtime.connectionStatus}
+              isLoading={currentRoundQuery.isLoading}
+              round={currentRound}
+            />
+
+            <BetControlsPanel
+              activeBet={activeBet}
+              className="sticky bottom-3 z-30 mx-2 mt-3 shadow-[0_0_60px_rgba(244,63,94,0.28)] lg:static lg:mx-auto lg:-mt-10 lg:max-w-5xl"
+              currentRound={currentRound}
+            />
+          </main>
+
+          <ArcadeTechnicalTabs
+            activeTab={activeTab}
+            bets={roundBets}
+            history={historyQuery.data ?? []}
+            historyIsLoading={historyQuery.isLoading}
+            now={now}
+            onTabChange={setActiveTab}
+            round={currentRound}
+            roundIsLoading={currentRoundQuery.isLoading}
+          />
+        </div>
+
+        <LeaderboardPanel
+          className="order-2 hidden self-start xl:sticky xl:top-4 xl:order-1 xl:block"
+          currentPlayerUsername={username}
+          entries={leaderboardQuery.data ?? []}
+          errorMessage={
+            leaderboardQuery.error
+              ? getApiErrorMessage(leaderboardQuery.error)
+              : null
+          }
+          isLoading={leaderboardQuery.isLoading}
+          onPeriodChange={setLeaderboardPeriod}
+          period={leaderboardPeriod}
         />
-
-        <BetControlsPanel
-          activeBet={activeBet}
-          className="sticky bottom-3 z-30 mx-2 mt-3 shadow-[0_0_60px_rgba(244,63,94,0.28)] lg:static lg:mx-auto lg:-mt-10 lg:max-w-5xl"
-          currentRound={currentRound}
-        />
-      </main>
-
-      <ArcadeTechnicalTabs
-        activeTab={activeTab}
-        bets={roundBets}
-        history={historyQuery.data ?? []}
-        historyIsLoading={historyQuery.isLoading}
-        now={now}
-        onTabChange={setActiveTab}
-        round={currentRound}
-        roundIsLoading={currentRoundQuery.isLoading}
-      />
+      </div>
     </div>
   );
 }

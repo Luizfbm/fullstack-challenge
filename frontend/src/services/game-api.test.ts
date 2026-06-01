@@ -68,6 +68,18 @@ describe("GameApi", () => {
       path: "/games/rounds/round%2Fwith%20spaces/verify",
     });
   });
+
+  it("loads leaderboard with period and limit", async () => {
+    const client = createClient([]);
+    const api = new GameApi(client);
+
+    await api.getLeaderboard({ limit: 25, period: "7d" });
+
+    expect(client.requests[0]).toEqual({
+      path: "/games/leaderboard?period=7d&limit=25",
+      options: undefined,
+    });
+  });
 });
 
 type RequestRecord = {
