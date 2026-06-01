@@ -13,14 +13,21 @@ export function buildCrashCurvePolyline(progress: number, steps = 24): string {
   }).join(" ");
 }
 
-export function getCrashCurveFormula(growthBpPerSecond: number): string {
-  return `multiplierBp = ${BASE_MULTIPLIER_BP} + floor(elapsedMs * ${growthBpPerSecond} / 1000)`;
+export function getCrashCurveFormula(
+  multiplierBaseBp: number,
+  growthRateBpPerSecond: number,
+): string {
+  return `multiplierBp = floor(${multiplierBaseBp} * exp(${formatGrowthRate(growthRateBpPerSecond)} * elapsedSeconds))`;
 }
 
-export function getCrashCurveHumanRate(growthBpPerSecond: number): string {
-  return `1.00x + ${formatMultiplier(growthBpPerSecond)} por segundo`;
+export function getCrashCurveHumanRate(growthRateBpPerSecond: number): string {
+  return `curva exponencial ${formatPercent(growthRateBpPerSecond)}/s`;
 }
 
-function formatMultiplier(multiplierBp: number): string {
-  return `${(multiplierBp / BASE_MULTIPLIER_BP).toFixed(2)}x`;
+function formatGrowthRate(growthRateBpPerSecond: number): string {
+  return (growthRateBpPerSecond / BASE_MULTIPLIER_BP).toFixed(2);
+}
+
+function formatPercent(growthRateBpPerSecond: number): string {
+  return `${((growthRateBpPerSecond / BASE_MULTIPLIER_BP) * 100).toFixed(2)}%`;
 }

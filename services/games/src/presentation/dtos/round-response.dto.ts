@@ -24,25 +24,44 @@ export class RoundResponseDto {
   @ApiProperty({ example: 25000, nullable: true })
   crashPointBp!: number | null;
 
-  @ApiProperty({ example: 1000 })
-  multiplierGrowthBpPerSecond!: number;
+  @ApiProperty({ example: "EXPONENTIAL" })
+  multiplierCurve!: "EXPONENTIAL";
 
-  @ApiProperty()
+  @ApiProperty({ example: 10000 })
+  multiplierBaseBp!: number;
+
+  @ApiProperty({
+    description: "Exponential growth rate in basis points per second.",
+    example: 1500,
+  })
+  multiplierGrowthRateBpPerSecond!: number;
+
+  @ApiProperty({
+    description: "Committed server seed hash used to verify the revealed seed.",
+  })
   serverSeedHash!: string;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({
+    description: "Revealed server seed after the round is settled.",
+    nullable: true,
+  })
   serverSeed!: string | null;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: "Public client seed used by the provably fair calculation.",
+  })
   clientSeed!: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: "Round nonce used by the provably fair hash." })
   nonce!: number;
 
-  @ApiProperty()
+  @ApiProperty({ description: "Monotonic hash-chain round index." })
   chainIndex!: number;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({
+    description: "Commitment hash for the next round seed when available.",
+    nullable: true,
+  })
   nextServerSeedHash!: string | null;
 
   @ApiProperty({ type: [BetResponseDto] })

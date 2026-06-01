@@ -52,7 +52,9 @@ describe("crash flight scene primitives", () => {
     const runningRound = {
       bettingEndsAt: "2026-06-01T12:00:00.000Z",
       currentMultiplierBp: 21000,
-      multiplierGrowthBpPerSecond: 1000,
+      multiplierBaseBp: 10000,
+      multiplierCurve: "EXPONENTIAL",
+      multiplierGrowthRateBpPerSecond: 1500,
       startedAt: "2026-06-01T12:00:00.000Z",
       status: "RUNNING",
     } as DashboardRound;

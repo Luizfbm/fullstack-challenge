@@ -54,7 +54,9 @@ export type RoundResponse = {
   startedAt: string | null;
   crashedAt: string | null;
   crashPointBp: number | null;
-  multiplierGrowthBpPerSecond: number;
+  multiplierBaseBp: number;
+  multiplierCurve: "EXPONENTIAL";
+  multiplierGrowthRateBpPerSecond: number;
   serverSeedHash: string;
   serverSeed: string | null;
   clientSeed: string;
@@ -315,6 +317,19 @@ export async function prepareDeterministicRound(
 export async function forceBettingRoundToStart(roundId: string): Promise<void> {
   await runGamesSql(
     `UPDATE rounds SET "bettingEndsAt" = NOW() WHERE id = '${roundId}' AND status = 'BETTING';`,
+  );
+}
+
+export async function extendBettingRound(
+  roundId: string,
+  durationMs: number,
+): Promise<void> {
+  if (!Number.isInteger(durationMs) || durationMs <= 0) {
+    throw new Error("Betting round extension must be a positive integer");
+  }
+
+  await runGamesSql(
+    `UPDATE rounds SET "bettingEndsAt" = NOW() + (${durationMs} * INTERVAL '1 millisecond') WHERE id = '${roundId}' AND status = 'BETTING';`,
   );
 }
 

@@ -1,4 +1,8 @@
-import { MULTIPLIER_GROWTH_BP_PER_SECOND } from "../application/game.constants";
+import {
+  BASE_MULTIPLIER_BP,
+  MULTIPLIER_CURVE,
+  MULTIPLIER_GROWTH_RATE_BP_PER_SECOND,
+} from "../application/game.constants";
 import { Bet } from "../domain/bet";
 import { Round } from "../domain/round";
 
@@ -11,7 +15,9 @@ export function toPublicRoundFields(round: Round) {
     startedAt: round.startedAt?.toISOString() ?? null,
     crashedAt: round.crashedAt?.toISOString() ?? null,
     crashPointBp: round.serverSeed ? round.crashPointBp : null,
-    multiplierGrowthBpPerSecond: MULTIPLIER_GROWTH_BP_PER_SECOND,
+    multiplierBaseBp: BASE_MULTIPLIER_BP,
+    multiplierCurve: MULTIPLIER_CURVE as typeof MULTIPLIER_CURVE,
+    multiplierGrowthRateBpPerSecond: MULTIPLIER_GROWTH_RATE_BP_PER_SECOND,
     serverSeedHash: round.serverSeedHash,
     serverSeed: round.serverSeed,
     clientSeed: round.clientSeed,
