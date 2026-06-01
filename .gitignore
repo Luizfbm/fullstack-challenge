@@ -32,3 +32,6 @@ yarn-error.log*
 # Test coverage
 coverage/
 quality/reports/
+
+# Local brainstorming artifacts
+.superpowers/
