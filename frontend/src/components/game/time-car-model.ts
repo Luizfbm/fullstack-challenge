@@ -2,7 +2,9 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 export const TIME_CAR_ASSET_PATH = "/models/time-machine-low-poly.glb";
-export const TIME_CAR_ASSET_ROTATION_Y = Math.PI;
+export const TIME_CAR_RUNNING_ASSET_PATH =
+  "/models/time-machine-low-poly-running.glb";
+export const TIME_CAR_ASSET_ROTATION_Y = Math.PI * 1.5;
 const TIME_CAR_TARGET_LENGTH = 2.45;
 
 export function createTimeCarModel(): THREE.Group {
@@ -73,10 +75,11 @@ export function createTimeCarModel(): THREE.Group {
 
 export async function loadTimeCarAsset(
   car: THREE.Group,
+  assetPath = TIME_CAR_ASSET_PATH,
   isCancelled = () => false,
 ): Promise<void> {
   const loader = new GLTFLoader();
-  const gltf = await loader.loadAsync(TIME_CAR_ASSET_PATH);
+  const gltf = await loader.loadAsync(assetPath);
   const model = gltf.scene;
 
   model.name = "time-car-glb-model";

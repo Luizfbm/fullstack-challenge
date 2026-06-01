@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
   {
     defaultVariants: {
       size: "md",
@@ -16,18 +16,20 @@ const buttonVariants = cva(
         sm: "h-8 px-3",
       },
       variant: {
+        cash:
+          "border border-emerald-300/50 bg-gradient-to-b from-emerald-300 to-green-600 text-zinc-950 shadow-[0_0_34px_rgba(34,197,94,0.32)] hover:from-emerald-200 hover:to-green-500 focus-visible:outline-emerald-200",
         danger:
           "bg-rose-500 text-white hover:bg-rose-400 focus-visible:outline-rose-300",
         ghost:
           "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 focus-visible:outline-zinc-500",
         neon:
-          "border border-cyan-300/30 bg-cyan-300/10 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.22)] hover:border-cyan-200/60 hover:bg-cyan-300/20 focus-visible:outline-cyan-200",
+          "border border-rose-300/35 bg-rose-400/10 text-rose-100 shadow-[0_0_24px_rgba(244,63,94,0.22)] hover:border-rose-200/60 hover:bg-rose-400/20 focus-visible:outline-rose-200",
         primary:
           "bg-emerald-400 text-zinc-950 hover:bg-emerald-300 focus-visible:outline-emerald-300",
         secondary:
           "bg-sky-400 text-zinc-950 hover:bg-sky-300 focus-visible:outline-sky-300",
         temporal:
-          "border border-amber-300/50 bg-gradient-to-b from-amber-300 to-orange-500 text-zinc-950 shadow-[0_0_34px_rgba(245,158,11,0.32)] hover:from-amber-200 hover:to-orange-400 focus-visible:outline-amber-200",
+          "border border-rose-300/60 bg-gradient-to-b from-rose-300 to-pink-600 text-zinc-950 shadow-[0_0_38px_rgba(244,63,94,0.36)] hover:from-rose-200 hover:to-pink-500 focus-visible:outline-rose-200",
       },
     },
   },

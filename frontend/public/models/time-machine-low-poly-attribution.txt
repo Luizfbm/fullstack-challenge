@@ -1,4 +1,6 @@
-Model: Delorean - time machine - low poly
-Author: Meloque
-Source: https://sketchfab.com/3d-models/delorean-time-machine-low-poly-a36c5afa1bb24e16a3adfbcf08eb9390
-License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+Model: Delorian com detalhe
+Source file: /Users/luiz_fbm/Downloads/delorian-com-detalhe.glb
+Usage: User-supplied replacement asset for local testing.
+Variants:
+- time-machine-low-poly-running.glb keeps the fire/detail mesh for ENTERING and RUNNING.
+- time-machine-low-poly.glb removes the fire/detail mesh for BETTING, CRASHED, and IDLE.

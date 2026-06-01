@@ -75,8 +75,7 @@ vi.mock("../../hooks/use-game-rest", () => ({
 
 vi.mock("./crash-round-panel", () => ({
   CrashRoundPanel: ({ round }: { round: RoundResponse | null }) => (
-    <section aria-label="Crash round">
-      <h2>Crash Game</h2>
+    <section aria-label="Arcade arena">
       <p>{round?.serverSeedHash ?? "no-round"}</p>
     </section>
   ),
@@ -128,7 +127,8 @@ describe("game dashboard helpers", () => {
     expect(screen.getAllByText("R$ 123,45").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Jogador").length).toBeGreaterThan(0);
     expect(screen.getAllByText("player").length).toBeGreaterThan(0);
-    expect(screen.getByText("Crash Game")).toBeTruthy();
+    expect(screen.getByLabelText("Arcade arena")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Provably Fair" })).toBeTruthy();
     expect(screen.getByText("Histórico")).toBeTruthy();
     expect(screen.getByText("Mesa")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Apostar" })).toBeTruthy();
