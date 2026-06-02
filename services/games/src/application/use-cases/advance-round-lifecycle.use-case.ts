@@ -9,6 +9,13 @@ import type { WalletClient } from "../ports/wallet.client";
 import type { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
+import type { GameMetrics } from "../../infrastructure/observability/game-metrics";
+
+type GameMetricsPort = Pick<GameMetrics, "recordCashout" | "recordCrashPoint">;
+type CashoutMetric = {
+  mode: "manual" | "auto";
+  payoutCents: bigint;
+};
 
 type AdvanceRoundLifecycleConfig = {
   bettingWindowMs: number;
@@ -35,6 +42,7 @@ export class AdvanceRoundLifecycleUseCase {
     private readonly walletClient: WalletClient,
     private readonly config: AdvanceRoundLifecycleConfig,
     private readonly roundEventsPublisher?: RoundEventsPublisher,
+    private readonly gameMetrics?: GameMetricsPort,
   ) {
     if (
       !Number.isInteger(config.bettingWindowMs) ||
@@ -124,6 +132,7 @@ export class AdvanceRoundLifecycleUseCase {
       this.roundSeedProvider.getServerSeed(round.chainIndex),
     );
     await this.gameRepository.saveRound(round);
+    this.recordCrashPoint(round.crashPointBp / 10000);
 
     return { action: "ROUND_CRASHED", round };
   }
@@ -168,6 +177,7 @@ export class AdvanceRoundLifecycleUseCase {
 
       round.completeCashOut(bet.playerId);
       await this.gameRepository.saveRound(round);
+      this.recordCashout("auto", bet.payoutCents);
       await this.roundEventsPublisher?.publishBetCashedOut(bet);
     }
   }
@@ -180,8 +190,9 @@ export class AdvanceRoundLifecycleUseCase {
     );
 
     for (const bet of pendingCashouts) {
-      await this.retryPendingCashout(round, bet);
+      const cashoutMetric = await this.retryPendingCashout(round, bet);
       await this.gameRepository.saveRound(round);
+      this.recordCashout(cashoutMetric.mode, cashoutMetric.payoutCents);
     }
 
     round.settle();
@@ -190,7 +201,10 @@ export class AdvanceRoundLifecycleUseCase {
     return { action: "ROUND_SETTLED", round };
   }
 
-  private async retryPendingCashout(round: Round, bet: Bet): Promise<void> {
+  private async retryPendingCashout(
+    round: Round,
+    bet: Bet,
+  ): Promise<CashoutMetric> {
     if (bet.payoutCents === null) {
       throw new Error("Pending cashout has no payout");
     }
@@ -203,5 +217,31 @@ export class AdvanceRoundLifecycleUseCase {
     });
 
     round.completeCashOut(bet.playerId);
+    const mode =
+      bet.autoCashoutMultiplierBp !== null &&
+      bet.cashoutMultiplierBp === bet.autoCashoutMultiplierBp
+        ? "auto"
+        : "manual";
+
+    return {
+      mode,
+      payoutCents: bet.payoutCents,
+    };
+  }
+
+  private recordCashout(mode: "manual" | "auto", payoutCents: bigint): void {
+    try {
+      this.gameMetrics?.recordCashout(mode, payoutCents);
+    } catch {
+      // Metrics are best-effort and must not alter round lifecycle behavior.
+    }
+  }
+
+  private recordCrashPoint(multiplier: number): void {
+    try {
+      this.gameMetrics?.recordCrashPoint(multiplier);
+    } catch {
+      // Metrics are best-effort and must not alter round lifecycle behavior.
+    }
   }
 }

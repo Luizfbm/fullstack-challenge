@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Controller, Get, Header, Post, UseGuards } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -12,6 +12,7 @@ import { GetWalletUseCase } from "../../application/use-cases/get-wallet.use-cas
 import { CurrentUser } from "../../infrastructure/auth/current-user.decorator";
 import type { AuthenticatedUser } from "../../infrastructure/auth/authenticated-user";
 import { KeycloakJwtGuard } from "../../infrastructure/auth/keycloak-jwt.guard";
+import { WalletMetrics } from "../../infrastructure/observability/wallet-metrics";
 import { HealthCheckResponseDto } from "../dtos/health-check-response.dto";
 import {
   CreateWalletResponseDto,
@@ -24,6 +25,7 @@ export class WalletsController {
   constructor(
     private readonly createWalletUseCase: CreateWalletUseCase,
     private readonly getWalletUseCase: GetWalletUseCase,
+    private readonly walletMetrics: WalletMetrics,
   ) {}
 
   @Get("health")
@@ -31,6 +33,13 @@ export class WalletsController {
   @ApiOkResponse({ type: HealthCheckResponseDto })
   check(): HealthCheckResponseDto {
     return { status: "ok", service: "wallets" };
+  }
+
+  @Get("metrics")
+  @Header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+  @ApiOperation({ summary: "Expose Wallet Service Prometheus metrics" })
+  async metrics(): Promise<string> {
+    return this.walletMetrics.metricsText();
   }
 
   @Post()

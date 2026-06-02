@@ -5,14 +5,37 @@ import { Money } from "../../src/domain/money";
 import { Wallet } from "../../src/domain/wallet";
 import { WalletsController } from "../../src/presentation/controllers/wallets.controller";
 
+const walletMetrics = {
+  contentType: () => "text/plain; version=0.0.4; charset=utf-8",
+  metricsText: async () => "",
+};
+
 describe("WalletsController", () => {
   test("returns health check payload", () => {
     const controller = new WalletsController(
       undefined as never,
       undefined as never,
+      walletMetrics as never,
     );
 
     expect(controller.check()).toEqual({ status: "ok", service: "wallets" });
+  });
+
+  test("returns wallet metrics in Prometheus text format", async () => {
+    const createWalletUseCase = undefined as never;
+    const getWalletUseCase = undefined as never;
+    const controller = new WalletsController(
+      createWalletUseCase,
+      getWalletUseCase,
+      {
+        ...walletMetrics,
+        metricsText: async () => "# HELP crash_wallet_commands_total Commands\n",
+      } as never,
+    );
+
+    await expect(controller.metrics()).resolves.toBe(
+      "# HELP crash_wallet_commands_total Commands\n",
+    );
   });
 
   test("creates wallet for the authenticated user", async () => {
@@ -27,6 +50,7 @@ describe("WalletsController", () => {
     const controller = new WalletsController(
       createWalletUseCase,
       undefined as never,
+      walletMetrics as never,
     );
 
     const response = await controller.create({
@@ -53,6 +77,7 @@ describe("WalletsController", () => {
     const controller = new WalletsController(
       undefined as never,
       getWalletUseCase,
+      walletMetrics as never,
     );
 
     const response = await controller.me({

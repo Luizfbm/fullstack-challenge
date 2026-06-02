@@ -37,6 +37,7 @@ import { rankLeaderboardBets } from "../../../src/application/leaderboard";
 
 class InMemoryGameRepository implements GameRepository {
   public leaderboardEntries: LeaderboardEntry[] = [];
+  public saveRoundError: unknown = null;
   public lastLeaderboardInput: ListLeaderboardInput | null = null;
   public savedRounds: Round[] = [];
   public lastBetsByPlayerIdInput: { playerId: string; limit: number } | null =
@@ -95,6 +96,10 @@ class InMemoryGameRepository implements GameRepository {
   }
 
   async saveRound(round: Round): Promise<void> {
+    if (this.saveRoundError) {
+      throw this.saveRoundError;
+    }
+
     this.currentRound = round;
     this.rounds.set(round.id, round);
     this.savedRounds.push(round);
@@ -120,10 +125,15 @@ class FixedClock implements Clock {
 class FakeWalletClient implements WalletClient {
   public debits: WalletOperationInput[] = [];
   public credits: WalletOperationInput[] = [];
+  public debitError: unknown = null;
   public creditError: unknown = null;
 
   async debit(input: WalletOperationInput): Promise<WalletOperationResult> {
     this.debits.push(input);
+
+    if (this.debitError) {
+      throw this.debitError;
+    }
 
     return { applied: true, balanceCents: 99000n };
   }
@@ -136,6 +146,74 @@ class FakeWalletClient implements WalletClient {
     }
 
     return { applied: true, balanceCents: 100500n };
+  }
+}
+
+class FakeGameMetrics {
+  acceptedBets: bigint[] = [];
+  rejectedBets = 0;
+  cashouts: Array<{ mode: "manual" | "auto"; payoutCents: bigint }> = [];
+  crashPoints: number[] = [];
+  walletCommands: Array<{
+    command: "debit" | "credit";
+    durationMs: number;
+    result: "succeeded" | "failed";
+  }> = [];
+
+  recordBetAccepted(amountCents: bigint): void {
+    this.acceptedBets.push(amountCents);
+  }
+
+  recordBetRejected(): void {
+    this.rejectedBets += 1;
+  }
+
+  recordCashout(mode: "manual" | "auto", payoutCents: bigint): void {
+    this.cashouts.push({ mode, payoutCents });
+  }
+
+  recordCrashPoint(multiplier: number): void {
+    this.crashPoints.push(multiplier);
+  }
+
+  recordWalletCommand(
+    command: "debit" | "credit",
+    durationMs: number,
+    result: "succeeded" | "failed",
+  ): void {
+    this.walletCommands.push({ command, durationMs, result });
+  }
+}
+
+class ThrowingGameMetrics extends FakeGameMetrics {
+  constructor(
+    private readonly throwOn: Array<"accepted" | "rejected" | "cashout">,
+  ) {
+    super();
+  }
+
+  recordBetAccepted(amountCents: bigint): void {
+    if (this.throwOn.includes("accepted")) {
+      throw new Error("accepted metric unavailable");
+    }
+
+    super.recordBetAccepted(amountCents);
+  }
+
+  recordBetRejected(): void {
+    if (this.throwOn.includes("rejected")) {
+      throw new Error("rejected metric unavailable");
+    }
+
+    super.recordBetRejected();
+  }
+
+  recordCashout(mode: "manual" | "auto", payoutCents: bigint): void {
+    if (this.throwOn.includes("cashout")) {
+      throw new Error("cashout metric unavailable");
+    }
+
+    super.recordCashout(mode, payoutCents);
   }
 }
 
@@ -159,6 +237,8 @@ class FakeRoundSeedProvider implements RoundSeedProvider {
 class FakeRoundEventsPublisher implements RoundEventsPublisher {
   public betPlacedEvents: Bet[] = [];
   public betCashedOutEvents: Bet[] = [];
+  public publishBetPlacedError: unknown = null;
+  public publishBetCashedOutError: unknown = null;
 
   async publishBettingStarted(): Promise<void> {}
 
@@ -171,10 +251,18 @@ class FakeRoundEventsPublisher implements RoundEventsPublisher {
   async publishSettled(): Promise<void> {}
 
   async publishBetPlaced(bet: Bet): Promise<void> {
+    if (this.publishBetPlacedError) {
+      throw this.publishBetPlacedError;
+    }
+
     this.betPlacedEvents.push(bet);
   }
 
   async publishBetCashedOut(bet: Bet): Promise<void> {
+    if (this.publishBetCashedOutError) {
+      throw this.publishBetCashedOutError;
+    }
+
     this.betCashedOutEvents.push(bet);
   }
 }
@@ -412,6 +500,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const round = openRound(12000);
     round.start(new Date("2026-05-30T10:00:10.000Z"));
     const repository = new InMemoryGameRepository(round);
+    const metrics = new FakeGameMetrics();
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
@@ -419,6 +508,8 @@ describe("AdvanceRoundLifecycleUseCase", () => {
       new FakeRoundSeedProvider(),
       new FakeWalletClient(),
       { bettingWindowMs: 10000 },
+      undefined,
+      metrics,
     );
 
     const result = await useCase.execute();
@@ -426,9 +517,52 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     expect(result.action).toBe("ROUND_CRASHED");
     expect(result.round?.status).toBe("CRASHED");
     expect(result.round?.serverSeed).toBe("server-seed-1");
+    expect(metrics.crashPoints).toEqual([round.crashPointBp / 10000]);
   });
 
   test("automatically cashes out accepted bets at the configured target", async () => {
+    const round = openRound(30000);
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 15000,
+    });
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const repository = new InMemoryGameRepository(round);
+    const walletClient = new FakeWalletClient();
+    const events = new FakeRoundEventsPublisher();
+    const metrics = new FakeGameMetrics();
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      new FakeRoundSeedProvider(),
+      walletClient,
+      { bettingWindowMs: 10000 },
+      events,
+      metrics,
+    );
+
+    const result = await useCase.execute();
+    const bet = result.round?.bets[0];
+
+    expect(result.action).toBe("NOOP");
+    expect(bet?.status).toBe("CASHED_OUT");
+    expect(bet?.cashoutMultiplierBp).toBe(15000);
+    expect(bet?.payoutCents).toBe(1500n);
+    expect(walletClient.credits[0]).toMatchObject({
+      amountCents: 1500n,
+      playerId: "player-1",
+      referenceId: "round:round-1:player:player-1:cashout-credit",
+      reason: "CASHOUT_PAYOUT",
+    });
+    expect(events.betCashedOutEvents[0]?.cashoutMultiplierBp).toBe(15000);
+    expect(metrics.cashouts).toEqual([{ mode: "auto", payoutCents: 1500n }]);
+  });
+
+  test("keeps automatic cashout behavior when cashout metrics throw", async () => {
     const round = openRound(30000);
     round.placeBet({
       id: "bet-1",
@@ -449,6 +583,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
       walletClient,
       { bettingWindowMs: 10000 },
       events,
+      new ThrowingGameMetrics(["cashout"]),
     );
 
     const result = await useCase.execute();
@@ -456,15 +591,10 @@ describe("AdvanceRoundLifecycleUseCase", () => {
 
     expect(result.action).toBe("NOOP");
     expect(bet?.status).toBe("CASHED_OUT");
-    expect(bet?.cashoutMultiplierBp).toBe(15000);
-    expect(bet?.payoutCents).toBe(1500n);
-    expect(walletClient.credits[0]).toMatchObject({
-      amountCents: 1500n,
-      playerId: "player-1",
-      referenceId: "round:round-1:player:player-1:cashout-credit",
-      reason: "CASHOUT_PAYOUT",
-    });
-    expect(events.betCashedOutEvents[0]?.cashoutMultiplierBp).toBe(15000);
+    expect(walletClient.credits).toHaveLength(1);
+    expect(events.betCashedOutEvents.map((eventBet) => eventBet.id)).toEqual([
+      "bet-1",
+    ]);
   });
 
   test("auto cashout wins when a tick passes target and crash point", async () => {
@@ -554,6 +684,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     );
 
     walletClient.creditError = null;
+    const metrics = new FakeGameMetrics();
     const crashRound = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
@@ -571,6 +702,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
       walletClient,
       { bettingWindowMs: 10000 },
       new FakeRoundEventsPublisher(),
+      metrics,
     );
 
     expect((await crashRound.execute()).action).toBe("ROUND_CRASHED");
@@ -579,6 +711,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     expect(result.action).toBe("ROUND_SETTLED");
     expect(result.round?.bets[0]?.status).toBe("CASHED_OUT");
     expect(walletClient.credits).toHaveLength(2);
+    expect(metrics.cashouts).toEqual([{ mode: "auto", payoutCents: 1500n }]);
   });
 
   test("settles a crashed round before opening the next round", async () => {
@@ -624,6 +757,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     );
     const repository = new InMemoryGameRepository(crashedRound);
     const walletClient = new FakeWalletClient();
+    const metrics = new FakeGameMetrics();
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
@@ -631,6 +765,8 @@ describe("AdvanceRoundLifecycleUseCase", () => {
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
+      undefined,
+      metrics,
     );
 
     const result = await useCase.execute();
@@ -645,6 +781,76 @@ describe("AdvanceRoundLifecycleUseCase", () => {
         reason: "CASHOUT_PAYOUT",
       },
     ]);
+    expect(metrics.cashouts).toEqual([
+      { mode: "manual", payoutCents: 1500n },
+    ]);
+  });
+
+  test("classifies pending manual cashout retry as manual when auto target differs", async () => {
+    const crashedRound = openRound(30000);
+    crashedRound.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 20000,
+    });
+    crashedRound.start(new Date("2026-05-30T10:00:10.000Z"));
+    crashedRound.cashOut("player-1", 15000);
+    crashedRound.crash(
+      new Date("2026-05-30T10:00:11.000Z"),
+      "server-seed-1",
+    );
+    const metrics = new FakeGameMetrics();
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      new InMemoryGameRepository(crashedRound),
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
+      { bettingWindowMs: 10000 },
+      undefined,
+      metrics,
+    );
+
+    await useCase.execute();
+
+    expect(metrics.cashouts).toEqual([
+      { mode: "manual", payoutCents: 1500n },
+    ]);
+  });
+
+  test("does not record pending cashout retry metrics when completed state save fails", async () => {
+    const crashedRound = openRound(30000);
+    crashedRound.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+    crashedRound.start(new Date("2026-05-30T10:00:10.000Z"));
+    crashedRound.cashOut("player-1", 15000);
+    crashedRound.crash(
+      new Date("2026-05-30T10:00:11.000Z"),
+      "server-seed-1",
+    );
+    const repository = new InMemoryGameRepository(crashedRound);
+    repository.saveRoundError = new Error("save failed");
+    const metrics = new FakeGameMetrics();
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
+      { bettingWindowMs: 10000 },
+      undefined,
+      metrics,
+    );
+
+    await expect(useCase.execute()).rejects.toThrow("save failed");
+
+    expect(metrics.cashouts).toEqual([]);
   });
 
   test("keeps a crashed round unsettled when pending cashout retry fails", async () => {
@@ -687,11 +893,13 @@ describe("PlaceBetUseCase", () => {
     const repository = new InMemoryGameRepository(openRound());
     const walletClient = new FakeWalletClient();
     const roundEventsPublisher = new FakeRoundEventsPublisher();
+    const metrics = new FakeGameMetrics();
     const useCase = new PlaceBetUseCase(
       repository,
       walletClient,
       new FixedIdGenerator("bet-1"),
       roundEventsPublisher,
+      metrics,
     );
 
     const result = await useCase.execute({
@@ -710,6 +918,33 @@ describe("PlaceBetUseCase", () => {
         reason: "BET_PLACED",
       },
     ]);
+    expect(repository.currentRound?.bets).toHaveLength(1);
+    expect(roundEventsPublisher.betPlacedEvents.map((bet) => bet.id)).toEqual([
+      "bet-1",
+    ]);
+    expect(metrics.acceptedBets).toEqual([1000n]);
+  });
+
+  test("keeps accepted bet behavior when accepted bet metrics throw", async () => {
+    const repository = new InMemoryGameRepository(openRound());
+    const walletClient = new FakeWalletClient();
+    const roundEventsPublisher = new FakeRoundEventsPublisher();
+    const useCase = new PlaceBetUseCase(
+      repository,
+      walletClient,
+      new FixedIdGenerator("bet-1"),
+      roundEventsPublisher,
+      new ThrowingGameMetrics(["accepted"]),
+    );
+
+    const result = await useCase.execute({
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+
+    expect(result.bet.status).toBe("ACCEPTED");
+    expect(result.balanceCents).toBe(99000n);
     expect(repository.currentRound?.bets).toHaveLength(1);
     expect(roundEventsPublisher.betPlacedEvents.map((bet) => bet.id)).toEqual([
       "bet-1",
@@ -772,11 +1007,13 @@ describe("PlaceBetUseCase", () => {
   test("rejects out-of-range amounts before debiting the wallet", async () => {
     const repository = new InMemoryGameRepository(openRound());
     const walletClient = new FakeWalletClient();
+    const metrics = new FakeGameMetrics();
     const useCase = new PlaceBetUseCase(
       repository,
       walletClient,
       new FixedIdGenerator("bet-1"),
       new FakeRoundEventsPublisher(),
+      metrics,
     );
 
     await expect(
@@ -787,6 +1024,117 @@ describe("PlaceBetUseCase", () => {
       }),
     ).rejects.toThrow(BetAmountOutOfRangeError);
     expect(walletClient.debits).toHaveLength(0);
+    expect(metrics.rejectedBets).toBe(1);
+  });
+
+  test("keeps the original rejected bet error when rejection metrics throw", async () => {
+    const walletClient = new FakeWalletClient();
+    const useCase = new PlaceBetUseCase(
+      new InMemoryGameRepository(openRound()),
+      walletClient,
+      new FixedIdGenerator("bet-1"),
+      new FakeRoundEventsPublisher(),
+      new ThrowingGameMetrics(["rejected"]),
+    );
+
+    await expect(
+      useCase.execute({
+        playerId: "player-1",
+        username: "player",
+        amountCents: 99n,
+      }),
+    ).rejects.toThrow(BetAmountOutOfRangeError);
+    expect(walletClient.debits).toHaveLength(0);
+  });
+
+  test("records a rejected bet when amount parsing fails", async () => {
+    const walletClient = new FakeWalletClient();
+    const metrics = new FakeGameMetrics();
+    const useCase = new PlaceBetUseCase(
+      new InMemoryGameRepository(openRound()),
+      walletClient,
+      new FixedIdGenerator("bet-1"),
+      new FakeRoundEventsPublisher(),
+      metrics,
+    );
+
+    await expect(
+      useCase.execute({
+        playerId: "player-1",
+        username: "player",
+        amountCents: "not-cents",
+      }),
+    ).rejects.toThrow("Amount in cents must be an integer string");
+    expect(walletClient.debits).toHaveLength(0);
+    expect(metrics.rejectedBets).toBe(1);
+  });
+
+  test("records a rejected bet when the wallet debit fails", async () => {
+    const walletClient = new FakeWalletClient();
+    walletClient.debitError = new Error("wallet rejected debit");
+    const metrics = new FakeGameMetrics();
+    const useCase = new PlaceBetUseCase(
+      new InMemoryGameRepository(openRound()),
+      walletClient,
+      new FixedIdGenerator("bet-1"),
+      new FakeRoundEventsPublisher(),
+      metrics,
+    );
+
+    await expect(
+      useCase.execute({
+        playerId: "player-1",
+        username: "player",
+        amountCents: 1000n,
+      }),
+    ).rejects.toThrow("wallet rejected debit");
+    expect(metrics.rejectedBets).toBe(1);
+  });
+
+  test("records a rejected bet when saving an accepted bet fails", async () => {
+    const repository = new InMemoryGameRepository(openRound());
+    repository.saveRoundError = new Error("save failed");
+    const metrics = new FakeGameMetrics();
+    const useCase = new PlaceBetUseCase(
+      repository,
+      new FakeWalletClient(),
+      new FixedIdGenerator("bet-1"),
+      new FakeRoundEventsPublisher(),
+      metrics,
+    );
+
+    await expect(
+      useCase.execute({
+        playerId: "player-1",
+        username: "player",
+        amountCents: 1000n,
+      }),
+    ).rejects.toThrow("save failed");
+    expect(metrics.acceptedBets).toEqual([]);
+    expect(metrics.rejectedBets).toBe(1);
+  });
+
+  test("does not record a rejected bet when publishing an accepted bet fails", async () => {
+    const events = new FakeRoundEventsPublisher();
+    events.publishBetPlacedError = new Error("publish failed");
+    const metrics = new FakeGameMetrics();
+    const useCase = new PlaceBetUseCase(
+      new InMemoryGameRepository(openRound()),
+      new FakeWalletClient(),
+      new FixedIdGenerator("bet-1"),
+      events,
+      metrics,
+    );
+
+    await expect(
+      useCase.execute({
+        playerId: "player-1",
+        username: "player",
+        amountCents: 1000n,
+      }),
+    ).rejects.toThrow("publish failed");
+    expect(metrics.acceptedBets).toEqual([1000n]);
+    expect(metrics.rejectedBets).toBe(0);
   });
 
   test("does not debit the wallet when the player already has a bet", async () => {
@@ -800,11 +1148,13 @@ describe("PlaceBetUseCase", () => {
     const repository = new InMemoryGameRepository(round);
     const walletClient = new FakeWalletClient();
     const roundEventsPublisher = new FakeRoundEventsPublisher();
+    const metrics = new FakeGameMetrics();
     const useCase = new PlaceBetUseCase(
       repository,
       walletClient,
       new FixedIdGenerator("bet-2"),
       roundEventsPublisher,
+      metrics,
     );
 
     await expect(
@@ -816,6 +1166,7 @@ describe("PlaceBetUseCase", () => {
     ).rejects.toThrow(InvalidRoundStateError);
     expect(walletClient.debits).toHaveLength(0);
     expect(roundEventsPublisher.betPlacedEvents).toHaveLength(0);
+    expect(metrics.rejectedBets).toBe(1);
   });
 });
 
@@ -832,11 +1183,13 @@ describe("CashOutUseCase", () => {
     const repository = new InMemoryGameRepository(round);
     const walletClient = new FakeWalletClient();
     const roundEventsPublisher = new FakeRoundEventsPublisher();
+    const metrics = new FakeGameMetrics();
     const useCase = new CashOutUseCase(
       repository,
       walletClient,
       new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
       roundEventsPublisher,
+      metrics,
     );
 
     const result = await useCase.execute({ playerId: "player-1" });
@@ -858,6 +1211,38 @@ describe("CashOutUseCase", () => {
     expect(roundEventsPublisher.betCashedOutEvents[0]?.status).toBe(
       "CASHED_OUT",
     );
+    expect(metrics.cashouts).toEqual([
+      { mode: "manual", payoutCents: 2117n },
+    ]);
+  });
+
+  test("keeps completed manual cashout behavior when cashout metrics throw", async () => {
+    const round = openRound();
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const repository = new InMemoryGameRepository(round);
+    const walletClient = new FakeWalletClient();
+    const roundEventsPublisher = new FakeRoundEventsPublisher();
+    const useCase = new CashOutUseCase(
+      repository,
+      walletClient,
+      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      roundEventsPublisher,
+      new ThrowingGameMetrics(["cashout"]),
+    );
+
+    const result = await useCase.execute({ playerId: "player-1" });
+
+    expect(result.bet.status).toBe("CASHED_OUT");
+    expect(result.balanceCents).toBe(100500n);
+    expect(
+      roundEventsPublisher.betCashedOutEvents.map((bet) => bet.id),
+    ).toEqual(["bet-1"]);
   });
 
   test("preserves pending cashout when wallet credit fails", async () => {
@@ -887,6 +1272,34 @@ describe("CashOutUseCase", () => {
       "CASHOUT_PENDING_CREDIT",
     );
     expect(roundEventsPublisher.betCashedOutEvents).toHaveLength(0);
+  });
+
+  test("records a completed manual cashout before publishing realtime events", async () => {
+    const round = openRound();
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const events = new FakeRoundEventsPublisher();
+    events.publishBetCashedOutError = new Error("publish failed");
+    const metrics = new FakeGameMetrics();
+    const useCase = new CashOutUseCase(
+      new InMemoryGameRepository(round),
+      new FakeWalletClient(),
+      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      events,
+      metrics,
+    );
+
+    await expect(
+      useCase.execute({ playerId: "player-1" }),
+    ).rejects.toThrow(WalletCreditFailedError);
+    expect(metrics.cashouts).toEqual([
+      { mode: "manual", payoutCents: 2117n },
+    ]);
   });
 
   test("does not credit cashout at or after the crash point", async () => {

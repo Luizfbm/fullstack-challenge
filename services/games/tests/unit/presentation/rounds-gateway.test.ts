@@ -34,10 +34,32 @@ class FakeNamespace {
 }
 
 class FakeGetCurrentRoundUseCase {
-  constructor(private readonly round: Round | null) {}
+  constructor(
+    private readonly round: Round | null,
+    private readonly error: Error | null = null,
+  ) {}
 
   async execute(): Promise<Round | null> {
+    if (this.error) {
+      throw this.error;
+    }
+
     return this.round;
+  }
+}
+
+class FakeGameMetrics {
+  public readonly websocketEvents: string[] = [];
+
+  recordWebSocketEvent(event: string): void {
+    this.websocketEvents.push(event);
+  }
+}
+
+class ThrowingGameMetrics extends FakeGameMetrics {
+  recordWebSocketEvent(event: string): void {
+    super.recordWebSocketEvent(event);
+    throw new Error("websocket metrics unavailable");
   }
 }
 
@@ -71,9 +93,11 @@ describe("RoundsGateway", () => {
 
   test("emits the current round snapshot when a client connects", async () => {
     const socket = new FakeSocket();
+    const metrics = new FakeGameMetrics();
     const gateway = new RoundsGateway(
       new FakeGetCurrentRoundUseCase(openRound()) as GetCurrentRoundUseCase,
       new RoundRealtimeSerializer(),
+      metrics,
     );
 
     await gateway.handleConnection(socket as never);
@@ -104,6 +128,7 @@ describe("RoundsGateway", () => {
         rejectionReason: null,
       },
     ]);
+    expect(metrics.websocketEvents).toEqual([ROUND_SNAPSHOT_EVENT]);
   });
 
   test("emits an empty snapshot when no round exists yet", async () => {
@@ -119,11 +144,48 @@ describe("RoundsGateway", () => {
     expect(payload.round).toBeNull();
   });
 
+  test("does not emit a round error when snapshot metrics throw after emit", async () => {
+    const socket = new FakeSocket();
+    const metrics = new ThrowingGameMetrics();
+    const gateway = new RoundsGateway(
+      new FakeGetCurrentRoundUseCase(openRound()) as GetCurrentRoundUseCase,
+      new RoundRealtimeSerializer(),
+      metrics,
+    );
+
+    await gateway.handleConnection(socket as never);
+
+    expect(socket.emitted.map((event) => event.event)).toEqual([
+      ROUND_SNAPSHOT_EVENT,
+    ]);
+    expect(metrics.websocketEvents).toEqual([ROUND_SNAPSHOT_EVENT]);
+  });
+
+  test("does not record a snapshot event when snapshot loading fails", async () => {
+    const socket = new FakeSocket();
+    const metrics = new FakeGameMetrics();
+    const gateway = new RoundsGateway(
+      new FakeGetCurrentRoundUseCase(
+        null,
+        new Error("snapshot unavailable"),
+      ) as GetCurrentRoundUseCase,
+      new RoundRealtimeSerializer(),
+      metrics,
+    );
+
+    await gateway.handleConnection(socket as never);
+
+    expect(socket.emitted[0]?.event).toBe("round.error");
+    expect(metrics.websocketEvents).toEqual([]);
+  });
+
   test("emits bet placed and cashed out events with bet payloads", async () => {
     const namespace = new FakeNamespace();
+    const metrics = new FakeGameMetrics();
     const gateway = new RoundsGateway(
       new FakeGetCurrentRoundUseCase(null) as GetCurrentRoundUseCase,
       new RoundRealtimeSerializer(),
+      metrics,
     );
     (gateway as unknown as { namespace: FakeNamespace }).namespace = namespace;
 
@@ -163,5 +225,9 @@ describe("RoundsGateway", () => {
       payoutCents: "1500",
     });
     expect(cashedOutPayload.emittedAt).toBeString();
+    expect(metrics.websocketEvents).toEqual([
+      BET_PLACED_EVENT,
+      BET_CASHED_OUT_EVENT,
+    ]);
   });
 });

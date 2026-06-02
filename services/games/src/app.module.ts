@@ -24,6 +24,7 @@ import { PlaceBetUseCase } from "./application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "./application/use-cases/verify-round.use-case";
 import { RoundLifecycleRunner } from "./infrastructure/lifecycle/round-lifecycle-runner";
 import { RabbitMqWalletClient } from "./infrastructure/messaging/rabbitmq-wallet.client";
+import { GameMetrics } from "./infrastructure/observability/game-metrics";
 import { HashChainRoundSeedProvider } from "./infrastructure/provably-fair/hash-chain-round-seed-provider";
 import { GamePrismaRepository } from "./infrastructure/prisma/game-prisma.repository";
 import { prismaClient } from "./infrastructure/prisma/prisma-client";
@@ -43,17 +44,20 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
     },
     {
       provide: RabbitMqWalletClient,
-      useFactory: (): RabbitMqWalletClient =>
+      useFactory: (gameMetrics: GameMetrics): RabbitMqWalletClient =>
         new RabbitMqWalletClient(
           process.env.RABBITMQ_URL ?? "amqp://localhost:5672",
           "wallet.commands",
           Number(process.env.WALLET_RPC_TIMEOUT_MS ?? 2000),
+          gameMetrics,
         ),
+      inject: [GameMetrics],
     },
     {
       provide: WALLET_CLIENT,
       useExisting: RabbitMqWalletClient,
     },
+    GameMetrics,
     {
       provide: ID_GENERATOR,
       useValue: {
@@ -86,6 +90,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         roundSeedProvider: HashChainRoundSeedProvider,
         walletClient: WalletClient,
         roundEventsPublisher: RoundEventsPublisher,
+        gameMetrics: GameMetrics,
       ): AdvanceRoundLifecycleUseCase =>
         new AdvanceRoundLifecycleUseCase(
           gameRepository,
@@ -97,6 +102,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
             bettingWindowMs: Number(process.env.ROUND_BETTING_WINDOW_MS ?? 10000),
           },
           roundEventsPublisher,
+          gameMetrics,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -105,6 +111,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         HashChainRoundSeedProvider,
         WALLET_CLIENT,
         ROUND_EVENTS_PUBLISHER,
+        GameMetrics,
       ],
     },
     {
@@ -168,18 +175,21 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         walletClient: WalletClient,
         idGenerator: IdGenerator,
         roundEventsPublisher: RoundEventsPublisher,
+        gameMetrics: GameMetrics,
       ): PlaceBetUseCase =>
         new PlaceBetUseCase(
           gameRepository,
           walletClient,
           idGenerator,
           roundEventsPublisher,
+          gameMetrics,
         ),
       inject: [
         GAME_REPOSITORY,
         WALLET_CLIENT,
         ID_GENERATOR,
         ROUND_EVENTS_PUBLISHER,
+        GameMetrics,
       ],
     },
     {
@@ -189,14 +199,22 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         walletClient: WalletClient,
         clock: Clock,
         roundEventsPublisher: RoundEventsPublisher,
+        gameMetrics: GameMetrics,
       ): CashOutUseCase =>
         new CashOutUseCase(
           gameRepository,
           walletClient,
           clock,
           roundEventsPublisher,
+          gameMetrics,
         ),
-      inject: [GAME_REPOSITORY, WALLET_CLIENT, CLOCK, ROUND_EVENTS_PUBLISHER],
+      inject: [
+        GAME_REPOSITORY,
+        WALLET_CLIENT,
+        CLOCK,
+        ROUND_EVENTS_PUBLISHER,
+        GameMetrics,
+      ],
     },
   ],
 })

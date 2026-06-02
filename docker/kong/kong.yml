@@ -21,12 +21,32 @@ services:
           - /games/bet/cashout
         strip_path: true
 
+  - name: games-metrics-service
+    url: http://games:4001/metrics
+    routes:
+      - name: games-metrics-route
+        methods:
+          - GET
+        paths:
+          - /games/metrics
+        strip_path: true
+
   - name: games-service
     url: http://games:4001
     routes:
       - name: games-routes
         paths:
           - /games
+        strip_path: true
+
+  - name: wallets-metrics-service
+    url: http://wallets:4002/metrics
+    routes:
+      - name: wallets-metrics-route
+        methods:
+          - GET
+        paths:
+          - /wallets/metrics
         strip_path: true
 
   - name: wallets-service

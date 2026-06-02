@@ -125,6 +125,9 @@ jobs:
       - name: Run API E2E through Kong and Keycloak
         run: bun run ci:e2e
 
+      - name: Check observability stack
+        run: bun scripts/ci/check-observability-health.ts
+
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
 
