@@ -5,12 +5,14 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  AutoBetSessionActiveError,
   AutoCashoutMultiplierOutOfRangeError,
   CurrentRoundNotFoundError,
   RoundNotFoundError,
   WalletOperationRejectedError,
   WalletOperationTimedOutError,
 } from "../../src/application/game.errors";
+import type { AutoBetSession } from "../../src/application/auto-bet/auto-bet-session";
 import { Bet } from "../../src/domain/bet";
 import { Round } from "../../src/domain/round";
 import { GamesController } from "../../src/presentation/controllers/games.controller";
@@ -42,6 +44,30 @@ function acceptedBet(
   });
 }
 
+function autoBetSessionFixture(
+  overrides: Partial<AutoBetSession> = {},
+): AutoBetSession {
+  return {
+    id: "auto-session-1",
+    playerId: "player-1",
+    username: "player",
+    status: "ACTIVE",
+    amountCents: 1000n,
+    autoCashoutMultiplierBp: 20000,
+    maxRounds: 3,
+    roundsPlayed: 0,
+    netProfitCents: 0n,
+    stopLossCents: 3000n,
+    takeProfitCents: 5000n,
+    stopReason: null,
+    startsAfterRoundId: "round-1",
+    createdAt: new Date("2026-05-30T10:00:00.000Z"),
+    updatedAt: new Date("2026-05-30T10:00:00.000Z"),
+    stoppedAt: null,
+    ...overrides,
+  };
+}
+
 function createController(overrides: Record<string, unknown> = {}): GamesController {
   return new GamesController(
     (overrides.getCurrentRoundUseCase ?? { execute: async () => null }) as never,
@@ -54,6 +80,15 @@ function createController(overrides: Record<string, unknown> = {}): GamesControl
     }) as never,
     (overrides.cashOutUseCase ?? {
       execute: async () => ({ bet: acceptedBet(), balanceCents: 101000n }),
+    }) as never,
+    (overrides.startAutoBetSessionUseCase ?? {
+      execute: async () => autoBetSessionFixture(),
+    }) as never,
+    (overrides.getMyAutoBetSessionUseCase ?? {
+      execute: async () => null,
+    }) as never,
+    (overrides.stopAutoBetSessionUseCase ?? {
+      execute: async () => null,
     }) as never,
     (overrides.gameMetrics ?? {
       contentType: () => "text/plain; version=0.0.4; charset=utf-8",
@@ -266,6 +301,81 @@ describe("GamesController", () => {
     await expect(controller.leaderboard("24h", "0")).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  test("starts an auto bet session for the authenticated user", async () => {
+    const controller = createController({
+      startAutoBetSessionUseCase: {
+        execute: async (input: unknown) => {
+          expect(input).toEqual({
+            amountCents: "1000",
+            autoCashoutMultiplierBp: 20000,
+            maxRounds: 3,
+            playerId: "player-1",
+            stopLossCents: "3000",
+            takeProfitCents: "5000",
+            username: "player",
+          });
+
+          return autoBetSessionFixture();
+        },
+      },
+    });
+
+    await expect(
+      controller.startAutoBetSession(
+        { playerId: "player-1", username: "player" },
+        {
+          amountCents: "1000",
+          autoCashoutMultiplierBp: 20000,
+          maxRounds: 3,
+          stopLossCents: "3000",
+          takeProfitCents: "5000",
+        },
+      ),
+    ).resolves.toMatchObject({
+      id: "auto-session-1",
+      amountCents: "1000",
+      status: "ACTIVE",
+      stopLossCents: "3000",
+      takeProfitCents: "5000",
+    });
+  });
+
+  test("gets and idempotently stops the authenticated user's auto bet session", async () => {
+    const controller = createController({
+      getMyAutoBetSessionUseCase: {
+        execute: async () => autoBetSessionFixture(),
+      },
+      stopAutoBetSessionUseCase: {
+        execute: async () =>
+          autoBetSessionFixture({ status: "STOPPED", stopReason: "MANUAL" }),
+      },
+    });
+
+    await expect(
+      controller.myAutoBetSession({ playerId: "player-1", username: "player" }),
+    ).resolves.toMatchObject({ id: "auto-session-1", status: "ACTIVE" });
+    await expect(
+      controller.stopAutoBetSession({ playerId: "player-1", username: "player" }),
+    ).resolves.toMatchObject({ status: "STOPPED", stopReason: "MANUAL" });
+  });
+
+  test("maps auto bet errors to bad request responses", async () => {
+    const controller = createController({
+      startAutoBetSessionUseCase: {
+        execute: async () => {
+          throw new AutoBetSessionActiveError();
+        },
+      },
+    });
+
+    await expect(
+      controller.startAutoBetSession(
+        { playerId: "player-1", username: "player" },
+        { amountCents: "1000", maxRounds: 3 },
+      ),
+    ).rejects.toThrow(BadRequestException);
   });
 
   test("verifies a round and cashes out the authenticated user", async () => {
