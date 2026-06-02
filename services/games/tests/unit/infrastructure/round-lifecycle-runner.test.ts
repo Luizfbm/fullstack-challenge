@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { RoundEventsPublisher } from "../../../src/application/ports/round-events.publisher";
 import { AdvanceRoundLifecycleUseCase } from "../../../src/application/use-cases/advance-round-lifecycle.use-case";
-import type { AdvanceRoundLifecycleResult } from "../../../src/application/use-cases/advance-round-lifecycle.use-case";
+import type { AdvanceRoundLifecycleResult } from "../../../src/application/use-cases/advance-round-lifecycle.types";
 import { Round } from "../../../src/domain/round";
 import { RoundLifecycleRunner } from "../../../src/infrastructure/lifecycle/round-lifecycle-runner";
 
