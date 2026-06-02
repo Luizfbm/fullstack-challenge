@@ -67,7 +67,7 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
             crashed && "text-rose-100",
           )}
         >
-          {isLoading ? "..." : formatRoundMultiplier(round)}
+          {isLoading ? "..." : formatRoundMultiplier(round, now)}
         </p>
       </div>
 

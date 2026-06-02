@@ -5,18 +5,20 @@ import type {
   StartAutoBetSessionInput,
 } from "../../services/game-api";
 import { calculatePayoutCents } from "../../services/payout";
+import { getDisplayMultiplierBp } from "../../services/display-multiplier";
 import type { BetMode } from "./bet-mode-toggle";
 import type { DashboardRound } from "./round-formatting";
 
 export function getPotentialPayout(
   activeBet: BetResponse | null,
   currentRound: DashboardRound | null,
+  now = new Date(),
 ): bigint | null {
   if (!activeBet || !currentRound || activeBet.status !== "ACCEPTED") {
     return null;
   }
 
-  const multiplierBp = currentRound.currentMultiplierBp;
+  const multiplierBp = getDisplayMultiplierBp(currentRound, now);
 
   if (typeof multiplierBp !== "number") {
     return null;
