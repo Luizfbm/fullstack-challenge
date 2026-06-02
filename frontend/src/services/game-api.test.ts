@@ -86,6 +86,49 @@ describe("GameApi", () => {
       options: undefined,
     });
   });
+
+  it("manages auto bet sessions with authenticated requests", async () => {
+    const client = createClient({ id: "auto-session-1" });
+    const api = new GameApi(client);
+
+    await api.getMyAutoBetSession();
+    await api.startAutoBetSession({
+      amountCents: "1000",
+      autoCashoutMultiplierBp: 20000,
+      maxRounds: 5,
+      stopLossCents: "3000",
+      takeProfitCents: "5000",
+    });
+    await api.stopAutoBetSession();
+
+    expect(client.requests).toEqual([
+      {
+        path: "/games/auto-bet/sessions/me",
+        options: { auth: true },
+      },
+      {
+        path: "/games/auto-bet/sessions",
+        options: {
+          auth: true,
+          body: JSON.stringify({
+            amountCents: "1000",
+            autoCashoutMultiplierBp: 20000,
+            maxRounds: 5,
+            stopLossCents: "3000",
+            takeProfitCents: "5000",
+          }),
+          method: "POST",
+        },
+      },
+      {
+        path: "/games/auto-bet/sessions/me/stop",
+        options: {
+          auth: true,
+          method: "POST",
+        },
+      },
+    ]);
+  });
 });
 
 type RequestRecord = {

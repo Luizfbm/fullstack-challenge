@@ -5,6 +5,7 @@ import { useGameRealtime } from "../../hooks/use-game-realtime";
 import {
   useCurrentRoundQuery,
   useLeaderboardQuery,
+  useMyAutoBetSessionQuery,
   useMyBetsQuery,
   useRoundHistoryQuery,
   useWalletQuery,
@@ -34,6 +35,7 @@ export function GameDashboardShell() {
   const currentRoundQuery = useCurrentRoundQuery();
   const historyQuery = useRoundHistoryQuery(20);
   const leaderboardQuery = useLeaderboardQuery(leaderboardPeriod, 10);
+  const autoBetSessionQuery = useMyAutoBetSessionQuery(isAuthenticated);
   const myBetsQuery = useMyBetsQuery(isAuthenticated, 10);
   const walletQuery = useWalletQuery(isAuthenticated);
   const realtime = useGameRealtime(currentRoundQuery.data ?? null);
@@ -51,6 +53,7 @@ export function GameDashboardShell() {
     historyQuery.error,
     walletQuery.error,
     myBetsQuery.error,
+    autoBetSessionQuery.error,
   ].find(Boolean);
 
   return (
@@ -126,6 +129,7 @@ export function GameDashboardShell() {
 
             <BetControlsPanel
               activeBet={activeBet}
+              autoBetSession={autoBetSessionQuery.data ?? null}
               className="sticky bottom-3 z-30 mx-2 mt-3 shadow-[0_0_60px_rgba(244,63,94,0.28)] lg:static lg:mx-auto lg:-mt-10 lg:max-w-5xl"
               currentRound={currentRound}
             />

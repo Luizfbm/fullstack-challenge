@@ -89,6 +89,42 @@ export type PlaceBetInput = {
   autoCashoutMultiplierBp?: number | null;
 };
 
+export type AutoBetStopReason =
+  | "MANUAL"
+  | "MAX_ROUNDS_REACHED"
+  | "STOP_LOSS_REACHED"
+  | "TAKE_PROFIT_REACHED"
+  | "WALLET_REJECTED"
+  | "WALLET_UNAVAILABLE"
+  | "ROUND_NOT_AVAILABLE";
+
+export type AutoBetSessionResponse = {
+  id: string;
+  playerId: string;
+  username: string;
+  status: "ACTIVE" | "STOPPED";
+  amountCents: string;
+  autoCashoutMultiplierBp: number | null;
+  maxRounds: number;
+  roundsPlayed: number;
+  netProfitCents: string;
+  stopLossCents: string | null;
+  takeProfitCents: string | null;
+  stopReason: AutoBetStopReason | null;
+  startsAfterRoundId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  stoppedAt: string | null;
+};
+
+export type StartAutoBetSessionInput = {
+  amountCents: string;
+  autoCashoutMultiplierBp?: number | null;
+  maxRounds: number;
+  stopLossCents?: string | null;
+  takeProfitCents?: string | null;
+};
+
 export type GetLeaderboardInput = {
   period?: LeaderboardPeriod;
   limit?: number;
@@ -147,6 +183,38 @@ export class GameApi {
       auth: true,
       method: "POST",
     });
+  }
+
+  getMyAutoBetSession(): Promise<AutoBetSessionResponse | null> {
+    return this.client.request<AutoBetSessionResponse | null>(
+      gameRoutes.myAutoBetSession,
+      {
+        auth: true,
+      },
+    );
+  }
+
+  startAutoBetSession(
+    input: StartAutoBetSessionInput,
+  ): Promise<AutoBetSessionResponse> {
+    return this.client.request<AutoBetSessionResponse>(
+      gameRoutes.autoBetSessions,
+      {
+        auth: true,
+        body: JSON.stringify(input),
+        method: "POST",
+      },
+    );
+  }
+
+  stopAutoBetSession(): Promise<AutoBetSessionResponse | null> {
+    return this.client.request<AutoBetSessionResponse | null>(
+      gameRoutes.stopMyAutoBetSession,
+      {
+        auth: true,
+        method: "POST",
+      },
+    );
   }
 }
 
