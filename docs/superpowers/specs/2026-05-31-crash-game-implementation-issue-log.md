@@ -990,6 +990,28 @@ Cada entrada deve conter:
   `duplicatedLines` 236, `clones` 12 e maior arquivo no baseline de 269 linhas.
 - Status: resolvido.
 
+### 57. Audit encontrou vulnerabilidade alta no OpenTelemetry Prometheus exporter
+
+- Contexto: babysit do PR #16, apos o quality gate reportar o warning
+  `security.high` com duas ocorrencias.
+- Sintoma: `bun audit --json` reportou a CVE-2026-44902 /
+  GHSA-q7rr-3cgh-j5r3 em `@opentelemetry/exporter-prometheus@0.57.2` e
+  `@opentelemetry/sdk-node@0.57.2`.
+- Causa: a versao instalada do `@opentelemetry/sdk-node` trazia o exporter
+  Prometheus vulneravel a crash de processo por request HTTP malformada.
+- Correcao: atualizar os pacotes OpenTelemetry dos servicos `games` e
+  `wallets` para a linha corrigida `0.218.0`/`2.7.1`, e trocar a criacao de
+  resource de tracing para `resourceFromAttributes`, API recomendada pela
+  versao atual.
+- Validacao: `bun audit --json` retornou `{}`; `bun run lint`,
+  `bun run check:types`, `bun run test:unit`,
+  `bun run test:coverage && bun run quality:gate`, `docker compose config`,
+  `docker compose up -d --build`, `bun scripts/ci/check-kong-health.ts`,
+  `bun scripts/ci/check-observability-health.ts`,
+  `cd services/games && bun run test:e2e` e `bun run test:e2e:browser`
+  passaram.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
