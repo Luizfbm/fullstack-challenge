@@ -2211,7 +2211,7 @@ describe("CashOutUseCase", () => {
       roundId: "round-1",
       betId: "bet-1",
       playerId: "player-1",
-      amountCents: 2117n,
+      amountCents: 1822n,
       referenceId: "round:round-1:player:player-1:cashout-credit",
       reason: "CASHOUT_PAYOUT",
     });
@@ -2248,12 +2248,12 @@ describe("CashOutUseCase", () => {
     const result = await useCase.execute({ playerId: "player-1" });
 
     expect(result.bet.status).toBe("CASHED_OUT");
-    expect(result.bet.cashoutMultiplierBp).toBe(21170);
-    expect(result.bet.payoutCents).toBe(2117n);
+    expect(result.bet.cashoutMultiplierBp).toBe(18221);
+    expect(result.bet.payoutCents).toBe(1822n);
     expect(walletClient.credits).toEqual([
       {
         playerId: "player-1",
-        amountCents: 2117n,
+        amountCents: 1822n,
         referenceId: "round:round-1:player:player-1:cashout-credit",
         reason: "CASHOUT_PAYOUT",
       },
@@ -2265,7 +2265,7 @@ describe("CashOutUseCase", () => {
       "CASHED_OUT",
     );
     expect(metrics.cashouts).toEqual([
-      { mode: "manual", payoutCents: 2117n },
+      { mode: "manual", payoutCents: 1822n },
     ]);
   });
 
@@ -2351,7 +2351,7 @@ describe("CashOutUseCase", () => {
       useCase.execute({ playerId: "player-1" }),
     ).rejects.toThrow(WalletCreditFailedError);
     expect(metrics.cashouts).toEqual([
-      { mode: "manual", payoutCents: 2117n },
+      { mode: "manual", payoutCents: 1822n },
     ]);
   });
 
