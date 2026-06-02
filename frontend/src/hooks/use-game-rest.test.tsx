@@ -61,16 +61,22 @@ describe("use-game-rest auto bet hooks", () => {
 
     startResult.current.mutate({
       amountCents: "1000",
+      martingaleMaxSteps: 3,
+      martingaleMultiplier: 2,
       maxRounds: 5,
       stopLossCents: "3000",
+      strategy: "MARTINGALE",
       takeProfitCents: "5000",
     });
 
     await waitFor(() => {
       expect(apiMocks.startAutoBetSession).toHaveBeenCalledWith({
         amountCents: "1000",
+        martingaleMaxSteps: 3,
+        martingaleMultiplier: 2,
         maxRounds: 5,
         stopLossCents: "3000",
+        strategy: "MARTINGALE",
         takeProfitCents: "5000",
       });
     });

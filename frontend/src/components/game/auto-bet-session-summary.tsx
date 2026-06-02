@@ -1,7 +1,17 @@
-import { Repeat, Target, TrendingUp, WalletCards } from "lucide-react";
+import {
+  Layers2,
+  Repeat,
+  Target,
+  TrendingUp,
+  WalletCards,
+} from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { formatMultiplierBp } from "../../services/auto-cashout";
-import type { AutoBetSessionResponse } from "../../services/game-api";
+import type {
+  AutoBetSessionResponse,
+  AutoBetStopReason,
+} from "../../services/game-api";
 import { formatCents } from "../../services/money";
 
 type AutoBetSessionSummaryProps = {
@@ -15,20 +25,42 @@ export function AutoBetSessionSummary({ session }: AutoBetSessionSummaryProps) {
   return (
     <div className="mt-3 rounded-md border border-cyan-300/20 bg-cyan-300/10 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-cyan-100">Auto Bet ativo</p>
-        {session.autoCashoutMultiplierBp ? (
-          <p className="rounded-md border border-cyan-200/30 bg-black/35 px-2 py-1 font-mono text-xs text-cyan-100">
-            Auto cashout {formatMultiplierBp(session.autoCashoutMultiplierBp)}
-          </p>
-        ) : null}
+        <p className="text-sm font-semibold text-cyan-100">
+          {session.status === "ACTIVE" ? "Auto Bet ativo" : "Ultimo Auto Bet"}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <SummaryBadge>
+            {session.strategy === "MARTINGALE" ? "Martingale" : "Valor fixo"}
+          </SummaryBadge>
+          {session.autoCashoutMultiplierBp ? (
+            <SummaryBadge>
+              Auto cashout {formatMultiplierBp(session.autoCashoutMultiplierBp)}
+            </SummaryBadge>
+          ) : null}
+          {session.stopReason ? (
+            <SummaryBadge>{formatStopReason(session.stopReason)}</SummaryBadge>
+          ) : null}
+        </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryMetric
           icon={Repeat}
           label="Rodadas"
           value={`${session.roundsPlayed} / ${session.maxRounds}`}
         />
+        <SummaryMetric
+          icon={WalletCards}
+          label="Proxima aposta"
+          value={formatCents(session.nextAmountCents)}
+        />
+        {session.strategy === "MARTINGALE" ? (
+          <SummaryMetric
+            icon={Layers2}
+            label="Passo"
+            value={`${session.martingaleCurrentStep} / ${session.martingaleMaxSteps}`}
+          />
+        ) : null}
         <SummaryMetric
           icon={TrendingUp}
           label="Resultado"
@@ -37,11 +69,16 @@ export function AutoBetSessionSummary({ session }: AutoBetSessionSummaryProps) {
         />
         <SummaryMetric
           icon={WalletCards}
+          label="Base"
+          value={formatCents(session.amountCents)}
+        />
+        <SummaryMetric
+          icon={Target}
           label="Stop-loss"
           value={session.stopLossCents ? formatCents(session.stopLossCents) : "-"}
         />
         <SummaryMetric
-          icon={Target}
+          icon={TrendingUp}
           label="Take-profit"
           value={
             session.takeProfitCents ? formatCents(session.takeProfitCents) : "-"
@@ -49,6 +86,18 @@ export function AutoBetSessionSummary({ session }: AutoBetSessionSummaryProps) {
         />
       </div>
     </div>
+  );
+}
+
+type SummaryBadgeProps = {
+  children: ReactNode;
+};
+
+function SummaryBadge({ children }: SummaryBadgeProps) {
+  return (
+    <p className="rounded-md border border-cyan-200/30 bg-black/35 px-2 py-1 font-mono text-xs text-cyan-100">
+      {children}
+    </p>
   );
 }
 
@@ -81,4 +130,27 @@ function SummaryMetric({
       <p className={cn("mt-1 font-mono text-sm", valueTone)}>{value}</p>
     </div>
   );
+}
+
+function formatStopReason(reason: AutoBetStopReason): string {
+  switch (reason) {
+    case "MARTINGALE_MAX_STEPS_REACHED":
+      return "Maximo de passos Martingale";
+    case "MARTINGALE_BET_LIMIT_REACHED":
+      return "Limite de aposta Martingale";
+    case "MAX_ROUNDS_REACHED":
+      return "Maximo de rodadas";
+    case "STOP_LOSS_REACHED":
+      return "Stop-loss atingido";
+    case "TAKE_PROFIT_REACHED":
+      return "Take-profit atingido";
+    case "WALLET_REJECTED":
+      return "Carteira rejeitou";
+    case "WALLET_UNAVAILABLE":
+      return "Carteira indisponivel";
+    case "ROUND_NOT_AVAILABLE":
+      return "Rodada indisponivel";
+    case "MANUAL":
+      return "Parado manualmente";
+  }
 }

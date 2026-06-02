@@ -189,6 +189,29 @@ describe("game dashboard helpers", () => {
     expect(screen.getByText("1 / 3")).toBeTruthy();
   });
 
+  it("renders martingale session progression and stop reason", () => {
+    hookMocks.autoBetSessionQuery.data = createAutoBetSession({
+      martingaleCurrentStep: 1,
+      martingaleMaxSteps: 3,
+      martingaleMultiplier: 2,
+      maxRounds: 5,
+      netProfitCents: "-1000",
+      nextAmountCents: "2000",
+      roundsPlayed: 2,
+      status: "STOPPED",
+      stopReason: "MARTINGALE_MAX_STEPS_REACHED",
+      strategy: "MARTINGALE",
+    });
+
+    render(<GameDashboardShell />);
+
+    expect(screen.getByText("Ultimo Auto Bet")).toBeTruthy();
+    expect(screen.getByText("Martingale")).toBeTruthy();
+    expect(screen.getByText("R$ 20,00")).toBeTruthy();
+    expect(screen.getByText("1 / 3")).toBeTruthy();
+    expect(screen.getByText("Maximo de passos Martingale")).toBeTruthy();
+  });
+
   it("normalizes the bet amount field and disables betting for invalid value", () => {
     render(<BetControlsPanel activeBet={null} currentRound={createRound()} />);
 
@@ -263,9 +286,44 @@ describe("game dashboard helpers", () => {
       autoCashoutMultiplierBp: 20000,
       maxRounds: 5,
       stopLossCents: "3000",
+      strategy: "FIXED",
       takeProfitCents: "5000",
     });
     expect(hookMocks.placeBetMutation.mutate).not.toHaveBeenCalled();
+  });
+
+  it("starts martingale auto bet with configured strategy fields", () => {
+    render(
+      <BetControlsPanel
+        activeBet={null}
+        autoBetSession={null}
+        currentRound={createRound()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Martingale" }));
+    fireEvent.change(screen.getByLabelText("Rodadas maximas"), {
+      target: { value: "6" },
+    });
+    fireEvent.change(screen.getByLabelText("Multiplicador Martingale"), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByLabelText("Passos Martingale"), {
+      target: { value: "4" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar Auto Bet" }));
+
+    expect(hookMocks.startAutoBetSessionMutation.mutate).toHaveBeenCalledWith({
+      amountCents: "1000",
+      autoCashoutMultiplierBp: null,
+      martingaleMaxSteps: 4,
+      martingaleMultiplier: 3,
+      maxRounds: 6,
+      stopLossCents: null,
+      strategy: "MARTINGALE",
+      takeProfitCents: null,
+    });
   });
 
   it("disables auto bet when persistent risk fields are invalid", () => {
@@ -291,6 +349,37 @@ describe("game dashboard helpers", () => {
     });
     fireEvent.change(screen.getByLabelText("Stop-loss em centavos"), {
       target: { value: "0" },
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Iniciar Auto Bet" }),
+    ).toHaveProperty("disabled", true);
+  });
+
+  it("disables martingale auto bet when strategy fields are invalid", () => {
+    render(
+      <BetControlsPanel
+        activeBet={null}
+        autoBetSession={null}
+        currentRound={createRound()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Martingale" }));
+    fireEvent.change(screen.getByLabelText("Multiplicador Martingale"), {
+      target: { value: "1" },
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Iniciar Auto Bet" }),
+    ).toHaveProperty("disabled", true);
+
+    fireEvent.change(screen.getByLabelText("Multiplicador Martingale"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText("Passos Martingale"), {
+      target: { value: "11" },
     });
 
     expect(
@@ -501,12 +590,17 @@ function createAutoBetSession(
     autoCashoutMultiplierBp: null,
     createdAt: "2026-06-01T12:00:00.000Z",
     id: "auto-bet-1",
+    martingaleCurrentStep: 0,
+    martingaleMaxSteps: 0,
+    martingaleMultiplier: 2,
     maxRounds: 10,
     netProfitCents: "0",
+    nextAmountCents: "1000",
     playerId: "player-1",
     roundsPlayed: 0,
     startsAfterRoundId: "round-1",
     status: "ACTIVE",
+    strategy: "FIXED",
     stopLossCents: null,
     stopReason: null,
     stoppedAt: null,

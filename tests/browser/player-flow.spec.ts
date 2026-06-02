@@ -124,6 +124,42 @@ test("player can use auto cashout preset without manual cashout", async ({
   }).toPass({ timeout: 60000 });
 });
 
+test("player can configure and stop a martingale auto bet session", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { exact: true, name: "Entrar" }).click();
+
+  await page.locator('input[name="username"]').fill("player");
+  await page.locator('input[name="password"]').fill("player123");
+  await page.locator('button[type="submit"]').click();
+
+  await expect(page).toHaveURL("http://localhost:8000/");
+  await expect(page.getByRole("banner").getByText("player")).toBeVisible();
+
+  await page.getByRole("button", { exact: true, name: "Auto" }).click();
+  await page.getByRole("button", { name: "Martingale" }).click();
+  await page.getByLabel("Rodadas maximas").fill("4");
+  await page.getByLabel("Multiplicador Martingale").fill("2");
+  await page.getByLabel("Passos Martingale").fill("3");
+
+  await expect(page.getByRole("button", { name: "Iniciar Auto Bet" }))
+    .toBeEnabled();
+  await page.getByRole("button", { name: "Iniciar Auto Bet" }).click();
+
+  await expect(page.getByText("Auto Bet ativo")).toBeVisible();
+  await expect(page.getByText("Martingale", { exact: true }).first())
+    .toBeVisible();
+  await expect(page.getByText("Proxima aposta")).toBeVisible();
+  await expect(page.getByText("0 / 4")).toBeVisible();
+  await expect(page.getByText("0 / 3")).toBeVisible();
+
+  await page.getByRole("button", { name: "Parar Auto Bet" }).click();
+
+  await expect(page.getByText("Ultimo Auto Bet")).toBeVisible();
+  await expect(page.getByText("Parado manualmente")).toBeVisible();
+});
+
 async function readDisplayedBalance(page: Page): Promise<string> {
   const balance = page.getByTestId("metric-saldo").locator("p").last();
 
