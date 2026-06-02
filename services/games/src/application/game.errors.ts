@@ -26,6 +26,27 @@ export class AutoCashoutMultiplierOutOfRangeError extends Error {
   }
 }
 
+export class AutoBetSessionActiveError extends Error {
+  constructor() {
+    super("An auto bet session is already active");
+    this.name = "AutoBetSessionActiveError";
+  }
+}
+
+export class AutoBetSessionConfigInvalidError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AutoBetSessionConfigInvalidError";
+  }
+}
+
+export class ManualBetBlockedByAutoBetError extends Error {
+  constructor() {
+    super("Manual betting is blocked while auto bet is active");
+    this.name = "ManualBetBlockedByAutoBetError";
+  }
+}
+
 export class WalletCreditFailedError extends Error {
   public readonly originalCause?: unknown;
 
