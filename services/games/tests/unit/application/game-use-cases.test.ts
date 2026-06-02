@@ -1,12 +1,24 @@
 import { describe, expect, test } from "bun:test";
+import type {
+  AutoBetRoundExecution,
+  AutoBetSession,
+} from "../../../src/application/auto-bet/auto-bet-session";
 import { Bet } from "../../../src/domain/bet";
 import { InvalidRoundStateError } from "../../../src/domain/game.errors";
 import { Round } from "../../../src/domain/round";
 import {
   AutoCashoutMultiplierOutOfRangeError,
+  AutoBetSessionActiveError,
   BetAmountOutOfRangeError,
   WalletCreditFailedError,
 } from "../../../src/application/game.errors";
+import type {
+  ApplyAutoBetResultInput,
+  AutoBetSessionRepository,
+  NewAutoBetRoundExecution,
+  NewAutoBetSession,
+  StopAutoBetSessionInput,
+} from "../../../src/application/ports/auto-bet-session.repository";
 import { Clock } from "../../../src/application/ports/clock";
 import {
   GameRepository,
@@ -30,11 +42,14 @@ import type {
 import { CashoutCreditService } from "../../../src/application/services/cashout-credit.service";
 import { AdvanceRoundLifecycleUseCase } from "../../../src/application/use-cases/advance-round-lifecycle.use-case";
 import { CashOutUseCase } from "../../../src/application/use-cases/cash-out.use-case";
+import { GetMyAutoBetSessionUseCase } from "../../../src/application/use-cases/get-my-auto-bet-session.use-case";
 import { GetCurrentRoundUseCase } from "../../../src/application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "../../../src/application/use-cases/list-my-bets.use-case";
 import { ListLeaderboardUseCase } from "../../../src/application/use-cases/list-leaderboard.use-case";
 import { ListRoundHistoryUseCase } from "../../../src/application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "../../../src/application/use-cases/place-bet.use-case";
+import { StartAutoBetSessionUseCase } from "../../../src/application/use-cases/start-auto-bet-session.use-case";
+import { StopAutoBetSessionUseCase } from "../../../src/application/use-cases/stop-auto-bet-session.use-case";
 import { VerifyRoundUseCase } from "../../../src/application/use-cases/verify-round.use-case";
 import { ProvablyFair } from "../../../src/domain/provably-fair";
 import {
@@ -242,6 +257,132 @@ class FakeWalletOutboxRepository implements WalletOutboxRepository {
   }
 }
 
+class FakeAutoBetSessionRepository implements AutoBetSessionRepository {
+  public sessions: AutoBetSession[] = [];
+  public executions: AutoBetRoundExecution[] = [];
+
+  async create(input: NewAutoBetSession): Promise<AutoBetSession> {
+    const session: AutoBetSession = {
+      ...input,
+      createdAt: new Date("2026-05-30T10:00:00.000Z"),
+      updatedAt: new Date("2026-05-30T10:00:00.000Z"),
+      stoppedAt: null,
+    };
+    this.sessions.push(session);
+
+    return session;
+  }
+
+  async findActiveByPlayer(playerId: string): Promise<AutoBetSession | null> {
+    return (
+      this.sessions.find(
+        (session) =>
+          session.playerId === playerId && session.status === "ACTIVE",
+      ) ?? null
+    );
+  }
+
+  async findLatestByPlayer(playerId: string): Promise<AutoBetSession | null> {
+    return (
+      this.sessions
+        .filter((session) => session.playerId === playerId)
+        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+        .at(0) ?? null
+    );
+  }
+
+  async listActive(): Promise<AutoBetSession[]> {
+    return this.sessions.filter((session) => session.status === "ACTIVE");
+  }
+
+  async stop(input: StopAutoBetSessionInput): Promise<AutoBetSession> {
+    const session = this.sessions.find(
+      (candidate) => candidate.id === input.sessionId,
+    );
+
+    if (!session) {
+      throw new Error(`Session not found: ${input.sessionId}`);
+    }
+
+    Object.assign(session, {
+      status: "STOPPED" as const,
+      stopReason: input.reason,
+      stoppedAt: new Date("2026-05-30T10:00:00.000Z"),
+      updatedAt: new Date("2026-05-30T10:00:00.000Z"),
+    });
+
+    return session;
+  }
+
+  async findExecution(
+    sessionId: string,
+    roundId: string,
+  ): Promise<AutoBetRoundExecution | null> {
+    return (
+      this.executions.find(
+        (execution) =>
+          execution.sessionId === sessionId && execution.roundId === roundId,
+      ) ?? null
+    );
+  }
+
+  async recordExecution(
+    input: NewAutoBetRoundExecution,
+  ): Promise<AutoBetRoundExecution> {
+    const execution: AutoBetRoundExecution = {
+      ...input,
+      createdAt: new Date("2026-05-30T10:00:00.000Z"),
+      resultAppliedAt: null,
+      resultDeltaCents: null,
+      resultStatus: null,
+    };
+    this.executions.push(execution);
+
+    return execution;
+  }
+
+  async incrementRoundsPlayed(sessionId: string): Promise<AutoBetSession> {
+    const session = this.sessions.find(
+      (candidate) => candidate.id === sessionId,
+    );
+
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    session.roundsPlayed += 1;
+
+    return session;
+  }
+
+  async applyBetResult(
+    input: ApplyAutoBetResultInput,
+  ): Promise<AutoBetSession | null> {
+    const execution = this.executions.find(
+      (candidate) => candidate.id === input.executionId,
+    );
+
+    if (!execution || execution.resultAppliedAt) {
+      return null;
+    }
+
+    const session = this.sessions.find(
+      (candidate) => candidate.id === execution.sessionId,
+    );
+
+    if (!session) {
+      throw new Error(`Session not found: ${execution.sessionId}`);
+    }
+
+    execution.resultStatus = input.resultStatus;
+    execution.resultDeltaCents = input.deltaCents;
+    execution.resultAppliedAt = new Date("2026-05-30T10:00:00.000Z");
+    session.netProfitCents += input.deltaCents;
+
+    return session;
+  }
+}
+
 class FakeWalletOutboxDispatcher {
   public dispatched: WalletOutboxMessage[] = [];
   public result: WalletOperationResult = {
@@ -263,6 +404,20 @@ class FixedIdGenerator implements IdGenerator {
 
   generate(): string {
     return this.id;
+  }
+}
+
+class SequenceIdGenerator implements IdGenerator {
+  constructor(private readonly ids: string[]) {}
+
+  generate(): string {
+    const id = this.ids.shift();
+
+    if (!id) {
+      throw new Error("SequenceIdGenerator ran out of ids");
+    }
+
+    return id;
   }
 }
 
@@ -430,6 +585,85 @@ function openRound(crashPointBp = 30000): Round {
     nonce: 1,
     chainIndex: 1,
   });
+}
+
+function openRoundFixture(
+  overrides: {
+    chainIndex?: number;
+    crashPointBp?: number;
+    id?: string;
+  } = {},
+): Round {
+  return Round.openBetting({
+    id: overrides.id ?? "round-1",
+    bettingStartsAt: new Date("2026-05-30T10:00:00.000Z"),
+    bettingEndsAt: new Date("2026-05-30T10:00:10.000Z"),
+    crashPointBp: overrides.crashPointBp ?? 30000,
+    serverSeedHash: "seed-hash",
+    clientSeed: "client-seed",
+    nonce: overrides.chainIndex ?? 1,
+    chainIndex: overrides.chainIndex ?? 1,
+  });
+}
+
+function acceptedBetFixture(
+  overrides: {
+    autoCashoutMultiplierBp?: number | null;
+    id?: string;
+    playerId?: string;
+    roundId?: string;
+  } = {},
+): Bet {
+  return Bet.accepted({
+    id: overrides.id ?? "bet-1",
+    roundId: overrides.roundId ?? "round-1",
+    playerId: overrides.playerId ?? "player-1",
+    username: "player",
+    amountCents: 1000n,
+    autoCashoutMultiplierBp: overrides.autoCashoutMultiplierBp ?? null,
+  });
+}
+
+function autoBetSessionFixture(
+  overrides: Partial<AutoBetSession> = {},
+): AutoBetSession {
+  return {
+    id: "auto-session-1",
+    playerId: "player-1",
+    username: "player",
+    status: "ACTIVE",
+    amountCents: 1000n,
+    autoCashoutMultiplierBp: null,
+    maxRounds: 3,
+    roundsPlayed: 0,
+    netProfitCents: 0n,
+    stopLossCents: null,
+    takeProfitCents: null,
+    stopReason: null,
+    startsAfterRoundId: null,
+    createdAt: new Date("2026-05-30T10:00:00.000Z"),
+    updatedAt: new Date("2026-05-30T10:00:00.000Z"),
+    stoppedAt: null,
+    ...overrides,
+  };
+}
+
+function autoBetExecutionFixture(
+  overrides: Partial<AutoBetRoundExecution> = {},
+): AutoBetRoundExecution {
+  return {
+    id: "execution-1",
+    sessionId: "auto-session-1",
+    roundId: "round-1",
+    betId: "bet-1",
+    status: "BET_PLACED",
+    reason: null,
+    resultStatus: null,
+    resultDeltaCents: null,
+    resultAppliedAt: null,
+    createdAt: new Date("2026-05-30T10:00:00.000Z"),
+    ...overrides,
+  };
 }
 
 function leaderboardBet(
@@ -1037,6 +1271,97 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     expect(repository.currentRound?.bets[0]?.status).toBe(
       "CASHOUT_PENDING_CREDIT",
     );
+  });
+});
+
+describe("AutoBetSession use cases", () => {
+  test("starts a persistent auto bet session after the current round", async () => {
+    const round = openRoundFixture();
+    const gameRepository = new InMemoryGameRepository(round);
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    const useCase = new StartAutoBetSessionUseCase(
+      gameRepository,
+      autoBetRepository,
+      new SequenceIdGenerator(["auto-session-1"]),
+    );
+
+    await expect(
+      useCase.execute({
+        amountCents: "1000",
+        autoCashoutMultiplierBp: 20000,
+        maxRounds: 3,
+        playerId: "player-1",
+        stopLossCents: "3000",
+        takeProfitCents: "5000",
+        username: "player",
+      }),
+    ).resolves.toMatchObject({
+      id: "auto-session-1",
+      amountCents: 1000n,
+      autoCashoutMultiplierBp: 20000,
+      maxRounds: 3,
+      netProfitCents: 0n,
+      playerId: "player-1",
+      roundsPlayed: 0,
+      startsAfterRoundId: round.id,
+      status: "ACTIVE",
+      stopLossCents: 3000n,
+      takeProfitCents: 5000n,
+    });
+  });
+
+  test("rejects a second active auto bet session for the same player", async () => {
+    const gameRepository = new InMemoryGameRepository(openRoundFixture());
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    const useCase = new StartAutoBetSessionUseCase(
+      gameRepository,
+      autoBetRepository,
+      new SequenceIdGenerator(["auto-session-1", "auto-session-2"]),
+    );
+
+    await useCase.execute({
+      amountCents: "1000",
+      maxRounds: 2,
+      playerId: "player-1",
+      username: "player",
+    });
+
+    await expect(
+      useCase.execute({
+        amountCents: "1000",
+        maxRounds: 2,
+        playerId: "player-1",
+        username: "player",
+      }),
+    ).rejects.toThrow(AutoBetSessionActiveError);
+  });
+
+  test("gets active auto bet session or latest stopped session", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    const getUseCase = new GetMyAutoBetSessionUseCase(autoBetRepository);
+    const stopUseCase = new StopAutoBetSessionUseCase(autoBetRepository);
+
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        playerId: "player-1",
+        status: "ACTIVE",
+      }),
+    );
+
+    await expect(
+      getUseCase.execute({ playerId: "player-1" }),
+    ).resolves.toMatchObject({ id: "auto-session-1", status: "ACTIVE" });
+
+    await stopUseCase.execute({ playerId: "player-1" });
+
+    await expect(
+      getUseCase.execute({ playerId: "player-1" }),
+    ).resolves.toMatchObject({
+      id: "auto-session-1",
+      status: "STOPPED",
+      stopReason: "MANUAL",
+    });
   });
 });
 
