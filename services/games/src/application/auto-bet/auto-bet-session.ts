@@ -5,6 +5,15 @@ import {
   MIN_BET_AMOUNT_CENTS,
 } from "../game.constants";
 import { AutoBetSessionConfigInvalidError } from "../game.errors";
+import {
+  parseMartingaleMaxSteps,
+  parseMartingaleMultiplier,
+  parseStrategy,
+  type AutoBetStrategy,
+} from "./auto-bet-strategy";
+
+export type { AutoBetProgression, AutoBetStrategy } from "./auto-bet-strategy";
+export { getAutoBetProgression } from "./auto-bet-strategy";
 
 export type AutoBetSessionStatus = "ACTIVE" | "STOPPED";
 
@@ -13,6 +22,8 @@ export type AutoBetStopReason =
   | "MAX_ROUNDS_REACHED"
   | "STOP_LOSS_REACHED"
   | "TAKE_PROFIT_REACHED"
+  | "MARTINGALE_MAX_STEPS_REACHED"
+  | "MARTINGALE_BET_LIMIT_REACHED"
   | "WALLET_REJECTED"
   | "WALLET_UNAVAILABLE"
   | "ROUND_NOT_AVAILABLE";
@@ -25,10 +36,15 @@ export type AutoBetSession = {
   playerId: string;
   username: string;
   status: AutoBetSessionStatus;
+  strategy: AutoBetStrategy;
   amountCents: bigint;
+  nextAmountCents: bigint;
   autoCashoutMultiplierBp: number | null;
   maxRounds: number;
   roundsPlayed: number;
+  martingaleMultiplier: number;
+  martingaleMaxSteps: number;
+  martingaleCurrentStep: number;
   netProfitCents: bigint;
   stopLossCents: bigint | null;
   takeProfitCents: bigint | null;
@@ -56,14 +72,22 @@ export type StartAutoBetConfig = {
   amountCents: bigint | number | string;
   autoCashoutMultiplierBp?: number | null;
   maxRounds: number;
+  strategy?: AutoBetStrategy | string | null;
+  martingaleMultiplier?: number | null;
+  martingaleMaxSteps?: number | null;
   stopLossCents?: bigint | number | string | null;
   takeProfitCents?: bigint | number | string | null;
 };
 
 export type ParsedAutoBetConfig = {
+  strategy: AutoBetStrategy;
   amountCents: bigint;
+  nextAmountCents: bigint;
   autoCashoutMultiplierBp: number | null;
   maxRounds: number;
+  martingaleMultiplier: number;
+  martingaleMaxSteps: number;
+  martingaleCurrentStep: number;
   stopLossCents: bigint | null;
   takeProfitCents: bigint | null;
 };
@@ -72,6 +96,7 @@ export function parseAutoBetConfig(
   input: StartAutoBetConfig,
 ): ParsedAutoBetConfig {
   const amountCents = toCents(input.amountCents);
+  const strategy = parseStrategy(input.strategy);
 
   if (
     amountCents < MIN_BET_AMOUNT_CENTS ||
@@ -93,11 +118,21 @@ export function parseAutoBetConfig(
   }
 
   return {
+    strategy,
     amountCents,
+    nextAmountCents: amountCents,
     autoCashoutMultiplierBp: parseAutoCashoutMultiplierBp(
       input.autoCashoutMultiplierBp,
     ),
     maxRounds: input.maxRounds,
+    martingaleMultiplier: parseMartingaleMultiplier(
+      input.martingaleMultiplier,
+    ),
+    martingaleMaxSteps: parseMartingaleMaxSteps(
+      strategy,
+      input.martingaleMaxSteps,
+    ),
+    martingaleCurrentStep: 0,
     stopLossCents: parseOptionalPositiveCents(
       input.stopLossCents,
       "stopLossCents",

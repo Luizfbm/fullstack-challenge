@@ -112,10 +112,15 @@ model AutoBetSession {
   playerId                String
   username                String
   status                  String
+  strategy                String                  @default("FIXED")
   amountCents             BigInt
+  nextAmountCents         BigInt                  @default(0)
   autoCashoutMultiplierBp Int?
   maxRounds               Int
   roundsPlayed            Int                     @default(0)
+  martingaleMultiplier    Int                     @default(2)
+  martingaleMaxSteps      Int                     @default(0)
+  martingaleCurrentStep   Int                     @default(0)
   netProfitCents          BigInt                  @default(0)
   stopLossCents           BigInt?
   takeProfitCents         BigInt?

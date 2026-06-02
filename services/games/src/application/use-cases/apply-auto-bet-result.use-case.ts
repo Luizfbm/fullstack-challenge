@@ -1,5 +1,7 @@
 import {
+  AutoBetSession,
   AutoBetResultStatus,
+  getAutoBetProgression,
   shouldStopForProfitLimits,
 } from "../auto-bet/auto-bet-session";
 import type { AutoBetSessionRepository } from "../ports/auto-bet-session.repository";
@@ -38,12 +40,38 @@ export class ApplyAutoBetResultUseCase {
     const stopReason = shouldStopForProfitLimits(updatedSession);
 
     if (!stopReason) {
+      await this.applyProgression(updatedSession, input.resultStatus);
       return;
     }
 
     await this.autoBetSessionRepository.stop({
       sessionId: updatedSession.id,
       reason: stopReason,
+    });
+  }
+
+  private async applyProgression(
+    session: AutoBetSession,
+    resultStatus: AutoBetResultStatus,
+  ): Promise<void> {
+    const progression = getAutoBetProgression(session, resultStatus);
+
+    if (!progression) {
+      return;
+    }
+
+    if (progression.stopReason) {
+      await this.autoBetSessionRepository.stop({
+        sessionId: session.id,
+        reason: progression.stopReason,
+      });
+      return;
+    }
+
+    await this.autoBetSessionRepository.updateProgression({
+      sessionId: session.id,
+      nextAmountCents: progression.nextAmountCents,
+      martingaleCurrentStep: progression.martingaleCurrentStep,
     });
   }
 

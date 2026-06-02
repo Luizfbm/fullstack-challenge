@@ -17,6 +17,31 @@ export class StartAutoBetSessionRequestDto {
   })
   autoCashoutMultiplierBp?: number | null;
 
+  @ApiPropertyOptional({
+    description: "Automatic betting strategy. Defaults to FIXED.",
+    enum: ["FIXED", "MARTINGALE"],
+    example: "MARTINGALE",
+  })
+  strategy?: "FIXED" | "MARTINGALE" | null;
+
+  @ApiPropertyOptional({
+    description: "Integer multiplier applied after each Martingale loss.",
+    example: 2,
+    maximum: 10,
+    minimum: 2,
+    nullable: true,
+  })
+  martingaleMultiplier?: number | null;
+
+  @ApiPropertyOptional({
+    description: "Maximum Martingale progression steps before stopping.",
+    example: 3,
+    maximum: 10,
+    minimum: 1,
+    nullable: true,
+  })
+  martingaleMaxSteps?: number | null;
+
   @ApiProperty({
     description: "Maximum number of automatic bets in this session.",
     example: 20,

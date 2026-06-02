@@ -37,6 +37,12 @@ export type ApplyAutoBetResultInput = {
   deltaCents: bigint;
 };
 
+export type UpdateAutoBetProgressionInput = {
+  sessionId: string;
+  nextAmountCents: bigint;
+  martingaleCurrentStep: number;
+};
+
 export interface AutoBetSessionRepository {
   create(input: NewAutoBetSession): Promise<AutoBetSession>;
   findActiveByPlayer(playerId: string): Promise<AutoBetSession | null>;
@@ -55,4 +61,7 @@ export interface AutoBetSessionRepository {
   applyBetResult(
     input: ApplyAutoBetResultInput,
   ): Promise<AutoBetSession | null>;
+  updateProgression(
+    input: UpdateAutoBetProgressionInput,
+  ): Promise<AutoBetSession>;
 }

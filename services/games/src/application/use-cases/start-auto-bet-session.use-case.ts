@@ -15,6 +15,9 @@ type StartAutoBetSessionInput = {
   amountCents: bigint | number | string;
   autoCashoutMultiplierBp?: number | null;
   maxRounds: number;
+  strategy?: string | null;
+  martingaleMultiplier?: number | null;
+  martingaleMaxSteps?: number | null;
   stopLossCents?: bigint | number | string | null;
   takeProfitCents?: bigint | number | string | null;
 };
@@ -43,10 +46,15 @@ export class StartAutoBetSessionUseCase {
       playerId: input.playerId,
       username: input.username,
       status: "ACTIVE",
+      strategy: config.strategy,
       amountCents: config.amountCents,
+      nextAmountCents: config.nextAmountCents,
       autoCashoutMultiplierBp: config.autoCashoutMultiplierBp,
       maxRounds: config.maxRounds,
       roundsPlayed: 0,
+      martingaleMultiplier: config.martingaleMultiplier,
+      martingaleMaxSteps: config.martingaleMaxSteps,
+      martingaleCurrentStep: config.martingaleCurrentStep,
       netProfitCents: 0n,
       stopLossCents: config.stopLossCents,
       takeProfitCents: config.takeProfitCents,
