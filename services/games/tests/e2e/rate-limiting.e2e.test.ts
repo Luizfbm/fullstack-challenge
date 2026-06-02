@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   apiResponse,
   ensureStackIsHealthy,
+  getAccessToken,
   withE2ELock,
 } from "./e2e-helpers";
 
@@ -11,6 +12,7 @@ describe("Kong rate limiting E2E", () => {
     async () => {
       await withE2ELock(async () => {
         await ensureStackIsHealthy();
+        const token = await getAccessToken();
 
         for (let request = 0; request < 15; request += 1) {
           const gamesHealth = await apiResponse("/games/health");
@@ -27,6 +29,7 @@ describe("Kong rate limiting E2E", () => {
         for (let request = 0; request < 12; request += 1) {
           const response = await apiResponse("/games/bet", {
             method: "POST",
+            token,
             headers: {
               "Content-Type": "application/json",
             },

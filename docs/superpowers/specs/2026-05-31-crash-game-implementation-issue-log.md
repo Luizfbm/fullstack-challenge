@@ -1012,6 +1012,41 @@ Cada entrada deve conter:
   passaram.
 - Status: resolvido.
 
+### 58. CI E2E de rate limiting dependia de requisicoes sem token
+
+- Contexto: babysit do PR #21, job `Docker Kong Keycloak E2E` no evento
+  `push`.
+- Sintoma: `tests/e2e/rate-limiting.e2e.test.ts` falhou esperando status
+  `429`, mas recebeu doze respostas `401`.
+- Causa: o teste tentava saturar o plugin de rate limiting de `/games/bet`
+  com requisicoes sem `Authorization`. Em stack fresco, essas requisicoes
+  podem ser rejeitadas pela autenticacao como `401` antes de produzirem o
+  comportamento esperado de limite, tornando o teste dependente de ordem/estado
+  de outros E2E.
+- Correcao: obter token real do Keycloak no teste e enviar as requisicoes de
+  `/games/bet` autenticadas, mantendo a cobertura de que o comando de aposta e
+  limitado pelo Kong sem limitar healthchecks ou frontend.
+- Validacao: `docker compose restart kong && cd services/games && bun test
+  tests/e2e/rate-limiting.e2e.test.ts`.
+- Status: resolvido.
+
+### 59. E2E outbox/inbox usava timeout padrao do Bun
+
+- Contexto: validacao local completa apos corrigir o E2E de rate limiting do
+  PR #21.
+- Sintoma: `bun run ci:e2e` falhou em
+  `tests/e2e/outbox-inbox.e2e.test.ts` com timeout de `5000ms` nos cenarios
+  de debit e credit.
+- Causa: os dois cenarios exercitam Kong, Keycloak, RabbitMQ Management e
+  consultas via `docker compose exec`, mas eram os unicos E2E do pacote sem
+  timeout explicito. A reproducao isolada passou, mas cada teste levou cerca
+  de `4.6s` a `4.8s`, deixando o pacote completo vulneravel ao timeout padrao
+  de `5s` do Bun.
+- Correcao: declarar `{ timeout: 120000 }` nos dois cenarios, alinhando-os aos
+  demais E2E de integracao sem alterar assercoes ou fluxo funcional.
+- Validacao: `cd services/games && bun test tests/e2e/outbox-inbox.e2e.test.ts`.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
