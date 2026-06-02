@@ -89,11 +89,15 @@ export type PlaceBetInput = {
   autoCashoutMultiplierBp?: number | null;
 };
 
+export type AutoBetStrategy = "FIXED" | "MARTINGALE";
+
 export type AutoBetStopReason =
   | "MANUAL"
   | "MAX_ROUNDS_REACHED"
   | "STOP_LOSS_REACHED"
   | "TAKE_PROFIT_REACHED"
+  | "MARTINGALE_MAX_STEPS_REACHED"
+  | "MARTINGALE_BET_LIMIT_REACHED"
   | "WALLET_REJECTED"
   | "WALLET_UNAVAILABLE"
   | "ROUND_NOT_AVAILABLE";
@@ -103,10 +107,15 @@ export type AutoBetSessionResponse = {
   playerId: string;
   username: string;
   status: "ACTIVE" | "STOPPED";
+  strategy: AutoBetStrategy;
   amountCents: string;
+  nextAmountCents: string;
   autoCashoutMultiplierBp: number | null;
   maxRounds: number;
   roundsPlayed: number;
+  martingaleMultiplier: number;
+  martingaleMaxSteps: number;
+  martingaleCurrentStep: number;
   netProfitCents: string;
   stopLossCents: string | null;
   takeProfitCents: string | null;
@@ -120,6 +129,9 @@ export type AutoBetSessionResponse = {
 export type StartAutoBetSessionInput = {
   amountCents: string;
   autoCashoutMultiplierBp?: number | null;
+  strategy?: AutoBetStrategy;
+  martingaleMultiplier?: number | null;
+  martingaleMaxSteps?: number | null;
   maxRounds: number;
   stopLossCents?: string | null;
   takeProfitCents?: string | null;

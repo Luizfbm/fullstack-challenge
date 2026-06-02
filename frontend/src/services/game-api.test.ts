@@ -95,8 +95,11 @@ describe("GameApi", () => {
     await api.startAutoBetSession({
       amountCents: "1000",
       autoCashoutMultiplierBp: 20000,
+      martingaleMaxSteps: 3,
+      martingaleMultiplier: 2,
       maxRounds: 5,
       stopLossCents: "3000",
+      strategy: "MARTINGALE",
       takeProfitCents: "5000",
     });
     await api.stopAutoBetSession();
@@ -113,8 +116,11 @@ describe("GameApi", () => {
           body: JSON.stringify({
             amountCents: "1000",
             autoCashoutMultiplierBp: 20000,
+            martingaleMaxSteps: 3,
+            martingaleMultiplier: 2,
             maxRounds: 5,
             stopLossCents: "3000",
+            strategy: "MARTINGALE",
             takeProfitCents: "5000",
           }),
           method: "POST",

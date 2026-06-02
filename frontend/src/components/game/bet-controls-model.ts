@@ -1,5 +1,6 @@
 import type { AutoCashoutParseResult } from "../../services/auto-cashout";
 import type {
+  AutoBetStrategy,
   BetResponse,
   StartAutoBetSessionInput,
 } from "../../services/game-api";
@@ -53,40 +54,60 @@ export function buildAutoBetPayload({
   autoCashoutEnabled,
   autoCashoutParseResult,
   maxRounds,
+  martingaleMaxSteps,
+  martingaleMultiplier,
   stopLossCents,
+  strategy,
   takeProfitCents,
 }: {
   amountCents: string;
   autoCashoutEnabled: boolean;
   autoCashoutParseResult: AutoCashoutParseResult;
   maxRounds: number;
+  martingaleMaxSteps: number;
+  martingaleMultiplier: number;
   stopLossCents: string;
+  strategy: AutoBetStrategy;
   takeProfitCents: string;
 }): StartAutoBetSessionInput {
+  const martingaleFields =
+    strategy === "MARTINGALE"
+      ? { martingaleMaxSteps, martingaleMultiplier }
+      : {};
+
   return {
     amountCents,
     autoCashoutMultiplierBp: autoCashoutEnabled
       ? autoCashoutParseResult.multiplierBp
       : null,
+    ...martingaleFields,
     maxRounds,
     stopLossCents: stopLossCents || null,
+    strategy,
     takeProfitCents: takeProfitCents || null,
   };
 }
 
 export function autoBetConfigIsValid({
   maxRounds,
+  martingaleMaxSteps,
+  martingaleMultiplier,
   stopLossCents,
+  strategy,
   takeProfitCents,
 }: {
   maxRounds: number;
+  martingaleMaxSteps: number;
+  martingaleMultiplier: number;
   stopLossCents: string;
+  strategy: AutoBetStrategy;
   takeProfitCents: string;
 }): boolean {
   return (
     Number.isInteger(maxRounds) &&
     maxRounds >= 1 &&
     maxRounds <= 100 &&
+    martingaleConfigIsValid(strategy, martingaleMultiplier, martingaleMaxSteps) &&
     optionalPositiveCentsIsValid(stopLossCents) &&
     optionalPositiveCentsIsValid(takeProfitCents)
   );
@@ -102,4 +123,23 @@ export function formatMultiplierInput(multiplierBp: number): string {
 
 function optionalPositiveCentsIsValid(value: string): boolean {
   return value === "" || BigInt(value) > 0n;
+}
+
+function martingaleConfigIsValid(
+  strategy: AutoBetStrategy,
+  martingaleMultiplier: number,
+  martingaleMaxSteps: number,
+): boolean {
+  if (strategy === "FIXED") {
+    return true;
+  }
+
+  return (
+    Number.isInteger(martingaleMultiplier) &&
+    martingaleMultiplier >= 2 &&
+    martingaleMultiplier <= 10 &&
+    Number.isInteger(martingaleMaxSteps) &&
+    martingaleMaxSteps >= 1 &&
+    martingaleMaxSteps <= 10
+  );
 }

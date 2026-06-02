@@ -10,9 +10,6 @@ import {
 } from "../../hooks/use-game-rest";
 import { cn } from "../../lib/utils";
 import { getApiErrorMessage } from "../../services/api-errors";
-import {
-  parseAutoCashoutMultiplierInput,
-} from "../../services/auto-cashout";
 import type {
   AutoBetSessionResponse,
   BetResponse,
@@ -24,18 +21,14 @@ import { ActiveBetSummary } from "./active-bet-summary";
 import { BetActionButtons } from "./bet-action-buttons";
 import { AutoBetSessionSummary } from "./auto-bet-session-summary";
 import { AutoBetSettingsFields } from "./auto-bet-settings-fields";
+import { AutoBetStrategyFields } from "./auto-bet-strategy-fields";
 import { AutoCashoutControl } from "./auto-cashout-control";
-import {
-  autoBetConfigIsValid,
-  buildAutoBetPayload,
-  formatMultiplierInput,
-  getPotentialPayout,
-  onlyDigits,
-} from "./bet-controls-model";
+import { getPotentialPayout } from "./bet-controls-model";
 import { BetModeToggle, type BetMode } from "./bet-mode-toggle";
 import { BetStakePreview } from "./bet-stake-preview";
 import type { DashboardRound } from "./round-formatting";
 import { ToastNotice } from "./toast-notice";
+import { useAutoBetForm } from "./use-auto-bet-form";
 
 type BetControlsPanelProps = {
   activeBet: BetResponse | null;
@@ -58,47 +51,16 @@ export function BetControlsPanel({
   const startAutoBetSessionMutation = useStartAutoBetSessionMutation();
   const stopAutoBetSessionMutation = useStopAutoBetSessionMutation();
   const [betMode, setBetMode] = useState<BetMode>("manual");
-  const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false);
-  const [autoCashoutTarget, setAutoCashoutTarget] = useState("2.00");
-  const [maxRounds, setMaxRounds] = useState("10");
-  const [stopLossCents, setStopLossCents] = useState("");
-  const [takeProfitCents, setTakeProfitCents] = useState("");
-  const autoCashoutParseResult =
-    parseAutoCashoutMultiplierInput(autoCashoutTarget);
-  const autoCashoutIsValid =
-    !autoCashoutEnabled || autoCashoutParseResult.valid;
   const amountIsValid = BigInt(betAmountCents) > 0n;
   const activeAutoBetSession =
     autoBetSession?.status === "ACTIVE" ? autoBetSession : null;
+  const autoBetForm = useAutoBetForm({
+    activeSession: activeAutoBetSession,
+    amountCents: betAmountCents,
+  });
   const selectedBetMode: BetMode = activeAutoBetSession ? "auto" : betMode;
   const visibleBetAmountCents =
     activeAutoBetSession?.amountCents ?? betAmountCents;
-  const visibleAutoCashoutEnabled = activeAutoBetSession
-    ? activeAutoBetSession.autoCashoutMultiplierBp !== null
-    : autoCashoutEnabled;
-  const visibleAutoCashoutTarget = activeAutoBetSession?.autoCashoutMultiplierBp
-    ? formatMultiplierInput(activeAutoBetSession.autoCashoutMultiplierBp)
-    : autoCashoutTarget;
-  const visibleAutoCashoutParseResult = activeAutoBetSession
-    ?.autoCashoutMultiplierBp
-    ? {
-        multiplierBp: activeAutoBetSession.autoCashoutMultiplierBp,
-        valid: true,
-      }
-    : autoCashoutParseResult;
-  const visibleMaxRounds = activeAutoBetSession
-    ? String(activeAutoBetSession.maxRounds)
-    : maxRounds;
-  const visibleStopLossCents =
-    activeAutoBetSession?.stopLossCents ?? stopLossCents;
-  const visibleTakeProfitCents =
-    activeAutoBetSession?.takeProfitCents ?? takeProfitCents;
-  const maxRoundsNumber = Number(maxRounds);
-  const autoBetConfigValid = autoBetConfigIsValid({
-    maxRounds: maxRoundsNumber,
-    stopLossCents,
-    takeProfitCents,
-  });
   const autoBetFormDisabled =
     Boolean(activeAutoBetSession) ||
     startAutoBetSessionMutation.isPending ||
@@ -106,15 +68,15 @@ export function BetControlsPanel({
   const canStartAutoBet =
     isAuthenticated &&
     amountIsValid &&
-    autoCashoutIsValid &&
-    autoBetConfigValid &&
+    autoBetForm.autoCashoutIsValid &&
+    autoBetForm.autoBetConfigValid &&
     !activeAutoBetSession &&
     !startAutoBetSessionMutation.isPending;
   const canPlaceBet =
     selectedBetMode === "manual" &&
     isAuthenticated &&
     amountIsValid &&
-    autoCashoutIsValid &&
+    autoBetForm.autoCashoutIsValid &&
     currentRound?.status === "BETTING" &&
     !activeBet &&
     !activeAutoBetSession &&
@@ -130,14 +92,6 @@ export function BetControlsPanel({
     startAutoBetSessionMutation.error ??
     stopAutoBetSessionMutation.error;
   const potentialPayout = getPotentialPayout(activeBet, currentRound);
-  const autoBetPayload = buildAutoBetPayload({
-    amountCents: betAmountCents,
-    autoCashoutEnabled,
-    autoCashoutParseResult,
-    maxRounds: maxRoundsNumber,
-    stopLossCents,
-    takeProfitCents,
-  });
 
   return (
     <section
@@ -191,27 +145,40 @@ export function BetControlsPanel({
 
       <AutoCashoutControl
         disabled={autoBetFormDisabled}
-        enabled={visibleAutoCashoutEnabled}
-        onEnabledChange={setAutoCashoutEnabled}
-        onTargetChange={setAutoCashoutTarget}
-        parseResult={visibleAutoCashoutParseResult}
-        target={visibleAutoCashoutTarget}
+        enabled={autoBetForm.visibleAutoCashoutEnabled}
+        onEnabledChange={autoBetForm.setAutoCashoutEnabled}
+        onTargetChange={autoBetForm.setAutoCashoutTarget}
+        parseResult={autoBetForm.visibleAutoCashoutParseResult}
+        target={autoBetForm.visibleAutoCashoutTarget}
       />
 
-      {activeAutoBetSession ? (
-        <AutoBetSessionSummary session={activeAutoBetSession} />
+      {autoBetSession ? (
+        <AutoBetSessionSummary session={autoBetSession} />
       ) : null}
 
       {selectedBetMode === "auto" ? (
-        <AutoBetSettingsFields
-          disabled={autoBetFormDisabled}
-          maxRounds={visibleMaxRounds}
-          onMaxRoundsChange={(value) => setMaxRounds(onlyDigits(value))}
-          onStopLossChange={(value) => setStopLossCents(onlyDigits(value))}
-          onTakeProfitChange={(value) => setTakeProfitCents(onlyDigits(value))}
-          stopLossCents={visibleStopLossCents}
-          takeProfitCents={visibleTakeProfitCents}
-        />
+        <>
+          <AutoBetSettingsFields
+            disabled={autoBetFormDisabled}
+            maxRounds={autoBetForm.visibleMaxRounds}
+            onMaxRoundsChange={autoBetForm.onMaxRoundsChange}
+            onStopLossChange={autoBetForm.onStopLossChange}
+            onTakeProfitChange={autoBetForm.onTakeProfitChange}
+            stopLossCents={autoBetForm.visibleStopLossCents}
+            takeProfitCents={autoBetForm.visibleTakeProfitCents}
+          />
+          <AutoBetStrategyFields
+            disabled={autoBetFormDisabled}
+            martingaleMaxSteps={autoBetForm.visibleMartingaleMaxSteps}
+            martingaleMultiplier={autoBetForm.visibleMartingaleMultiplier}
+            onMartingaleMaxStepsChange={autoBetForm.onMartingaleMaxStepsChange}
+            onMartingaleMultiplierChange={
+              autoBetForm.onMartingaleMultiplierChange
+            }
+            onStrategyChange={autoBetForm.setStrategy}
+            strategy={autoBetForm.visibleStrategy}
+          />
+        </>
       ) : null}
 
       <BetActionButtons
@@ -224,15 +191,18 @@ export function BetControlsPanel({
         onCashOut={() => cashOutMutation.mutate()}
         onPlaceBet={() =>
           placeBetMutation.mutate(
-            autoCashoutEnabled
+            autoBetForm.autoCashoutEnabled
               ? {
                   amountCents: betAmountCents,
-                  autoCashoutMultiplierBp: autoCashoutParseResult.multiplierBp,
+                  autoCashoutMultiplierBp:
+                    autoBetForm.autoCashoutParseResult.multiplierBp,
                 }
               : { amountCents: betAmountCents },
           )
         }
-        onStartAutoBet={() => startAutoBetSessionMutation.mutate(autoBetPayload)}
+        onStartAutoBet={() =>
+          startAutoBetSessionMutation.mutate(autoBetForm.autoBetPayload)
+        }
         onStopAutoBet={() => stopAutoBetSessionMutation.mutate()}
         placeBetIsPending={placeBetMutation.isPending}
         potentialPayout={potentialPayout}
