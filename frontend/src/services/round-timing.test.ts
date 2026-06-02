@@ -37,7 +37,7 @@ function roundFixture(overrides: Partial<RoundResponse>): RoundResponse {
     id: "round-1",
     multiplierBaseBp: 10000,
     multiplierCurve: "EXPONENTIAL",
-    multiplierGrowthRateBpPerSecond: 1500,
+    multiplierGrowthRateBpPerSecond: 1200,
     nextServerSeedHash: null,
     nonce: 1,
     serverSeed: null,

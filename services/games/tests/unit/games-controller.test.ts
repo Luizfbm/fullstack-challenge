@@ -147,7 +147,7 @@ describe("GamesController", () => {
       crashPointBp: null,
       multiplierBaseBp: 10000,
       multiplierCurve: "EXPONENTIAL",
-      multiplierGrowthRateBpPerSecond: 1500,
+      multiplierGrowthRateBpPerSecond: 1200,
       bets: [
         {
           id: "bet-1",
