@@ -14,8 +14,13 @@ import {
   WALLET_CLIENT,
   WalletClient,
 } from "./application/ports/wallet.client";
+import {
+  WALLET_OUTBOX_REPOSITORY,
+  WalletOutboxRepository,
+} from "./application/ports/wallet-outbox.repository";
 import { CashOutUseCase } from "./application/use-cases/cash-out.use-case";
 import { AdvanceRoundLifecycleUseCase } from "./application/use-cases/advance-round-lifecycle.use-case";
+import { CashoutCreditService } from "./application/services/cashout-credit.service";
 import { GetCurrentRoundUseCase } from "./application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "./application/use-cases/list-my-bets.use-case";
 import { ListLeaderboardUseCase } from "./application/use-cases/list-leaderboard.use-case";
@@ -24,10 +29,13 @@ import { PlaceBetUseCase } from "./application/use-cases/place-bet.use-case";
 import { VerifyRoundUseCase } from "./application/use-cases/verify-round.use-case";
 import { RoundLifecycleRunner } from "./infrastructure/lifecycle/round-lifecycle-runner";
 import { RabbitMqWalletClient } from "./infrastructure/messaging/rabbitmq-wallet.client";
+import { WalletOutboxDispatcher } from "./infrastructure/messaging/wallet-outbox-dispatcher";
 import { GameMetrics } from "./infrastructure/observability/game-metrics";
+import { cashoutCreditServiceProvider } from "./infrastructure/providers/cashout-credit-service.provider";
 import { HashChainRoundSeedProvider } from "./infrastructure/provably-fair/hash-chain-round-seed-provider";
 import { GamePrismaRepository } from "./infrastructure/prisma/game-prisma.repository";
 import { prismaClient } from "./infrastructure/prisma/prisma-client";
+import { WalletOutboxPrismaRepository } from "./infrastructure/prisma/wallet-outbox-prisma.repository";
 import { GamesController } from "./presentation/controllers/games.controller";
 import { RoundRealtimeSerializer } from "./presentation/realtime/round-realtime.serializer";
 import { RoundsGateway } from "./presentation/realtime/rounds.gateway";
@@ -57,6 +65,21 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
       provide: WALLET_CLIENT,
       useExisting: RabbitMqWalletClient,
     },
+    {
+      provide: WALLET_OUTBOX_REPOSITORY,
+      useFactory: (): WalletOutboxRepository =>
+        new WalletOutboxPrismaRepository(prismaClient),
+    },
+    {
+      provide: WalletOutboxDispatcher,
+      useFactory: (
+        walletOutboxRepository: WalletOutboxRepository,
+        walletPublisher: RabbitMqWalletClient,
+      ): WalletOutboxDispatcher =>
+        new WalletOutboxDispatcher(walletOutboxRepository, walletPublisher),
+      inject: [WALLET_OUTBOX_REPOSITORY, RabbitMqWalletClient],
+    },
+    cashoutCreditServiceProvider,
     GameMetrics,
     {
       provide: ID_GENERATOR,
@@ -91,6 +114,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         walletClient: WalletClient,
         roundEventsPublisher: RoundEventsPublisher,
         gameMetrics: GameMetrics,
+        cashoutCreditService: CashoutCreditService,
       ): AdvanceRoundLifecycleUseCase =>
         new AdvanceRoundLifecycleUseCase(
           gameRepository,
@@ -103,6 +127,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
           },
           roundEventsPublisher,
           gameMetrics,
+          cashoutCreditService,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -112,6 +137,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         WALLET_CLIENT,
         ROUND_EVENTS_PUBLISHER,
         GameMetrics,
+        CashoutCreditService,
       ],
     },
     {
@@ -176,6 +202,8 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         idGenerator: IdGenerator,
         roundEventsPublisher: RoundEventsPublisher,
         gameMetrics: GameMetrics,
+        walletOutboxRepository: WalletOutboxRepository,
+        walletOutboxDispatcher: WalletOutboxDispatcher,
       ): PlaceBetUseCase =>
         new PlaceBetUseCase(
           gameRepository,
@@ -183,6 +211,8 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
           idGenerator,
           roundEventsPublisher,
           gameMetrics,
+          walletOutboxRepository,
+          walletOutboxDispatcher,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -190,6 +220,8 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         ID_GENERATOR,
         ROUND_EVENTS_PUBLISHER,
         GameMetrics,
+        WALLET_OUTBOX_REPOSITORY,
+        WalletOutboxDispatcher,
       ],
     },
     {
@@ -200,6 +232,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         clock: Clock,
         roundEventsPublisher: RoundEventsPublisher,
         gameMetrics: GameMetrics,
+        cashoutCreditService: CashoutCreditService,
       ): CashOutUseCase =>
         new CashOutUseCase(
           gameRepository,
@@ -207,6 +240,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
           clock,
           roundEventsPublisher,
           gameMetrics,
+          cashoutCreditService,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -214,6 +248,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         CLOCK,
         ROUND_EVENTS_PUBLISHER,
         GameMetrics,
+        CashoutCreditService,
       ],
     },
   ],

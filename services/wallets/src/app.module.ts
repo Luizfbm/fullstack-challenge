@@ -4,6 +4,10 @@ import {
   WALLET_REPOSITORY,
   WalletRepository,
 } from "./application/ports/wallet.repository";
+import {
+  WALLET_INBOX_REPOSITORY,
+  WalletInboxRepository,
+} from "./application/ports/wallet-inbox.repository";
 import { CreateWalletUseCase } from "./application/use-cases/create-wallet.use-case";
 import { CreditWalletUseCase } from "./application/use-cases/credit-wallet.use-case";
 import { DebitWalletUseCase } from "./application/use-cases/debit-wallet.use-case";
@@ -11,6 +15,7 @@ import { GetWalletUseCase } from "./application/use-cases/get-wallet.use-case";
 import { RabbitMqWalletServer } from "./infrastructure/messaging/rabbitmq-wallet-server";
 import { WalletCommandHandler } from "./infrastructure/messaging/wallet-command-handler";
 import { WalletMetrics } from "./infrastructure/observability/wallet-metrics";
+import { WalletInboxPrismaRepository } from "./infrastructure/prisma/wallet-inbox-prisma.repository";
 import { WalletPrismaRepository } from "./infrastructure/prisma/wallet-prisma.repository";
 import { DevelopmentWalletSeeder } from "./infrastructure/seed/development-wallet-seeder";
 import { prismaClient } from "./infrastructure/prisma/prisma-client";
@@ -24,6 +29,11 @@ import { randomUUID } from "node:crypto";
       provide: WALLET_REPOSITORY,
       useFactory: (): WalletRepository =>
         new WalletPrismaRepository(prismaClient),
+    },
+    {
+      provide: WALLET_INBOX_REPOSITORY,
+      useFactory: (): WalletInboxRepository =>
+        new WalletInboxPrismaRepository(prismaClient),
     },
     {
       provide: CreateWalletUseCase,
@@ -52,16 +62,11 @@ import { randomUUID } from "node:crypto";
     {
       provide: WalletCommandHandler,
       useFactory: (
-        debitWalletUseCase: DebitWalletUseCase,
-        creditWalletUseCase: CreditWalletUseCase,
+        walletInboxRepository: WalletInboxRepository,
         walletMetrics: WalletMetrics,
       ): WalletCommandHandler =>
-        new WalletCommandHandler(
-          debitWalletUseCase,
-          creditWalletUseCase,
-          walletMetrics,
-        ),
-      inject: [DebitWalletUseCase, CreditWalletUseCase, WalletMetrics],
+        new WalletCommandHandler(walletInboxRepository, walletMetrics),
+      inject: [WALLET_INBOX_REPOSITORY, WalletMetrics],
     },
     {
       provide: RabbitMqWalletServer,

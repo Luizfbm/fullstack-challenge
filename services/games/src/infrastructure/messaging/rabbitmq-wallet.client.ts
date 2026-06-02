@@ -79,9 +79,30 @@ export class RabbitMqWalletClient
     return this.send("wallet.credit", input);
   }
 
+  async publishWalletCommand(input: {
+    messageId: string;
+    pattern: "wallet.debit" | "wallet.credit";
+    playerId: string;
+    amountCents: bigint;
+    referenceId: string;
+    reason: "BET_PLACED" | "CASHOUT_PAYOUT";
+  }): Promise<WalletOperationResult> {
+    return this.send(
+      input.pattern,
+      {
+        playerId: input.playerId,
+        amountCents: input.amountCents,
+        referenceId: input.referenceId,
+        reason: input.reason,
+      },
+      input.messageId,
+    );
+  }
+
   private async send(
     pattern: "wallet.debit" | "wallet.credit",
     input: WalletOperationInput,
+    messageId?: string,
   ): Promise<WalletOperationResult> {
     const startedAt = performance.now();
     const command = pattern === "wallet.debit" ? "debit" : "credit";
@@ -115,6 +136,7 @@ export class RabbitMqWalletClient
 
       const correlationId = randomUUID();
       const payload = {
+        messageId: messageId ?? correlationId,
         pattern,
         data: {
           ...input,

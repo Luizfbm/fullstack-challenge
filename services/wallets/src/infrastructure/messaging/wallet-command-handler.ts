@@ -1,9 +1,7 @@
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Tracer } from "@opentelemetry/api";
-import { CreditWalletUseCase } from "../../application/use-cases/credit-wallet.use-case";
-import { DebitWalletUseCase } from "../../application/use-cases/debit-wallet.use-case";
-import { WalletNotFoundError } from "../../application/wallet.errors";
-import { InsufficientFundsError } from "../../domain/wallet.errors";
+import type { WalletInboxRepository } from "../../application/ports/wallet-inbox.repository";
+import type { WalletInboxCommandPattern } from "../../application/wallet-inbox/wallet-inbox-message";
 import { WalletTransactionReason } from "../../domain/wallet-transaction";
 import type { WalletMetrics } from "../observability/wallet-metrics";
 
@@ -15,6 +13,7 @@ type WalletCommandData = {
 };
 
 export type WalletCommand = {
+  messageId: string;
   pattern: string;
   data: WalletCommandData;
 };
@@ -35,10 +34,6 @@ export type WalletCommandResponse =
       };
     };
 
-type WalletCommandFailureResponse = Extract<
-  WalletCommandResponse,
-  { ok: false }
->;
 type WalletCommandMetrics = Pick<WalletMetrics, "recordCommand">;
 type KnownWalletCommandName = "debit" | "credit";
 
@@ -46,8 +41,7 @@ const defaultTracer = trace.getTracer("wallets");
 
 export class WalletCommandHandler {
   constructor(
-    private readonly debitWalletUseCase: DebitWalletUseCase,
-    private readonly creditWalletUseCase: CreditWalletUseCase,
+    private readonly walletInboxRepository: WalletInboxRepository,
     private readonly walletMetrics?: WalletCommandMetrics,
     private readonly tracer: Tracer = defaultTracer,
   ) {}
@@ -74,19 +68,21 @@ export class WalletCommandHandler {
           let response: WalletCommandResponse;
 
           try {
-            const result =
-              commandName === "debit"
-                ? await this.debitWalletUseCase.execute(command.data)
-                : await this.creditWalletUseCase.execute(command.data);
-            response = this.success(result);
+            response = await this.walletInboxRepository.process({
+              messageId: command.messageId || command.data.referenceId,
+              pattern: command.pattern as WalletInboxCommandPattern,
+              data: command.data,
+            });
           } catch (error) {
-            response = this.failure(error);
-
-            if (response.error.code === "WALLET_COMMAND_FAILED") {
-              span.recordException(
-                error instanceof Error ? error : String(error),
-              );
-            }
+            span.recordException(error instanceof Error ? error : String(error));
+            response = {
+              ok: false,
+              error: {
+                code: "WALLET_COMMAND_FAILED",
+                message:
+                  error instanceof Error ? error.message : "Wallet command failed",
+              },
+            };
           }
 
           if (response.ok) {
@@ -132,19 +128,6 @@ export class WalletCommandHandler {
     }
   }
 
-  private success(result: {
-    applied: boolean;
-    balanceCents: bigint;
-  }): WalletCommandResponse {
-    return {
-      ok: true,
-      data: {
-        applied: result.applied,
-        balanceCents: result.balanceCents.toString(),
-      },
-    };
-  }
-
   private recordCommandMetric(
     commandName: KnownWalletCommandName,
     command: WalletCommand,
@@ -174,33 +157,4 @@ export class WalletCommandHandler {
     }
   }
 
-  private failure(error: unknown): WalletCommandFailureResponse {
-    if (error instanceof InsufficientFundsError) {
-      return {
-        ok: false,
-        error: {
-          code: "INSUFFICIENT_FUNDS",
-          message: error.message,
-        },
-      };
-    }
-
-    if (error instanceof WalletNotFoundError) {
-      return {
-        ok: false,
-        error: {
-          code: "WALLET_NOT_FOUND",
-          message: error.message,
-        },
-      };
-    }
-
-    return {
-      ok: false,
-      error: {
-        code: "WALLET_COMMAND_FAILED",
-        message: error instanceof Error ? error.message : "Wallet command failed",
-      },
-    };
-  }
 }

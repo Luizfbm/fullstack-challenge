@@ -6,6 +6,7 @@ import { IdGenerator } from "../ports/id-generator";
 import type { RoundEventsPublisher } from "../ports/round-events.publisher";
 import { RoundSeedProvider } from "../ports/round-seed-provider";
 import type { WalletClient } from "../ports/wallet.client";
+import { CashoutCreditService } from "../services/cashout-credit.service";
 import type { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
@@ -43,6 +44,10 @@ export class AdvanceRoundLifecycleUseCase {
     private readonly config: AdvanceRoundLifecycleConfig,
     private readonly roundEventsPublisher?: RoundEventsPublisher,
     private readonly gameMetrics?: GameMetricsPort,
+    private readonly cashoutCreditService = new CashoutCreditService(
+      gameRepository,
+      walletClient,
+    ),
   ) {
     if (
       !Number.isInteger(config.bettingWindowMs) ||
@@ -162,16 +167,13 @@ export class AdvanceRoundLifecycleUseCase {
         throw new Error("Auto cashout payout was not calculated");
       }
 
-      await this.gameRepository.saveRound(round);
-
       try {
-        await this.walletClient.credit({
-          playerId: bet.playerId,
-          amountCents: bet.payoutCents,
-          referenceId: `round:${round.id}:player:${bet.playerId}:cashout-credit`,
-          reason: "CASHOUT_PAYOUT",
-        });
+        await this.cashoutCreditService.creditCashout(round, bet);
       } catch (error) {
+        if (error instanceof WalletCreditFailedError) {
+          throw error;
+        }
+
         throw new WalletCreditFailedError(error);
       }
 
@@ -209,12 +211,7 @@ export class AdvanceRoundLifecycleUseCase {
       throw new Error("Pending cashout has no payout");
     }
 
-    await this.walletClient.credit({
-      playerId: bet.playerId,
-      amountCents: bet.payoutCents,
-      referenceId: `round:${round.id}:player:${bet.playerId}:cashout-credit`,
-      reason: "CASHOUT_PAYOUT",
-    });
+    await this.cashoutCreditService.creditCashout(round, bet);
 
     round.completeCashOut(bet.playerId);
     const mode =

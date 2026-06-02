@@ -1,5 +1,9 @@
 import { Bet } from "../../domain/bet";
 import { Round } from "../../domain/round";
+import type {
+  NewWalletOutboxMessage,
+  WalletOutboxMessage,
+} from "../wallet-outbox/wallet-outbox-message";
 
 export const GAME_REPOSITORY = Symbol("GAME_REPOSITORY");
 
@@ -28,4 +32,8 @@ export interface GameRepository {
   listBetsByPlayerId(playerId: string, limit: number): Promise<Bet[]>;
   listLeaderboard(input: ListLeaderboardInput): Promise<LeaderboardEntry[]>;
   saveRound(round: Round): Promise<void>;
+  saveRoundWithWalletOutbox(
+    round: Round,
+    message: NewWalletOutboxMessage,
+  ): Promise<WalletOutboxMessage>;
 }
