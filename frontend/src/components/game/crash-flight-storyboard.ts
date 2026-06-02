@@ -11,6 +11,7 @@ import {
   usesRunningTimeCarAsset,
 } from "./crash-flight-motion";
 import type { DashboardRound } from "./round-formatting";
+import type { TimeCarTrailFrame } from "./time-car-trail";
 
 type VectorTuple = [number, number, number];
 
@@ -38,6 +39,7 @@ export type CrashFlightStoryboard = {
   redFlashOpacity: number;
   running: boolean;
   showRunningCar: boolean;
+  trail: TimeCarTrailFrame;
   wormholeActive: boolean;
   wormholePosition: VectorTuple;
 };
@@ -111,8 +113,73 @@ export function getCrashFlightStoryboard({
       : 0,
     running,
     showRunningCar: usesRunningTimeCarAsset(phase),
+    trail: getTrailFrame({
+      crashImpact,
+      eased,
+      entering,
+      progress,
+      reducedMotion,
+      running,
+      crashed,
+    }),
     wormholeActive: getWormholeVisibilityForPhase(phase),
     wormholePosition: [compact ? 0.06 : 0.2, compact ? -0.06 : -0.08, -1.05],
+  };
+}
+
+function getTrailFrame({
+  crashImpact,
+  crashed,
+  eased,
+  entering,
+  progress,
+  reducedMotion,
+  running,
+}: {
+  crashImpact: number;
+  crashed: boolean;
+  eased: number;
+  entering: boolean;
+  progress: number;
+  reducedMotion: boolean;
+  running: boolean;
+}): TimeCarTrailFrame {
+  if (crashed) {
+    return {
+      intensity: reducedMotion ? 0.58 : 0.76 + crashImpact * 0.22,
+      length: 2.12 + crashImpact * 0.42,
+      spread: 0.48 + crashImpact * 0.16,
+      tone: "crash",
+      visible: true,
+    };
+  }
+
+  if (running) {
+    return {
+      intensity: reducedMotion ? 0.5 : 0.62 + eased * 0.24,
+      length: 2.04 + eased * 0.72,
+      spread: 0.34 + eased * 0.12,
+      tone: "boost",
+      visible: true,
+    };
+  }
+
+  if (entering) {
+    return {
+      intensity: reducedMotion ? 0.34 : 0.28 + progress * 0.42,
+      length: lerp(0.62, 1.45, eased),
+      spread: lerp(0.12, 0.32, eased),
+      tone: "boost",
+      visible: progress > 0.08,
+    };
+  }
+
+  return {
+    intensity: 0,
+    length: 0,
+    spread: 0,
+    tone: "boost",
+    visible: false,
   };
 }
 
