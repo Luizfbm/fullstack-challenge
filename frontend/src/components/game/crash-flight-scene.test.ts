@@ -247,57 +247,307 @@ describe("crash flight scene primitives", () => {
     disposeObject(wormhole.group);
   });
 
-  it("builds a procedural time-car trail that shifts from boost to crash flare", () => {
+  it("builds an edge-mounted dynamic growth guide that reveals from the frame", () => {
     const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
 
-    expect(trail.group.name).toBe("time-car-trail");
-    expect(trail.ribbon.name).toBe("time-car-trail-ribbon");
-    expect(trail.particles.name).toBe("time-car-trail-particles");
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    expect(trail.group.name).toBe("time-car-growth-guide");
+    expect(trail.ribbon.name).toBe("time-car-growth-guide-area");
+    expect(trail.curve.name).toBe("time-car-growth-guide-curve");
+    expect(trail.axisLabels.name).toBe("time-car-growth-guide-axis-labels");
+    expect(trail.multiplierPillar.name).toBe(
+      "time-car-growth-guide-multiplier-pillar",
+    );
+    expect(trail.multiplierPillar.visible).toBe(false);
+    expect(trail.timeAxis.name).toBe("time-car-growth-guide-time-axis");
+    expect(trail.axisReveal.name).toBe("time-car-growth-guide-axis-reveal");
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(
+      expect.arrayContaining(["1x"]),
+    );
     expect(trail.group.visible).toBe(false);
 
-    updateTimeCarTrail(trail, {
-      carPosition: [0.4, 0.2, -1.1],
-      carRotation: [0.1, 0.5, 0.2],
+    const firstTrailState = updateTimeCarTrail(trail, {
+      camera,
       reducedMotion: true,
       time: 2,
       trail: {
+        axisRevealProgress: 0.25,
+        carPosition: [0.35, 0.25, -4],
+        elapsedSeconds: 4.2,
+        height: 0.82,
         intensity: 0.7,
-        length: 2.2,
-        spread: 0.34,
+        multiplier: 1.82,
+        progress: 0.64,
         tone: "boost",
         visible: true,
+        width: 2.35,
       },
     });
 
     expect(trail.group.visible).toBe(true);
-    expect(trail.group.position.x).toBeCloseTo(0.4);
+    expect(trail.group.position.x).toBeLessThan(0);
     expect(
-      (trail.ribbon.material as THREE.MeshBasicMaterial).color.getHexString(),
+      (trail.multiplierPillar.material as THREE.MeshBasicMaterial).opacity,
+    ).toBe(0);
+    const firstAxisTicks = trail.axisTicks.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const firstYAxisEndpoint = new THREE.Vector3().fromBufferAttribute(
+      firstAxisTicks,
+      3,
+    );
+
+    expect(firstYAxisEndpoint.y).toBeGreaterThan(1.8);
+    expect(trail.axisLabels.children[3].position.y).toBeCloseTo(
+      firstYAxisEndpoint.y,
+    );
+    expect(trail.group.position.x).toBeLessThan(-1.25);
+    expect(trail.group.position.y).toBeLessThan(-0.9);
+    expect(trail.axisReveal.position.x).toBeLessThan(0);
+    expect(trail.axisReveal.position.y).toBeLessThan(0);
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(expect.arrayContaining(["1.82x", "4s"]));
+    const firstGuidePosition = trail.group.position.clone();
+    const firstAxisPosition = Array.from(
+      (trail.timeAxis.geometry.getAttribute("position") as THREE.BufferAttribute)
+        .array,
+    );
+    const firstLabelPosition = trail.axisLabels.children[0].position.clone();
+    const firstCurvePosition = trail.curve.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const firstCurveEndpoint = new THREE.Vector3().fromBufferAttribute(
+      firstCurvePosition,
+      firstCurvePosition.count - 1,
+    );
+
+    expect(firstTrailState?.carAnchor[0]).toBeCloseTo(
+      trail.group.position.x +
+        trail.axisReveal.position.x +
+        firstCurveEndpoint.x * trail.axisReveal.scale.x,
+      3,
+    );
+    expect(firstTrailState?.carAnchor[1]).toBeCloseTo(
+      trail.group.position.y +
+        trail.axisReveal.position.y +
+        firstCurveEndpoint.y * trail.axisReveal.scale.y,
+      3,
+    );
+    expect(firstTrailState?.tangentAngle).toBeGreaterThan(0);
+    expect(
+      (trail.curve.material as THREE.LineBasicMaterial).color.getHexString(),
     ).toBe("22d3ee");
     expect(
       (trail.ribbon.material as THREE.MeshBasicMaterial).opacity,
-    ).toBeGreaterThan(0.25);
+    ).toBeGreaterThan(0.12);
+    expect(
+      (trail.ribbon.material as THREE.MeshBasicMaterial).opacity,
+    ).toBeGreaterThan(0.02);
 
-    updateTimeCarTrail(trail, {
-      carPosition: [0.4, 0.2, -1.1],
-      carRotation: [0.1, 0.5, 0.2],
+    const secondTrailState = updateTimeCarTrail(trail, {
+      camera,
       reducedMotion: true,
       time: 3,
       trail: {
+        axisRevealProgress: 1,
+        carPosition: [0.9, 0.68, -4],
+        elapsedSeconds: 12.4,
+        height: 1.08,
         intensity: 1,
-        length: 2.5,
-        spread: 0.56,
+        multiplier: 8.4,
+        progress: 1,
         tone: "crash",
         visible: true,
+        width: 2.35,
       },
     });
 
+    const secondCurveEndpoint = new THREE.Vector3().fromBufferAttribute(
+      trail.curve.geometry.getAttribute("position") as THREE.BufferAttribute,
+      firstCurvePosition.count - 1,
+    );
+
+    expect(trail.group.position.toArray()).toEqual(
+      firstGuidePosition.toArray(),
+    );
     expect(
-      (trail.ribbon.material as THREE.MeshBasicMaterial).color.getHexString(),
+      Array.from(
+        (trail.timeAxis.geometry.getAttribute(
+          "position",
+        ) as THREE.BufferAttribute).array,
+      ),
+    ).not.toEqual(firstAxisPosition);
+    expect(trail.axisLabels.children[0].position.toArray()).toEqual(
+      firstLabelPosition.toArray(),
+    );
+    expect(trail.axisReveal.position.x).toBeCloseTo(0);
+    expect(trail.axisReveal.position.y).toBeCloseTo(0);
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(expect.arrayContaining(["8.40x", "12s"]));
+    expect(secondCurveEndpoint.x).toBeGreaterThan(firstCurveEndpoint.x);
+    expect(secondCurveEndpoint.y).toBeGreaterThan(firstCurveEndpoint.y);
+    expect(secondTrailState?.carAnchor[0]).toBeGreaterThan(
+      firstTrailState?.carAnchor[0] ?? 0,
+    );
+    expect(secondTrailState?.carAnchor[1]).toBeGreaterThan(
+      firstTrailState?.carAnchor[1] ?? 0,
+    );
+    expect(
+      (trail.curve.material as THREE.LineBasicMaterial).color.getHexString(),
     ).toBe("fb7185");
     expect(
       (trail.particles.material as THREE.PointsMaterial).opacity,
     ).toBeGreaterThan(0.3);
+
+    disposeObject(trail.group);
+  });
+
+  it("keeps the trail endpoint pinned to the right edge after ten seconds", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const tenSecondState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 10,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 10,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 1.82,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    const laterState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 12.4,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 12.4,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 1.82,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    const longRunState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 80,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 80,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 1.82,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+    const timeAxisPosition = trail.timeAxis.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const timeAxisEndpoint = new THREE.Vector3().fromBufferAttribute(
+      timeAxisPosition,
+      1,
+    );
+    const rightGuideEdge =
+      trail.group.position.x +
+      trail.axisReveal.position.x +
+      timeAxisEndpoint.x * trail.axisReveal.scale.x;
+
+    expect(tenSecondState?.carAnchor[0]).toBeCloseTo(rightGuideEdge, 3);
+    expect(laterState?.carAnchor[0]).toBeCloseTo(rightGuideEdge, 3);
+    expect(longRunState?.carAnchor[0]).toBeCloseTo(rightGuideEdge, 3);
+    expect(laterState?.edgeHoldProgress).toBeGreaterThan(0);
+    expect(longRunState?.edgeHoldProgress).toBeGreaterThan(
+      laterState?.edgeHoldProgress ?? 0,
+    );
+
+    disposeObject(trail.group);
+  });
+
+  it("floors multiplier axis labels and keeps the y anchor growing around 2x", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const beforeTwoState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 6,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 6,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 1.999,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(expect.arrayContaining(["1.99x"]));
+
+    const afterTwoState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 6,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 6,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 2.001,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(expect.arrayContaining(["2.00x"]));
+    expect(afterTwoState?.carAnchor[1]).toBeGreaterThan(
+      beforeTwoState?.carAnchor[1] ?? 0,
+    );
 
     disposeObject(trail.group);
   });
@@ -341,12 +591,25 @@ describe("crash flight scene primitives", () => {
       bettingFrame.portal.position[0],
     );
     expect(bettingFrame.wormholeActive).toBe(false);
+    expect(bettingFrame.trail.visible).toBe(false);
+    expect(bettingFrame.car.scale).toEqual([1, 1, 1]);
+
+    const enteringFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "entering",
+      phaseElapsed: 0.9,
+      reducedMotion: true,
+      round: { status: "RUNNING" } as DashboardRound,
+      time: 2,
+    });
+
+    expect(enteringFrame.trail.visible).toBe(false);
 
     const runningFrame = getCrashFlightStoryboard({
       cameraAspect: 1.2,
       phase: "running",
-      phaseElapsed: 2,
-      reducedMotion: true,
+      phaseElapsed: 0.35,
+      reducedMotion: false,
       round: {
         currentMultiplierBp: 16000,
         status: "RUNNING",
@@ -358,7 +621,30 @@ describe("crash flight scene primitives", () => {
     expect(runningFrame.wormholeActive).toBe(true);
     expect(runningFrame.trail.visible).toBe(true);
     expect(runningFrame.trail.tone).toBe("boost");
-    expect(runningFrame.trail.length).toBeGreaterThan(2);
+    expect(runningFrame.trail.carPosition).toEqual(runningFrame.car.position);
+    expect(runningFrame.car).toMatchObject({ followTrail: true });
+    expect(runningFrame.car.scale[0]).toBeLessThan(bettingFrame.car.scale[0]);
+    expect(runningFrame.car.scale[0]).toBeLessThan(0.6);
+    expect(runningFrame.trail.axisRevealProgress).toBeGreaterThan(0);
+    expect(runningFrame.trail.axisRevealProgress).toBeLessThan(1);
+    expect(runningFrame.trail.elapsedSeconds).toBe(0.35);
+    expect(runningFrame.trail.multiplier).toBe(1.6);
+    expect(runningFrame.trail.width).toBeGreaterThan(2.8);
+
+    const longRunningFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "running",
+      phaseElapsed: 0.2,
+      reducedMotion: true,
+      round: {
+        currentMultiplierBp: 73900,
+        startedAt: new Date(Date.now() - 12_000).toISOString(),
+        status: "RUNNING",
+      } as DashboardRound,
+      time: 5,
+    });
+
+    expect(longRunningFrame.trail.elapsedSeconds).toBeGreaterThan(10);
 
     const crashedFrame = getCrashFlightStoryboard({
       cameraAspect: 1.2,
@@ -373,6 +659,9 @@ describe("crash flight scene primitives", () => {
     expect(crashedFrame.wormholeActive).toBe(true);
     expect(crashedFrame.trail.visible).toBe(true);
     expect(crashedFrame.trail.tone).toBe("crash");
+    expect(crashedFrame.trail.carPosition).toEqual(crashedFrame.car.position);
+    expect(crashedFrame.car).toMatchObject({ followTrail: true });
+    expect(crashedFrame.trail.axisRevealProgress).toBe(1);
     expect(crashedFrame.redFlashOpacity).toBeGreaterThan(0.18);
     expect("roadOpacity" in crashedFrame).toBe(false);
   });

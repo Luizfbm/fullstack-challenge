@@ -26,4 +26,29 @@ describe("ChronoStage", () => {
     expect(screen.getByTestId("chrono-stage")).toBeTruthy();
     expect(screen.queryByTestId("chrono-stage-curve")).toBeNull();
   });
+
+  it("keeps the stage chrome clean and centers the multiplier over the scene", () => {
+    render(
+      <ChronoStage
+        isLoading={false}
+        now={new Date("2026-06-02T12:00:00.000Z")}
+        round={{ currentMultiplierBp: 21400, status: "RUNNING" } as DashboardRound}
+      />,
+    );
+
+    expect(screen.queryByText("LIVE")).toBeNull();
+    expect(screen.queryByText("Arcade run")).toBeNull();
+    expect(screen.getByTestId("stage-multiplier").className).toContain(
+      "items-center",
+    );
+    expect(screen.getByTestId("stage-multiplier").className).toContain(
+      "justify-center",
+    );
+    expect(screen.getByTestId("stage-multiplier-pill")).toBeTruthy();
+    expect(screen.getByTestId("stage-multiplier-value").textContent).toBe(
+      "2.14x",
+    );
+    expect(screen.getByText("Multiplicador atual")).toBeTruthy();
+    expect(screen.getByText("2.14x")).toBeTruthy();
+  });
 });

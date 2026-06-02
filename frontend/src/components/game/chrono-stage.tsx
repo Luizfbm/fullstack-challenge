@@ -1,5 +1,4 @@
-import { RadioTower, Zap } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import {
   CrashFlightScene,
@@ -48,27 +47,37 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
         round={round}
       />
 
-      <div className="absolute left-4 top-4 z-20 flex flex-wrap gap-2">
-        <StageChip tone={crashed ? "rose" : "green"}>
-          <RadioTower className="size-3.5" aria-hidden="true" />
-          {running ? "LIVE" : round?.status ?? "SYNC"}
-        </StageChip>
-        <StageChip tone="rose">
-          <Zap className="size-3.5" aria-hidden="true" />
-          Arcade run
-        </StageChip>
-      </div>
-
-      <div className="pointer-events-none absolute right-5 top-16 z-20 flex max-w-[calc(100%-2.5rem)] justify-end sm:right-7 sm:top-7">
-        <p
+      <div
+        className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-5"
+        data-testid="stage-multiplier"
+      >
+        <div
           className={cn(
-            "text-right text-[clamp(3.25rem,8vw,7rem)] font-black leading-none tracking-normal text-zinc-50 drop-shadow-[0_12px_0_rgba(0,0,0,0.42)]",
-            running && "chrono-pulse",
-            crashed && "text-rose-100",
+            "rounded-md border border-cyan-200/25 bg-slate-950/64 px-5 py-3 text-center shadow-[0_18px_54px_rgba(8,47,73,0.35)] backdrop-blur-md",
+            crashed &&
+              "border-rose-200/35 bg-rose-950/42 shadow-[0_18px_64px_rgba(244,63,94,0.3)]",
           )}
+          data-testid="stage-multiplier-pill"
         >
-          {isLoading ? "..." : formatRoundMultiplier(round, now)}
-        </p>
+          <p
+            className={cn(
+              "text-[clamp(2.5rem,6vw,5rem)] font-black leading-none tracking-normal text-zinc-50 drop-shadow-[0_10px_0_rgba(0,0,0,0.38)]",
+              running && "chrono-pulse",
+              crashed && "text-rose-100",
+            )}
+            data-testid="stage-multiplier-value"
+          >
+            {isLoading ? "..." : formatRoundMultiplier(round, now)}
+          </p>
+          <p
+            className={cn(
+              "mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-100/78",
+              crashed && "text-rose-100/78",
+            )}
+          >
+            Multiplicador atual
+          </p>
+        </div>
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-black via-slate-950/70 to-transparent" />
@@ -107,28 +116,4 @@ function useStageAnimationPhase(
   }
 
   return status === "BETTING" ? "betting" : "idle";
-}
-
-function StageChip({
-  children,
-  tone,
-}: {
-  children: ReactNode;
-  tone: "green" | "rose";
-}) {
-  const className =
-    tone === "green"
-      ? "border-emerald-300/35 bg-emerald-300/10 text-emerald-100"
-      : "border-rose-300/35 bg-rose-300/10 text-rose-100";
-
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] backdrop-blur-xl",
-        className,
-      )}
-    >
-      {children}
-    </span>
-  );
 }
