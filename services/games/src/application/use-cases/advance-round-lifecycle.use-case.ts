@@ -11,31 +11,16 @@ import { CashoutCreditService } from "../services/cashout-credit.service";
 import type { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
-import type { GameMetrics } from "../../infrastructure/observability/game-metrics";
 import type { ApplyAutoBetResultUseCase } from "./apply-auto-bet-result.use-case";
+import {
+  assertAdvanceRoundLifecycleConfig,
+  DEFAULT_CRASH_DISPLAY_MS,
+  type AdvanceRoundLifecycleConfig,
+  type AdvanceRoundLifecycleResult,
+  type CashoutMetric,
+  type GameMetricsPort,
+} from "./advance-round-lifecycle.types";
 import type { ExecuteAutoBetsForRoundUseCase } from "./execute-auto-bets-for-round.use-case";
-
-type GameMetricsPort = Pick<GameMetrics, "recordCashout" | "recordCrashPoint">;
-type CashoutMetric = {
-  mode: "manual" | "auto";
-  payoutCents: bigint;
-};
-
-type AdvanceRoundLifecycleConfig = {
-  bettingWindowMs: number;
-};
-
-export type AdvanceRoundLifecycleAction =
-  | "ROUND_OPENED"
-  | "ROUND_STARTED"
-  | "ROUND_CRASHED"
-  | "ROUND_SETTLED"
-  | "NOOP";
-
-export type AdvanceRoundLifecycleResult = {
-  action: AdvanceRoundLifecycleAction;
-  round: Round | null;
-};
 
 export class AdvanceRoundLifecycleUseCase {
   constructor(
@@ -60,12 +45,7 @@ export class AdvanceRoundLifecycleUseCase {
       "execute"
     >,
   ) {
-    if (
-      !Number.isInteger(config.bettingWindowMs) ||
-      config.bettingWindowMs <= 0
-    ) {
-      throw new Error("Betting window must be a positive integer");
-    }
+    assertAdvanceRoundLifecycleConfig(config);
   }
 
   async execute(): Promise<AdvanceRoundLifecycleResult> {
@@ -205,6 +185,20 @@ export class AdvanceRoundLifecycleUseCase {
   private async settleCrashedRound(
     round: Round,
   ): Promise<AdvanceRoundLifecycleResult> {
+    if (!round.crashedAt) {
+      throw new Error("Crashed round has no crash time");
+    }
+
+    const crashDisplayMs =
+      this.config.crashDisplayMs ?? DEFAULT_CRASH_DISPLAY_MS;
+
+    if (
+      this.clock.now().getTime() - round.crashedAt.getTime() <
+      crashDisplayMs
+    ) {
+      return { action: "NOOP", round };
+    }
+
     const pendingCashouts = round.bets.filter(
       (bet) => bet.status === "CASHOUT_PENDING_CREDIT",
     );

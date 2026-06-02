@@ -11,6 +11,7 @@ import type { RoundEventsPublisher } from "../../application/ports/round-events.
 import { WALLET_CLIENT } from "../../application/ports/wallet.client";
 import type { WalletClient } from "../../application/ports/wallet.client";
 import { AdvanceRoundLifecycleUseCase } from "../../application/use-cases/advance-round-lifecycle.use-case";
+import { DEFAULT_CRASH_DISPLAY_MS } from "../../application/use-cases/advance-round-lifecycle.types";
 import { ApplyAutoBetResultUseCase } from "../../application/use-cases/apply-auto-bet-result.use-case";
 import { ExecuteAutoBetsForRoundUseCase } from "../../application/use-cases/execute-auto-bets-for-round.use-case";
 import { GetCurrentRoundUseCase } from "../../application/use-cases/get-current-round.use-case";
@@ -43,6 +44,9 @@ export const roundLifecycleProviders: Provider[] = [
         walletClient,
         {
           bettingWindowMs: Number(process.env.ROUND_BETTING_WINDOW_MS ?? 10000),
+          crashDisplayMs: Number(
+            process.env.ROUND_CRASH_DISPLAY_MS ?? DEFAULT_CRASH_DISPLAY_MS,
+          ),
         },
         roundEventsPublisher,
         gameMetrics,

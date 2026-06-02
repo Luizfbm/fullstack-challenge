@@ -1,7 +1,7 @@
 import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import type { RoundEventsPublisher } from "../../application/ports/round-events.publisher";
 import { AdvanceRoundLifecycleUseCase } from "../../application/use-cases/advance-round-lifecycle.use-case";
-import type { AdvanceRoundLifecycleResult } from "../../application/use-cases/advance-round-lifecycle.use-case";
+import type { AdvanceRoundLifecycleResult } from "../../application/use-cases/advance-round-lifecycle.types";
 
 export class RoundLifecycleRunner implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RoundLifecycleRunner.name);

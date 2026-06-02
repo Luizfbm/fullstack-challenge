@@ -1117,7 +1117,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const settleRound = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:17.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:21.000Z")),
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
@@ -1145,7 +1145,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:16.000Z")),
       new FakeRoundSeedProvider(),
       new FakeWalletClient(),
       { bettingWindowMs: 10000 },
@@ -1159,6 +1159,30 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     expect(opened.action).toBe("ROUND_OPENED");
     expect(opened.round?.id).toBe("round-2");
     expect(opened.round?.chainIndex).toBe(2);
+  });
+
+  test("keeps a crashed round visible before the crash display window elapses", async () => {
+    const crashedRound = openRound(10000);
+    crashedRound.start(new Date("2026-05-30T10:00:10.000Z"));
+    crashedRound.crash(
+      new Date("2026-05-30T10:00:11.000Z"),
+      "server-seed-1",
+    );
+    const repository = new InMemoryGameRepository(crashedRound);
+    const useCase = new AdvanceRoundLifecycleUseCase(
+      repository,
+      new FixedIdGenerator("round-2"),
+      new FixedClock(new Date("2026-05-30T10:00:15.999Z")),
+      new FakeRoundSeedProvider(),
+      new FakeWalletClient(),
+      { bettingWindowMs: 10000 },
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.action).toBe("NOOP");
+    expect(result.round?.status).toBe("CRASHED");
+    expect(repository.currentRound?.status).toBe("CRASHED");
   });
 
   test("retries pending cashout credits before settlement", async () => {
@@ -1181,7 +1205,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:16.000Z")),
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
@@ -1225,7 +1249,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       new InMemoryGameRepository(crashedRound),
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:16.000Z")),
       new FakeRoundSeedProvider(),
       new FakeWalletClient(),
       { bettingWindowMs: 10000 },
@@ -1260,7 +1284,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:16.000Z")),
       new FakeRoundSeedProvider(),
       new FakeWalletClient(),
       { bettingWindowMs: 10000 },
@@ -1293,7 +1317,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:16.000Z")),
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
