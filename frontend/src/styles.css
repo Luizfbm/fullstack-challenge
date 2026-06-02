@@ -35,6 +35,14 @@ input {
   font: inherit;
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 .chrono-frame {
   background:
     linear-gradient(135deg, rgba(244, 63, 94, 0.16), transparent 22%),

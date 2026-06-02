@@ -1,4 +1,6 @@
+import { useState, type PointerEvent } from "react";
 import { Activity, History, ShieldCheck } from "lucide-react";
+import { cn } from "../../lib/utils";
 import type { BetResponse, RoundResponse } from "../../services/game-api";
 import { formatCents } from "../../services/money";
 import { Badge } from "../ui/badge";
@@ -42,6 +44,42 @@ export function RoundHistoryPanel({
   history: RoundResponse[];
   isLoading: boolean;
 }) {
+  const [dragState, setDragState] = useState<HistoryDragState | null>(null);
+  const isDragging = dragState !== null;
+
+  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "mouse" || event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    capturePointer(event.currentTarget, event.pointerId);
+    setDragState({
+      pointerId: event.pointerId,
+      scrollLeft: event.currentTarget.scrollLeft,
+      startX: event.clientX,
+    });
+  }
+
+  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!dragState || event.pointerId !== dragState.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.scrollLeft =
+      dragState.scrollLeft - (event.clientX - dragState.startX);
+  }
+
+  function finishDrag(event: PointerEvent<HTMLDivElement>) {
+    if (!dragState || event.pointerId !== dragState.pointerId) {
+      return;
+    }
+
+    releasePointer(event.currentTarget, event.pointerId);
+    setDragState(null);
+  }
+
   return (
     <section
       aria-label="Histórico de rodadas"
@@ -55,8 +93,17 @@ export function RoundHistoryPanel({
         <ShieldCheck className="size-4 text-emerald-300" aria-hidden="true" />
       </div>
       <div
-        className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1"
+        className={cn(
+          "scrollbar-none flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 select-none",
+          isDragging ? "cursor-grabbing" : "cursor-grab",
+        )}
+        data-dragging={isDragging}
         data-testid="round-history-track"
+        onPointerCancel={finishDrag}
+        onPointerDown={handlePointerDown}
+        onPointerLeave={finishDrag}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishDrag}
       >
         {history.map((round) => (
           <Badge
@@ -73,6 +120,28 @@ export function RoundHistoryPanel({
       </div>
     </section>
   );
+}
+
+type HistoryDragState = {
+  pointerId: number;
+  scrollLeft: number;
+  startX: number;
+};
+
+function capturePointer(element: HTMLDivElement, pointerId: number) {
+  try {
+    element.setPointerCapture?.(pointerId);
+  } catch {
+    // Synthetic browser tests may not register pointer capture as active.
+  }
+}
+
+function releasePointer(element: HTMLDivElement, pointerId: number) {
+  try {
+    element.releasePointerCapture?.(pointerId);
+  } catch {
+    // Releasing an already-cleared pointer capture should not break dragging.
+  }
 }
 
 function BetTableRow({ bet }: { bet: BetResponse }) {
