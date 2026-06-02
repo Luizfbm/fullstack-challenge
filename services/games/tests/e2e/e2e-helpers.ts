@@ -89,6 +89,33 @@ export type WalletResponse = {
   balanceCents: string;
 };
 
+export type AutoBetSessionResponse = {
+  id: string;
+  playerId: string;
+  username: string;
+  status: "ACTIVE" | "STOPPED";
+  amountCents: string;
+  autoCashoutMultiplierBp: number | null;
+  maxRounds: number;
+  roundsPlayed: number;
+  netProfitCents: string;
+  stopLossCents: string | null;
+  takeProfitCents: string | null;
+  stopReason:
+    | "MANUAL"
+    | "MAX_ROUNDS_REACHED"
+    | "STOP_LOSS_REACHED"
+    | "TAKE_PROFIT_REACHED"
+    | "WALLET_REJECTED"
+    | "WALLET_UNAVAILABLE"
+    | "ROUND_NOT_AVAILABLE"
+    | null;
+  startsAfterRoundId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  stoppedAt: string | null;
+};
+
 type FetchOptions = RequestInit & {
   token?: string;
 };
@@ -222,6 +249,47 @@ export async function cashOut(token: string): Promise<BetResponse> {
     method: "POST",
     token,
   });
+}
+
+export async function startAutoBetSession(
+  token: string,
+  body: {
+    amountCents: string;
+    autoCashoutMultiplierBp?: number | null;
+    maxRounds: number;
+    stopLossCents?: string | null;
+    takeProfitCents?: string | null;
+  },
+): Promise<AutoBetSessionResponse> {
+  return apiJson<AutoBetSessionResponse>("/games/auto-bet/sessions", {
+    method: "POST",
+    token,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getMyAutoBetSession(
+  token: string,
+): Promise<AutoBetSessionResponse | null> {
+  return apiJson<AutoBetSessionResponse | null>(
+    "/games/auto-bet/sessions/me",
+    { token },
+  );
+}
+
+export async function stopAutoBetSession(
+  token: string,
+): Promise<AutoBetSessionResponse | null> {
+  return apiJson<AutoBetSessionResponse | null>(
+    "/games/auto-bet/sessions/me/stop",
+    {
+      method: "POST",
+      token,
+    },
+  );
 }
 
 export async function listMyBets(token: string, limit = 1): Promise<BetResponse[]> {
@@ -373,11 +441,11 @@ export async function getRoundCrashPointBp(roundId: string): Promise<number> {
   return Number(result.trim());
 }
 
-async function waitForCurrentRound(): Promise<RoundResponse> {
+export async function waitForCurrentRound(): Promise<RoundResponse> {
   return waitFor(async () => await getCurrentRound(), "current round");
 }
 
-async function waitFor<T>(
+export async function waitFor<T>(
   callback: () => Promise<T | null>,
   description: string,
   timeoutMs = 60000,
@@ -429,5 +497,7 @@ async function runGamesSql(sql: string): Promise<void> {
 }
 
 async function resetE2EGameState(): Promise<void> {
-  await runGamesSql("DELETE FROM bets; DELETE FROM rounds;");
+  await runGamesSql(
+    "DELETE FROM auto_bet_round_executions; DELETE FROM auto_bet_sessions; DELETE FROM bets; DELETE FROM rounds;",
+  );
 }
