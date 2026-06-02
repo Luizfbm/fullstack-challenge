@@ -324,7 +324,7 @@ describe("crash flight scene primitives", () => {
       currentMultiplierBp: 21000,
       multiplierBaseBp: 10000,
       multiplierCurve: "EXPONENTIAL",
-      multiplierGrowthRateBpPerSecond: 1200,
+      multiplierGrowthRateBpPerSecond: 500,
       startedAt: "2026-06-01T12:00:00.000Z",
       status: "RUNNING",
     } as DashboardRound;

@@ -555,7 +555,7 @@ function createRound(
     id: "round-1",
     multiplierBaseBp: 10000,
     multiplierCurve: "EXPONENTIAL",
-    multiplierGrowthRateBpPerSecond: 1200,
+    multiplierGrowthRateBpPerSecond: 500,
     nextServerSeedHash: "next-hash",
     nonce: 1,
     serverSeed: null,

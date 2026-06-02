@@ -1,6 +1,6 @@
 export const BASE_MULTIPLIER_BP = 10000;
 export const MULTIPLIER_CURVE = "EXPONENTIAL";
-export const DEFAULT_MULTIPLIER_GROWTH_RATE_BP_PER_SECOND = 1200;
+export const DEFAULT_MULTIPLIER_GROWTH_RATE_BP_PER_SECOND = 500;
 
 export function calculatePayoutCents(
   amountCents: bigint,

@@ -35,11 +35,11 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
   await page.getByRole("tab", { name: "Round State" }).click();
   await expect(
     page.getByText(
-      "multiplierBp = floor(10000 * exp(0.12 * elapsedSeconds))",
+      "multiplierBp = floor(10000 * exp(0.05 * elapsedSeconds))",
     ).first(),
   ).toBeVisible();
   await expect(
-    page.getByText("curva exponencial 12.00%/s").first(),
+    page.getByText("curva exponencial 5.00%/s").first(),
   ).toBeVisible();
 
   const balanceBeforeBet = await readDisplayedBalance(page);

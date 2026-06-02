@@ -22,7 +22,7 @@ function historyRound(crashPointBp: number): RoundResponse {
     id: `round-${crashPointBp}`,
     multiplierBaseBp: 10000,
     multiplierCurve: "EXPONENTIAL",
-    multiplierGrowthRateBpPerSecond: 1200,
+    multiplierGrowthRateBpPerSecond: 500,
     nextServerSeedHash: null,
     nonce: 1,
     serverSeed: "seed",

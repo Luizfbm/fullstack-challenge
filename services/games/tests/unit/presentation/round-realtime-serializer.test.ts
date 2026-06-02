@@ -30,11 +30,11 @@ describe("RoundRealtimeSerializer", () => {
     );
 
     expect(payload.roundId).toBe("round-1");
-    expect(payload.currentMultiplierBp).toBe(18221);
+    expect(payload.currentMultiplierBp).toBe(12840);
     expect(payload.crashPointBp).toBeNull();
     expect(payload.multiplierCurve).toBe("EXPONENTIAL");
     expect(payload.multiplierBaseBp).toBe(10000);
-    expect(payload.multiplierGrowthRateBpPerSecond).toBe(1200);
+    expect(payload.multiplierGrowthRateBpPerSecond).toBe(500);
     expect(payload.serverSeed).toBeNull();
     expect(payload.serverSeedHash).toBe("server-seed-hash");
     expect(payload.nextServerSeedHash).toBe("next-seed-hash");
