@@ -1,20 +1,19 @@
-import { useNow } from "../../hooks/use-now";
 import { CrashCurveChart } from "./crash-curve-chart";
 import type { DashboardRound } from "./round-formatting";
 
 type CrashRoundPanelProps = {
   connectionStatus: string;
   isLoading: boolean;
+  now: Date;
   round: DashboardRound | null;
 };
 
 export function CrashRoundPanel({
   connectionStatus,
   isLoading,
+  now,
   round,
 }: CrashRoundPanelProps) {
-  const now = useNow();
-
   return (
     <section
       aria-label="Arcade arena"

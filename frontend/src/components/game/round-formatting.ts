@@ -1,23 +1,26 @@
 import type { RoundResponse, RoundStatus } from "../../services/game-api";
 import type { RealtimeRoundPayload } from "../../services/realtime-events";
+import {
+  formatDisplayMultiplierBp,
+  getDisplayMultiplierBp,
+} from "../../services/display-multiplier";
 
 export type DashboardRound = (RoundResponse | RealtimeRoundPayload) & {
   currentMultiplierBp?: number | null;
 };
 
-export function formatRoundMultiplier(round: DashboardRound | null): string {
+export function formatRoundMultiplier(
+  round: DashboardRound | null,
+  now = new Date(),
+): string {
   if (!round) {
     return "1.00x";
   }
 
-  if (typeof round.currentMultiplierBp === "number") {
-    return `${(round.currentMultiplierBp / 10000).toFixed(2)}x`;
-  }
+  const displayMultiplierBp = getDisplayMultiplierBp(round, now);
 
-  if (round.status === "CRASHED" || round.status === "SETTLED") {
-    return round.crashPointBp
-      ? `${(round.crashPointBp / 10000).toFixed(2)}x`
-      : "CRASHED";
+  if (typeof displayMultiplierBp === "number") {
+    return formatDisplayMultiplierBp(displayMultiplierBp);
   }
 
   return round.status === "RUNNING" ? "RUNNING" : "1.00x";

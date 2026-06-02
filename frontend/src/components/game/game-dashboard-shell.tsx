@@ -31,7 +31,7 @@ export function GameDashboardShell() {
   const [leaderboardPeriod, setLeaderboardPeriod] =
     useState<LeaderboardPeriod>("24h");
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-  const now = useNow();
+  const now = useNow(100);
   const currentRoundQuery = useCurrentRoundQuery();
   const historyQuery = useRoundHistoryQuery(20);
   const leaderboardQuery = useLeaderboardQuery(leaderboardPeriod, 10);
@@ -124,6 +124,7 @@ export function GameDashboardShell() {
             <CrashRoundPanel
               connectionStatus={realtime.connectionStatus}
               isLoading={currentRoundQuery.isLoading}
+              now={now}
               round={currentRound}
             />
 
@@ -132,6 +133,7 @@ export function GameDashboardShell() {
               autoBetSession={autoBetSessionQuery.data ?? null}
               className="sticky bottom-3 z-30 mx-2 mt-3 shadow-[0_0_60px_rgba(244,63,94,0.28)] lg:static lg:mx-auto lg:-mt-10 lg:max-w-5xl"
               currentRound={currentRound}
+              now={now}
             />
           </main>
 

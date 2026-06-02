@@ -35,6 +35,7 @@ type BetControlsPanelProps = {
   autoBetSession?: AutoBetSessionResponse | null;
   className?: string;
   currentRound: DashboardRound | null;
+  now?: Date;
 };
 
 export function BetControlsPanel({
@@ -42,6 +43,7 @@ export function BetControlsPanel({
   autoBetSession = null,
   className,
   currentRound,
+  now = new Date(),
 }: BetControlsPanelProps) {
   const { isAuthenticated, login } = useAuth();
   const { betAmountCents, betAmountLabel, resetBetSlip, setBetAmountCents } =
@@ -91,7 +93,7 @@ export function BetControlsPanel({
     cashOutMutation.error ??
     startAutoBetSessionMutation.error ??
     stopAutoBetSessionMutation.error;
-  const potentialPayout = getPotentialPayout(activeBet, currentRound);
+  const potentialPayout = getPotentialPayout(activeBet, currentRound, now);
 
   return (
     <section
