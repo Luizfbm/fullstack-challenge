@@ -36,10 +36,8 @@ export type CrashFlightStoryboard = {
   portalVisible: boolean;
   progress: number;
   redFlashOpacity: number;
-  roadOpacity: number;
   running: boolean;
   showRunningCar: boolean;
-  trailProgress: number;
   wormholeActive: boolean;
   wormholePosition: VectorTuple;
 };
@@ -111,10 +109,8 @@ export function getCrashFlightStoryboard({
     redFlashOpacity: crashed
       ? 0.18 + crashImpact * 0.35 + Math.sin(time * 7) * 0.06
       : 0,
-    roadOpacity: crashed ? 0.28 : running ? 0.18 : 0.52,
     running,
     showRunningCar: usesRunningTimeCarAsset(phase),
-    trailProgress: running || crashed || entering ? Math.max(progress, 0.15) : 0.02,
     wormholeActive: getWormholeVisibilityForPhase(phase),
     wormholePosition: [compact ? 0.06 : 0.2, compact ? -0.06 : -0.08, -1.05],
   };

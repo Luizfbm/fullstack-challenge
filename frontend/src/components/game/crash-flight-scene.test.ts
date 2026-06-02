@@ -13,7 +13,6 @@ import {
 } from "./crash-flight-motion";
 import { createFlightStage, disposeObject } from "./crash-flight-stage";
 import { animateTimeCarFire } from "./time-car-fire";
-import { createGrowthTrail, updateGrowthTrail } from "./growth-trail";
 import { getCrashFlightStoryboard } from "./crash-flight-storyboard";
 import type { DashboardRound } from "./round-formatting";
 import {
@@ -21,6 +20,7 @@ import {
   BLACKHOLE_PORTAL_ASSET_ROTATION_X,
   BLACKHOLE_PORTAL_ASSET_ROTATION_Z,
   createBlackholePortalFallback,
+  getBlackholePortalAnimationDelta,
   normalizeBlackholePortalForScene,
   prepareBlackholePortalMaterialsForScene,
   updateBlackholePortal,
@@ -137,6 +137,7 @@ describe("crash flight scene primitives", () => {
     updateBlackholePortal(portal, {
       crashImpact: 0,
       entering: false,
+      phase: "betting",
       phaseElapsed: 0,
       reducedMotion: true,
       time: 0,
@@ -148,6 +149,7 @@ describe("crash flight scene primitives", () => {
     updateBlackholePortal(portal, {
       crashImpact: 0,
       entering: true,
+      phase: "entering",
       phaseElapsed: 1.4,
       reducedMotion: true,
       time: 1,
@@ -158,6 +160,40 @@ describe("crash flight scene primitives", () => {
     expect(portal.scale.x).toBeGreaterThan(1);
 
     disposeObject(portal);
+  });
+
+  it("gives the betting portal a smooth floating full-spin idle", () => {
+    const portal = createBlackholePortalFallback();
+
+    updateBlackholePortal(portal, {
+      crashImpact: 0,
+      entering: false,
+      phase: "betting",
+      phaseElapsed: 0,
+      reducedMotion: false,
+      time: 10,
+      visible: true,
+    });
+
+    expect(portal.visible).toBe(true);
+    expect(portal.rotation.z).toBeGreaterThan(Math.PI * 2);
+    expect(Math.abs(portal.position.y)).toBeGreaterThan(0.01);
+    expect(Math.hypot(portal.rotation.x, portal.rotation.y)).toBeGreaterThan(
+      0.01,
+    );
+
+    disposeObject(portal);
+  });
+
+  it("slows the GLB portal animation while idling in betting", () => {
+    const frameDelta = 1 / 60;
+
+    expect(getBlackholePortalAnimationDelta("betting", frameDelta)).toBeLessThan(
+      frameDelta * 0.5,
+    );
+    expect(getBlackholePortalAnimationDelta("entering", frameDelta)).toBe(
+      frameDelta,
+    );
   });
 
   it("creates and disposes the procedural wormhole tunnel", () => {
@@ -264,7 +300,7 @@ describe("crash flight scene primitives", () => {
 
     expect(runningFrame.portalVisible).toBe(false);
     expect(runningFrame.wormholeActive).toBe(true);
-    expect(runningFrame.trailProgress).toBeGreaterThanOrEqual(0.15);
+    expect("trailProgress" in runningFrame).toBe(false);
 
     const crashedFrame = getCrashFlightStoryboard({
       cameraAspect: 1.2,
@@ -278,7 +314,7 @@ describe("crash flight scene primitives", () => {
     expect(crashedFrame.portalVisible).toBe(false);
     expect(crashedFrame.wormholeActive).toBe(true);
     expect(crashedFrame.redFlashOpacity).toBeGreaterThan(0.18);
-    expect(crashedFrame.roadOpacity).toBe(0.28);
+    expect("roadOpacity" in crashedFrame).toBe(false);
   });
 
   it("calculates scene progress and easing helpers for storyboard motion", () => {
@@ -379,22 +415,11 @@ describe("crash flight scene primitives", () => {
     expect(frontPosition.x).toBeGreaterThan(rearPosition.x);
   });
 
-  it("updates the growth trail geometry and crash color", () => {
-    const trail = createGrowthTrail();
-
-    updateGrowthTrail(trail, 0.64, true);
-
-    expect(trail.group.children).toHaveLength(2);
-    expect(trail.core.geometry.getAttribute("position").count).toBe(72);
-    expect(
-      (trail.core.material as THREE.LineBasicMaterial).color.getHexString(),
-    ).toBe("fb7185");
-  });
-
   it("creates and disposes the glass arena stage resources", () => {
     const stage = createFlightStage();
 
     expect(stage.group.children.length).toBeGreaterThan(4);
+    expect(stage.group.children).not.toContain(stage.road);
     expect(stage.engineLight.intensity).toBeGreaterThan(0);
     expect(stage.redFlash.material.opacity).toBe(0);
 

@@ -1,12 +1,15 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { disposeObject } from "./crash-flight-stage";
+import type { StageAnimationPhase } from "./crash-flight-motion";
 
 export const BLACKHOLE_PORTAL_ASSET_PATH =
   "/models/blackhole_pixel_pass_3.glb";
 export const BLACKHOLE_PORTAL_ASSET_ROTATION_X = Math.PI / 2;
 export const BLACKHOLE_PORTAL_ASSET_ROTATION_Z = 0;
 const BLACKHOLE_PORTAL_TARGET_DIAMETER = 2.9;
+const BLACKHOLE_PORTAL_IDLE_SPIN_RADIANS_PER_SECOND = 0.72;
+const BLACKHOLE_PORTAL_DEFAULT_SPIN_RADIANS_PER_SECOND = 0.18;
 
 export type LoadedBlackholePortal = {
   actions: THREE.AnimationAction[];
@@ -102,6 +105,7 @@ export function updateBlackholePortal(
   input: {
     crashImpact: number;
     entering: boolean;
+    phase: StageAnimationPhase;
     phaseElapsed: number;
     reducedMotion: boolean;
     time: number;
@@ -121,11 +125,29 @@ export function updateBlackholePortal(
     ? 1 + Math.min(1, input.phaseElapsed / 1.4) * 0.28
     : 1;
   const crashScale = 1 + input.crashImpact * 0.08;
+  const bettingIdle = input.phase === "betting" && !input.reducedMotion;
 
   portal.scale.setScalar(idlePulse * enteringScale * crashScale);
+  if (bettingIdle) {
+    portal.position.x += Math.sin(input.time * 0.82 + 1.1) * 0.025;
+    portal.position.y += Math.sin(input.time * 1.12 + 0.35) * 0.062;
+    portal.rotation.x += Math.sin(input.time * 1.05 + 0.4) * 0.035;
+    portal.rotation.y += Math.cos(input.time * 0.92 + 0.2) * 0.045;
+  }
+
   portal.rotation.z = input.reducedMotion
     ? portal.rotation.z
-    : input.time * 0.18;
+    : input.time *
+      (input.phase === "betting"
+        ? BLACKHOLE_PORTAL_IDLE_SPIN_RADIANS_PER_SECOND
+        : BLACKHOLE_PORTAL_DEFAULT_SPIN_RADIANS_PER_SECOND);
+}
+
+export function getBlackholePortalAnimationDelta(
+  phase: StageAnimationPhase,
+  frameDeltaSeconds = 1 / 60,
+) {
+  return phase === "betting" ? frameDeltaSeconds * 0.32 : frameDeltaSeconds;
 }
 
 export function prepareBlackholePortalMaterialsForScene(model: THREE.Object3D) {

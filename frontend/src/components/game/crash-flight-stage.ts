@@ -38,7 +38,7 @@ export function createFlightStage(): FlightStage {
   redFlash.position.set(0, 0.38, -1.7);
   engineLight.position.set(-1.65, -0.36, 0.25);
 
-  group.add(createStars(), createLights(), road, grid, redFlash, engineLight);
+  group.add(createStars(), createLights(), grid, redFlash, engineLight);
 
   return { engineLight, group, redFlash, road };
 }
