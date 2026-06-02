@@ -43,21 +43,33 @@ export function RoundHistoryPanel({
   isLoading: boolean;
 }) {
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between gap-2">
+    <section
+      aria-label="Histórico de rodadas"
+      className="casino-mini-panel min-w-0 rounded-lg border border-amber-200/20 bg-black/45 p-2.5 shadow-[0_0_42px_rgba(251,191,36,0.1)]"
+    >
+      <div className="mb-2 flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-2">
           <History className="size-4 text-amber-300" aria-hidden="true" />
           <h2 className="text-sm font-semibold text-zinc-100">Histórico</h2>
         </div>
         <ShieldCheck className="size-4 text-emerald-300" aria-hidden="true" />
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div
+        className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1"
+        data-testid="round-history-track"
+      >
         {history.map((round) => (
-          <Badge key={round.id} variant={roundHistoryVariant(round)}>
+          <Badge
+            className="shrink-0 font-mono"
+            key={round.id}
+            variant={roundHistoryVariant(round)}
+          >
             {formatRoundMultiplier(round)}
           </Badge>
         ))}
-        {history.length ? null : <Badge>{isLoading ? "..." : "-"}</Badge>}
+        {history.length ? null : (
+          <Badge className="shrink-0 font-mono">{isLoading ? "..." : "-"}</Badge>
+        )}
       </div>
     </section>
   );

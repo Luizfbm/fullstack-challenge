@@ -177,6 +177,30 @@ describe("game dashboard helpers", () => {
     expect(screen.getAllByText("R$ 40,00").length).toBeGreaterThan(0);
   });
 
+  it("places round history as a horizontal rail directly above the arcade arena", () => {
+    hookMocks.currentRoundQuery.data = createRound();
+    hookMocks.historyQuery.data = [
+      createRound({ crashPointBp: 12000, id: "round-history-1" }),
+      createRound({ crashPointBp: 25000, id: "round-history-2" }),
+    ];
+
+    render(<GameDashboardShell />);
+
+    const historyRail = screen.getByRole("region", {
+      name: "Histórico de rodadas",
+    });
+    const arena = screen.getByLabelText("Arcade arena");
+    const track = screen.getByTestId("round-history-track");
+
+    expect(
+      historyRail.compareDocumentPosition(arena) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(track.className).toContain("overflow-x-auto");
+    expect(track.className).toContain("flex-nowrap");
+    expect(screen.queryByRole("tab", { name: "Histórico" })).toBeNull();
+  });
+
   it("renders the authenticated player's active auto bet session", () => {
     hookMocks.autoBetSessionQuery.data = createAutoBetSession({
       maxRounds: 3,
