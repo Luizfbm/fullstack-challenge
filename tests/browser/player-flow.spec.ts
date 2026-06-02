@@ -137,6 +137,15 @@ test("player can configure and stop a martingale auto bet session", async ({
   await expect(page).toHaveURL("http://localhost:8000/");
   await expect(page.getByRole("banner").getByText("player")).toBeVisible();
 
+  const preparedRound = prepareBrowserCashoutRound();
+
+  await page.reload();
+
+  await expect(page.getByText("LIVE").first()).toBeVisible();
+  await expect(page.getByTestId("metric-rodada")).toContainText(
+    `#${preparedRound.chainIndex} BETTING`,
+  );
+
   await page.getByRole("button", { exact: true, name: "Auto" }).click();
   await page.getByRole("button", { name: "Martingale" }).click();
   await page.getByLabel("Rodadas maximas").fill("4");

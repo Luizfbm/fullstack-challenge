@@ -1047,6 +1047,23 @@ Cada entrada deve conter:
 - Validacao: `cd services/games && bun test tests/e2e/outbox-inbox.e2e.test.ts`.
 - Status: resolvido.
 
+### 60. E2E browser de Martingale dependia da rodada corrente real
+
+- Contexto: babysit do PR #21, job `Docker Kong Keycloak E2E` no evento
+  `push` apos o commit `ca461a0`.
+- Sintoma: o teste browser `player can configure and stop a martingale auto bet
+  session` falhou procurando `0 / 4`, enquanto o snapshot do Playwright mostrava
+  a sessao ja em `2 / 4`, com aposta ativa e passo `1 / 3`.
+- Causa: esse cenario nao preparava uma rodada deterministica com janela
+  estendida antes de iniciar o Auto Bet. Em CI, a lifecycle real podia avancar
+  a rodada corrente e executar apostas automaticas antes da assercao inicial da
+  sessao.
+- Correcao: preparar uma rodada deterministica `cashout` com janela de aposta
+  estendida tambem no cenario browser de Martingale, recarregando a UI e
+  validando a rodada antes de iniciar a sessao.
+- Validacao: `bun run test:e2e:browser`.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
