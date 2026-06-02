@@ -22,8 +22,10 @@ export type CrashFlightStoryboard = {
     targetFov: number;
   };
   car: {
+    followTrail: boolean;
     position: VectorTuple;
     rotation: VectorTuple;
+    scale: VectorTuple;
   };
   compact: boolean;
   crashImpact: number;
@@ -70,8 +72,11 @@ export function getCrashFlightStoryboard({
     1,
     Math.max(0, phaseElapsed / ENTERING_BLACK_HOLE_SECONDS),
   );
+  const now = new Date();
+  const roundElapsedSeconds =
+    getRoundElapsedSeconds(round, now) ?? phaseElapsed;
   const crashImpact = crashed ? Math.max(0, 1 - phaseElapsed / 1.1) : 0;
-  const progress = entering ? enteringProgress : getSceneProgress(round, new Date());
+  const progress = entering ? enteringProgress : getSceneProgress(round, now);
   const eased = easeOutCubic(progress);
   const idle = Math.sin(time * 2.6) * 0.025;
   const layout = getStageLayout(compact);
@@ -79,23 +84,24 @@ export function getCrashFlightStoryboard({
     ? { x: 0, y: 0 }
     : getCameraShake(time, running ? 0.028 : crashImpact * 0.1);
   const cameraZoom = entering ? eased : running || crashed ? 1 : 0;
+  const car = getCarFrame({
+    betting,
+    crashed,
+    eased,
+    entering,
+    idle,
+    layout,
+    progress,
+    reducedMotion,
+    running,
+    time,
+    warp: getWarpLayout(compact),
+    crashImpact,
+  });
 
   return {
     camera: getCameraFrame({ cameraZoom, compact, crashed, eased, entering, running, shake }),
-    car: getCarFrame({
-      betting,
-      crashed,
-      eased,
-      entering,
-      idle,
-      layout,
-      progress,
-      reducedMotion,
-      running,
-      time,
-      warp: getWarpLayout(compact),
-      crashImpact,
-    }),
+    car,
     compact,
     crashImpact,
     crashed,
@@ -114,9 +120,13 @@ export function getCrashFlightStoryboard({
     running,
     showRunningCar: usesRunningTimeCarAsset(phase),
     trail: getTrailFrame({
+      carPosition: car.position,
+      compact,
       crashImpact,
       eased,
-      entering,
+      elapsedSeconds: roundElapsedSeconds,
+      multiplier: getRoundMultiplier(round),
+      phaseElapsed,
       progress,
       reducedMotion,
       running,
@@ -128,58 +138,83 @@ export function getCrashFlightStoryboard({
 }
 
 function getTrailFrame({
+  carPosition,
+  compact,
   crashImpact,
   crashed,
   eased,
-  entering,
+  elapsedSeconds,
+  multiplier,
+  phaseElapsed,
   progress,
   reducedMotion,
   running,
 }: {
+  carPosition: VectorTuple;
+  compact: boolean;
   crashImpact: number;
   crashed: boolean;
   eased: number;
-  entering: boolean;
+  elapsedSeconds: number;
+  multiplier: number;
+  phaseElapsed: number;
   progress: number;
   reducedMotion: boolean;
   running: boolean;
 }): TimeCarTrailFrame {
+  const layout = getTrailLayout(compact);
+
   if (crashed) {
     return {
+      axisRevealProgress: 1,
+      carPosition,
+      elapsedSeconds,
+      height: layout.height,
       intensity: reducedMotion ? 0.58 : 0.76 + crashImpact * 0.22,
-      length: 2.12 + crashImpact * 0.42,
-      spread: 0.48 + crashImpact * 0.16,
+      multiplier,
+      progress: 1,
       tone: "crash",
       visible: true,
+      width: layout.width,
     };
   }
 
   if (running) {
     return {
+      axisRevealProgress: getAxisRevealProgress(phaseElapsed, reducedMotion),
+      carPosition,
+      elapsedSeconds,
+      height: layout.height,
       intensity: reducedMotion ? 0.5 : 0.62 + eased * 0.24,
-      length: 2.04 + eased * 0.72,
-      spread: 0.34 + eased * 0.12,
+      multiplier,
+      progress: Math.max(0.1, progress),
       tone: "boost",
       visible: true,
-    };
-  }
-
-  if (entering) {
-    return {
-      intensity: reducedMotion ? 0.34 : 0.28 + progress * 0.42,
-      length: lerp(0.62, 1.45, eased),
-      spread: lerp(0.12, 0.32, eased),
-      tone: "boost",
-      visible: progress > 0.08,
+      width: layout.width,
     };
   }
 
   return {
+    axisRevealProgress: 0,
+    carPosition,
+    elapsedSeconds: 0,
+    height: layout.height,
     intensity: 0,
-    length: 0,
-    spread: 0,
+    multiplier: 1,
+    progress: 0,
     tone: "boost",
     visible: false,
+    width: layout.width,
+  };
+}
+
+function getTrailLayout(compact: boolean): {
+  height: number;
+  width: number;
+} {
+  return {
+    height: compact ? 0.72 : 0.92,
+    width: compact ? 1.72 : 2.92,
   };
 }
 
@@ -230,6 +265,7 @@ function getCarFrame({
 }): CrashFlightStoryboard["car"] {
   if (entering) {
     return {
+      followTrail: false,
       position: [
         lerp(layout.parkedX, layout.portalX, eased),
         lerp(layout.parkedY, layout.portalY, easeInOutCubic(progress)) +
@@ -241,13 +277,16 @@ function getCarFrame({
         lerp(0.24, 0.72, eased),
         lerp(-0.08, 0.32, eased),
       ],
+      scale: [1, 1, 1],
     };
   }
 
   if (running || crashed) {
     const speedJitter = reducedMotion ? 0 : Math.sin(time * 22) * 0.035;
+    const scale = running ? 0.42 : 0.46;
 
     return {
+      followTrail: true,
       position: [
         warp.x + eased * warp.advance + Math.sin(time * 2.8) * 0.08,
         warp.y + eased * warp.rise + speedJitter,
@@ -258,13 +297,53 @@ function getCarFrame({
         0.58 + Math.sin(time * 3.2) * 0.08,
         0.28 + Math.sin(time * 9) * 0.05 + crashImpact * 0.18,
       ],
+      scale: [scale, scale, scale],
     };
   }
 
   return {
+    followTrail: false,
     position: [layout.parkedX, layout.parkedY + (betting ? idle : 0), -0.14],
     rotation: [-0.06, 0.24, -0.08],
+    scale: [1, 1, 1],
   };
+}
+
+function getRoundMultiplier(round: DashboardRound | null) {
+  if (typeof round?.currentMultiplierBp === "number") {
+    return round.currentMultiplierBp / 10000;
+  }
+
+  if (typeof round?.crashPointBp === "number") {
+    return round.crashPointBp / 10000;
+  }
+
+  return 1;
+}
+
+function getRoundElapsedSeconds(round: DashboardRound | null, now: Date) {
+  if (!round?.startedAt) {
+    return null;
+  }
+
+  const startedAtMs = new Date(round.startedAt).getTime();
+  const endedAtMs = round.crashedAt
+    ? new Date(round.crashedAt).getTime()
+    : now.getTime();
+
+  if (!Number.isFinite(startedAtMs) || !Number.isFinite(endedAtMs)) {
+    return null;
+  }
+
+  return Math.max(0, (endedAtMs - startedAtMs) / 1000);
+}
+
+function getAxisRevealProgress(phaseElapsed: number, reducedMotion: boolean) {
+  if (reducedMotion) {
+    return 1;
+  }
+
+  return easeOutCubic(Math.min(1, Math.max(0, phaseElapsed / 0.7)));
 }
 
 function getCameraFrame({

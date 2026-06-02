@@ -102,6 +102,7 @@ export function CrashFlightScene({
     let activePhase = stateRef.current.animationPhase;
     let phaseStartedAt = performance.now();
     const cameraTarget = new THREE.Vector3();
+    const trailCarTarget = new THREE.Vector3();
 
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
@@ -110,9 +111,10 @@ export function CrashFlightScene({
     parkedCar.name = "time-car-model-parked";
     runningCar.name = "time-car-model-running";
     portalRoot.name = "blackhole-portal-root";
+    camera.add(trail.group);
     portalRoot.add(portal);
     car.add(parkedCar, runningCar);
-    scene.add(stage.group, wormhole.group, trail.group, portalRoot, car);
+    scene.add(camera, stage.group, wormhole.group, portalRoot, car);
     loadTimeCarAsset(parkedCar, TIME_CAR_ASSET_PATH, () => disposed).catch(
       () => {
         if (!disposed) {
@@ -186,13 +188,7 @@ export function CrashFlightScene({
       animateTimeCarFire(runningCar, time, frame.showRunningCar && !reducedMotion);
       car.position.set(...frame.car.position);
       car.rotation.set(...frame.car.rotation);
-      updateTimeCarTrail(trail, {
-        carPosition: frame.car.position,
-        carRotation: frame.car.rotation,
-        reducedMotion,
-        time,
-        trail: frame.trail,
-      });
+      car.scale.set(...frame.car.scale);
       portalRoot.position.set(...frame.portal.position);
       portalRoot.rotation.set(
         frame.portal.rotation[0],
@@ -228,6 +224,37 @@ export function CrashFlightScene({
         (frame.camera.targetFov - camera.fov) * (reducedMotion ? 1 : 0.08);
       camera.updateProjectionMatrix();
       camera.lookAt(...frame.camera.lookAt);
+      camera.updateMatrixWorld(true);
+      const trailState = updateTimeCarTrail(trail, {
+        camera,
+        reducedMotion,
+        time,
+        trail: frame.trail,
+      });
+      if (frame.car.followTrail && trailState) {
+        const edgeScale = 1 + trailState.edgeHoldProgress * 0.32;
+        const carTipOffset = 0.3 * frame.car.scale[0] * edgeScale;
+
+        trailCarTarget.set(
+          trailState.carAnchor[0] -
+            Math.cos(trailState.tangentAngle) * carTipOffset,
+          trailState.carAnchor[1] -
+            Math.sin(trailState.tangentAngle) * carTipOffset,
+          trailState.carAnchor[2],
+        );
+        camera.localToWorld(trailCarTarget);
+        car.position.copy(trailCarTarget);
+        car.scale.set(
+          frame.car.scale[0] * edgeScale,
+          frame.car.scale[1] * edgeScale,
+          frame.car.scale[2] * edgeScale,
+        );
+        car.rotation.set(
+          frame.car.rotation[0],
+          frame.car.rotation[1],
+          frame.car.rotation[2] + trailState.tangentAngle * 0.22,
+        );
+      }
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
     };
