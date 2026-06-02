@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { FlightFallback } from "./crash-flight-fallback";
 import {
   createBlackholePortalFallback,
+  getBlackholePortalAnimationDelta,
   loadBlackholePortalAsset,
   updateBlackholePortal,
 } from "./blackhole-portal-model";
@@ -11,7 +12,6 @@ import {
   type StageAnimationPhase,
 } from "./crash-flight-motion";
 import { getCrashFlightStoryboard } from "./crash-flight-storyboard";
-import { createGrowthTrail, updateGrowthTrail } from "./growth-trail";
 import {
   createWormholeTunnel,
   updateWormholeTunnel,
@@ -91,7 +91,6 @@ export function CrashFlightScene({
     const car = new THREE.Group();
     const parkedCar = createTimeCarModel();
     const runningCar = createTimeCarModel();
-    const trail = createGrowthTrail();
     const portalRoot = new THREE.Group();
     let portal = createBlackholePortalFallback();
     const wormhole = createWormholeTunnel();
@@ -111,7 +110,7 @@ export function CrashFlightScene({
     portalRoot.name = "blackhole-portal-root";
     portalRoot.add(portal);
     car.add(parkedCar, runningCar);
-    scene.add(stage.group, wormhole.group, portalRoot, trail.group, car);
+    scene.add(stage.group, wormhole.group, portalRoot, car);
     loadTimeCarAsset(parkedCar, TIME_CAR_ASSET_PATH, () => disposed).catch(
       () => {
         if (!disposed) {
@@ -194,12 +193,15 @@ export function CrashFlightScene({
       updateBlackholePortal(portalRoot, {
         crashImpact: frame.crashImpact,
         entering: frame.entering,
+        phase,
         phaseElapsed,
         reducedMotion,
         time,
         visible: frame.portalVisible,
       });
-      portalMixer?.update(reducedMotion ? 0 : 1 / 60);
+      portalMixer?.update(
+        reducedMotion ? 0 : getBlackholePortalAnimationDelta(phase),
+      );
       updateWormholeTunnel(wormhole, {
         crashImpact: frame.crashImpact,
         phase,
@@ -210,8 +212,6 @@ export function CrashFlightScene({
       wormhole.group.position.set(...frame.wormholePosition);
       stage.engineLight.intensity = frame.engineLightIntensity;
       stage.redFlash.material.opacity = frame.redFlashOpacity;
-      stage.road.material.opacity = frame.roadOpacity;
-      updateGrowthTrail(trail, frame.trailProgress, frame.crashed);
 
       cameraTarget.set(...frame.camera.position);
       camera.position.lerp(cameraTarget, reducedMotion ? 1 : 0.08);

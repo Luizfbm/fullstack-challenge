@@ -47,14 +47,6 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
         now={now}
         round={round}
       />
-      <div
-        className={cn(
-          "black-hole-flight-line pointer-events-none absolute inset-x-[12%] bottom-[24%] z-10 h-px origin-left -rotate-12 bg-gradient-to-r from-zinc-300/10 via-zinc-200/70 to-transparent",
-          (running || phase === "entering") && "black-hole-flight-line-active",
-          crashed && "via-rose-200/80",
-        )}
-        data-testid="chrono-stage-curve"
-      />
 
       <div className="absolute left-4 top-4 z-20 flex flex-wrap gap-2">
         <StageChip tone={crashed ? "rose" : "green"}>
