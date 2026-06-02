@@ -11,6 +11,7 @@ import type { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
 import type { GameMetrics } from "../../infrastructure/observability/game-metrics";
+import type { ExecuteAutoBetsForRoundUseCase } from "./execute-auto-bets-for-round.use-case";
 
 type GameMetricsPort = Pick<GameMetrics, "recordCashout" | "recordCrashPoint">;
 type CashoutMetric = {
@@ -48,6 +49,10 @@ export class AdvanceRoundLifecycleUseCase {
       gameRepository,
       walletClient,
     ),
+    private readonly executeAutoBetsForRoundUseCase?: Pick<
+      ExecuteAutoBetsForRoundUseCase,
+      "execute"
+    >,
   ) {
     if (
       !Number.isInteger(config.bettingWindowMs) ||
@@ -96,6 +101,7 @@ export class AdvanceRoundLifecycleUseCase {
     });
 
     await this.gameRepository.saveRound(round);
+    await this.executeAutoBetsForRoundUseCase?.execute({ round });
 
     return { action: "ROUND_OPENED", round };
   }
