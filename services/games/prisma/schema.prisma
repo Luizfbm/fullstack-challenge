@@ -106,3 +106,45 @@ model WalletOutboxMessage {
   @@index([playerId, createdAt])
   @@map("wallet_outbox_messages")
 }
+
+model AutoBetSession {
+  id                      String                  @id
+  playerId                String
+  username                String
+  status                  String
+  amountCents             BigInt
+  autoCashoutMultiplierBp Int?
+  maxRounds               Int
+  roundsPlayed            Int                     @default(0)
+  netProfitCents          BigInt                  @default(0)
+  stopLossCents           BigInt?
+  takeProfitCents         BigInt?
+  stopReason              String?
+  startsAfterRoundId      String?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  stoppedAt               DateTime?
+  executions              AutoBetRoundExecution[]
+
+  @@index([playerId, createdAt])
+  @@index([status])
+  @@map("auto_bet_sessions")
+}
+
+model AutoBetRoundExecution {
+  id               String         @id
+  sessionId        String
+  roundId          String
+  betId            String?
+  status           String
+  reason           String?
+  resultStatus     String?
+  resultDeltaCents BigInt?
+  resultAppliedAt  DateTime?
+  createdAt        DateTime       @default(now())
+  session          AutoBetSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, roundId])
+  @@index([roundId])
+  @@map("auto_bet_round_executions")
+}
