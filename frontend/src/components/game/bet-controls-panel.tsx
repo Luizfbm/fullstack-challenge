@@ -1,33 +1,52 @@
-import { Gauge, RotateCcw, Sparkles } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../hooks/use-auth";
 import { useBetSlip } from "../../hooks/use-bet-slip";
 import {
   useCashOutMutation,
   usePlaceBetMutation,
+  useStartAutoBetSessionMutation,
+  useStopAutoBetSessionMutation,
 } from "../../hooks/use-game-rest";
 import { cn } from "../../lib/utils";
 import { getApiErrorMessage } from "../../services/api-errors";
 import {
-  formatMultiplierBp,
   parseAutoCashoutMultiplierInput,
 } from "../../services/auto-cashout";
-import type { BetResponse } from "../../services/game-api";
+import type {
+  AutoBetSessionResponse,
+  BetResponse,
+} from "../../services/game-api";
 import { formatCents } from "../../services/money";
-import { calculatePayoutCents } from "../../services/payout";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { ActiveBetSummary } from "./active-bet-summary";
+import { BetActionButtons } from "./bet-action-buttons";
+import { AutoBetSessionSummary } from "./auto-bet-session-summary";
+import { AutoBetSettingsFields } from "./auto-bet-settings-fields";
 import { AutoCashoutControl } from "./auto-cashout-control";
+import {
+  autoBetConfigIsValid,
+  buildAutoBetPayload,
+  formatMultiplierInput,
+  getPotentialPayout,
+  onlyDigits,
+} from "./bet-controls-model";
+import { BetModeToggle, type BetMode } from "./bet-mode-toggle";
+import { BetStakePreview } from "./bet-stake-preview";
 import type { DashboardRound } from "./round-formatting";
+import { ToastNotice } from "./toast-notice";
 
 type BetControlsPanelProps = {
   activeBet: BetResponse | null;
+  autoBetSession?: AutoBetSessionResponse | null;
   className?: string;
   currentRound: DashboardRound | null;
 };
 
 export function BetControlsPanel({
   activeBet,
+  autoBetSession = null,
   className,
   currentRound,
 }: BetControlsPanelProps) {
@@ -36,27 +55,89 @@ export function BetControlsPanel({
     useBetSlip();
   const placeBetMutation = usePlaceBetMutation();
   const cashOutMutation = useCashOutMutation();
+  const startAutoBetSessionMutation = useStartAutoBetSessionMutation();
+  const stopAutoBetSessionMutation = useStopAutoBetSessionMutation();
+  const [betMode, setBetMode] = useState<BetMode>("manual");
   const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false);
   const [autoCashoutTarget, setAutoCashoutTarget] = useState("2.00");
+  const [maxRounds, setMaxRounds] = useState("10");
+  const [stopLossCents, setStopLossCents] = useState("");
+  const [takeProfitCents, setTakeProfitCents] = useState("");
   const autoCashoutParseResult =
     parseAutoCashoutMultiplierInput(autoCashoutTarget);
   const autoCashoutIsValid =
     !autoCashoutEnabled || autoCashoutParseResult.valid;
   const amountIsValid = BigInt(betAmountCents) > 0n;
+  const activeAutoBetSession =
+    autoBetSession?.status === "ACTIVE" ? autoBetSession : null;
+  const selectedBetMode: BetMode = activeAutoBetSession ? "auto" : betMode;
+  const visibleBetAmountCents =
+    activeAutoBetSession?.amountCents ?? betAmountCents;
+  const visibleAutoCashoutEnabled = activeAutoBetSession
+    ? activeAutoBetSession.autoCashoutMultiplierBp !== null
+    : autoCashoutEnabled;
+  const visibleAutoCashoutTarget = activeAutoBetSession?.autoCashoutMultiplierBp
+    ? formatMultiplierInput(activeAutoBetSession.autoCashoutMultiplierBp)
+    : autoCashoutTarget;
+  const visibleAutoCashoutParseResult = activeAutoBetSession
+    ?.autoCashoutMultiplierBp
+    ? {
+        multiplierBp: activeAutoBetSession.autoCashoutMultiplierBp,
+        valid: true,
+      }
+    : autoCashoutParseResult;
+  const visibleMaxRounds = activeAutoBetSession
+    ? String(activeAutoBetSession.maxRounds)
+    : maxRounds;
+  const visibleStopLossCents =
+    activeAutoBetSession?.stopLossCents ?? stopLossCents;
+  const visibleTakeProfitCents =
+    activeAutoBetSession?.takeProfitCents ?? takeProfitCents;
+  const maxRoundsNumber = Number(maxRounds);
+  const autoBetConfigValid = autoBetConfigIsValid({
+    maxRounds: maxRoundsNumber,
+    stopLossCents,
+    takeProfitCents,
+  });
+  const autoBetFormDisabled =
+    Boolean(activeAutoBetSession) ||
+    startAutoBetSessionMutation.isPending ||
+    stopAutoBetSessionMutation.isPending;
+  const canStartAutoBet =
+    isAuthenticated &&
+    amountIsValid &&
+    autoCashoutIsValid &&
+    autoBetConfigValid &&
+    !activeAutoBetSession &&
+    !startAutoBetSessionMutation.isPending;
   const canPlaceBet =
+    selectedBetMode === "manual" &&
     isAuthenticated &&
     amountIsValid &&
     autoCashoutIsValid &&
     currentRound?.status === "BETTING" &&
     !activeBet &&
+    !activeAutoBetSession &&
     !placeBetMutation.isPending;
   const canCashOut =
     isAuthenticated &&
     currentRound?.status === "RUNNING" &&
     activeBet?.status === "ACCEPTED" &&
     !cashOutMutation.isPending;
-  const mutationError = placeBetMutation.error ?? cashOutMutation.error;
+  const mutationError =
+    placeBetMutation.error ??
+    cashOutMutation.error ??
+    startAutoBetSessionMutation.error ??
+    stopAutoBetSessionMutation.error;
   const potentialPayout = getPotentialPayout(activeBet, currentRound);
+  const autoBetPayload = buildAutoBetPayload({
+    amountCents: betAmountCents,
+    autoCashoutEnabled,
+    autoCashoutParseResult,
+    maxRounds: maxRoundsNumber,
+    stopLossCents,
+    takeProfitCents,
+  });
 
   return (
     <section
@@ -83,89 +164,87 @@ export function BetControlsPanel({
         </Button>
       </div>
 
+      <BetModeToggle
+        disabled={Boolean(activeAutoBetSession)}
+        onChange={setBetMode}
+        value={selectedBetMode}
+      />
+
       <label className="block text-xs font-medium text-zinc-400" htmlFor="bet">
         Valor em centavos
       </label>
       <Input
         className="mt-2 h-12 border-rose-300/25 bg-black/45 font-mono text-lg"
-        disabled={placeBetMutation.isPending}
+        disabled={placeBetMutation.isPending || autoBetFormDisabled}
         id="bet"
         inputMode="numeric"
         onChange={(event) => setBetAmountCents(event.target.value)}
-        value={betAmountCents}
+        value={visibleBetAmountCents}
       />
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-md border border-white/5 bg-black/35 px-3 py-2 text-sm text-zinc-300">
-          <p className="text-xs text-zinc-500">Entrada</p>
-          <p className="font-mono text-zinc-50">{betAmountLabel}</p>
-        </div>
-        <div className="rounded-md border border-emerald-300/15 bg-emerald-300/10 px-3 py-2 text-sm">
-          <p className="text-xs text-zinc-500">Extracao estimada</p>
-          <p className="font-mono text-emerald-100">
-            {potentialPayout ? formatCents(potentialPayout) : "-"}
-          </p>
-        </div>
-      </div>
+      <BetStakePreview
+        entryLabel={
+          activeAutoBetSession ? formatCents(visibleBetAmountCents) : betAmountLabel
+        }
+        potentialPayout={potentialPayout}
+      />
 
       <AutoCashoutControl
-        enabled={autoCashoutEnabled}
+        disabled={autoBetFormDisabled}
+        enabled={visibleAutoCashoutEnabled}
         onEnabledChange={setAutoCashoutEnabled}
         onTargetChange={setAutoCashoutTarget}
-        parseResult={autoCashoutParseResult}
-        target={autoCashoutTarget}
+        parseResult={visibleAutoCashoutParseResult}
+        target={visibleAutoCashoutTarget}
       />
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Button
-          disabled={!canPlaceBet}
-          onClick={() =>
-            placeBetMutation.mutate(
-              autoCashoutEnabled
-                ? {
-                    amountCents: betAmountCents,
-                    autoCashoutMultiplierBp:
-                      autoCashoutParseResult.multiplierBp,
-                  }
-                : { amountCents: betAmountCents },
-            )
-          }
-          type="button"
-          variant="temporal"
-        >
-          <Sparkles className="size-4" aria-hidden="true" />
-          {placeBetMutation.isPending ? "Enviando" : "Apostar"}
-        </Button>
-        <Button
-          disabled={!canCashOut}
-          onClick={() => cashOutMutation.mutate()}
-          type="button"
-          variant="cash"
-        >
-          <Gauge className="size-4" aria-hidden="true" />
-          {cashOutMutation.isPending
-            ? "Sacando"
-            : potentialPayout
-              ? `Cash Out ${formatCents(potentialPayout)}`
-              : "Cash Out"}
-        </Button>
-      </div>
+      {activeAutoBetSession ? (
+        <AutoBetSessionSummary session={activeAutoBetSession} />
+      ) : null}
+
+      {selectedBetMode === "auto" ? (
+        <AutoBetSettingsFields
+          disabled={autoBetFormDisabled}
+          maxRounds={visibleMaxRounds}
+          onMaxRoundsChange={(value) => setMaxRounds(onlyDigits(value))}
+          onStopLossChange={(value) => setStopLossCents(onlyDigits(value))}
+          onTakeProfitChange={(value) => setTakeProfitCents(onlyDigits(value))}
+          stopLossCents={visibleStopLossCents}
+          takeProfitCents={visibleTakeProfitCents}
+        />
+      ) : null}
+
+      <BetActionButtons
+        activeAutoBetSession={Boolean(activeAutoBetSession)}
+        betMode={selectedBetMode}
+        canCashOut={canCashOut}
+        canPlaceBet={canPlaceBet}
+        canStartAutoBet={canStartAutoBet}
+        cashOutIsPending={cashOutMutation.isPending}
+        onCashOut={() => cashOutMutation.mutate()}
+        onPlaceBet={() =>
+          placeBetMutation.mutate(
+            autoCashoutEnabled
+              ? {
+                  amountCents: betAmountCents,
+                  autoCashoutMultiplierBp: autoCashoutParseResult.multiplierBp,
+                }
+              : { amountCents: betAmountCents },
+          )
+        }
+        onStartAutoBet={() => startAutoBetSessionMutation.mutate(autoBetPayload)}
+        onStopAutoBet={() => stopAutoBetSessionMutation.mutate()}
+        placeBetIsPending={placeBetMutation.isPending}
+        potentialPayout={potentialPayout}
+        startAutoBetIsPending={startAutoBetSessionMutation.isPending}
+        stopAutoBetIsPending={stopAutoBetSessionMutation.isPending}
+      />
 
       {activeBet ? (
-        <div className="mt-3 rounded-md border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs text-zinc-300">
-          <p>Aposta ativa: {activeBet.status}</p>
-          {activeBet.autoCashoutMultiplierBp ? (
-            <p className="mt-1 text-cyan-200">
-              Auto cashout em{" "}
-              {formatMultiplierBp(activeBet.autoCashoutMultiplierBp)}
-            </p>
-          ) : null}
-          {potentialPayout ? (
-            <p className="mt-1 text-emerald-200">
-              Payout potencial: {formatCents(potentialPayout)}
-            </p>
-          ) : null}
-        </div>
+        <ActiveBetSummary
+          activeBet={activeBet}
+          potentialPayout={potentialPayout}
+        />
       ) : null}
 
       {mutationError ? (
@@ -183,34 +262,5 @@ export function BetControlsPanel({
         </Button>
       ) : null}
     </section>
-  );
-}
-
-function getPotentialPayout(
-  activeBet: BetResponse | null,
-  currentRound: DashboardRound | null,
-): bigint | null {
-  if (!activeBet || !currentRound || activeBet.status !== "ACCEPTED") {
-    return null;
-  }
-
-  const multiplierBp = currentRound.currentMultiplierBp;
-
-  if (typeof multiplierBp !== "number") {
-    return null;
-  }
-
-  return calculatePayoutCents(activeBet.amountCents, multiplierBp);
-}
-
-function ToastNotice({ message }: { message: string }) {
-  return (
-    <div
-      aria-live="polite"
-      className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+15rem)] z-50 rounded-md border border-rose-400/40 bg-rose-950 px-4 py-3 text-sm text-rose-50 shadow-xl shadow-black/40 sm:left-auto sm:w-96 lg:bottom-4"
-      role="alert"
-    >
-      {message}
-    </div>
   );
 }

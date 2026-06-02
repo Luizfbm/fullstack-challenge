@@ -7,6 +7,7 @@ import {
   gameApi,
   type LeaderboardPeriod,
   type PlaceBetInput,
+  type StartAutoBetSessionInput,
 } from "../services/game-api";
 import { walletApi } from "../services/wallet-api";
 
@@ -17,6 +18,8 @@ export const gameQueryKeys = {
   leaderboard: (period: LeaderboardPeriod, limit: number) =>
     [...gameQueryKeys.all, "leaderboard", period, limit] as const,
   myBets: (limit: number) => [...gameQueryKeys.all, "my-bets", limit] as const,
+  myAutoBetSession: () =>
+    [...gameQueryKeys.all, "auto-bet-session", "me"] as const,
   verifyRound: (roundId: string) =>
     [...gameQueryKeys.all, "verify-round", roundId] as const,
 };
@@ -67,6 +70,15 @@ export function useMyBetsQuery(isAuthenticated: boolean, limit = 10) {
   });
 }
 
+export function useMyAutoBetSessionQuery(isAuthenticated: boolean) {
+  return useQuery({
+    enabled: isAuthenticated,
+    queryFn: () => gameApi.getMyAutoBetSession(),
+    queryKey: gameQueryKeys.myAutoBetSession(),
+    refetchInterval: isAuthenticated ? 2000 : false,
+  });
+}
+
 export function useWalletQuery(isAuthenticated: boolean) {
   return useQuery({
     enabled: isAuthenticated,
@@ -92,6 +104,29 @@ export function useCashOutMutation() {
 
   return useMutation({
     mutationFn: () => gameApi.cashOut(),
+    onSuccess: async () => {
+      await invalidateGameState(queryClient);
+    },
+  });
+}
+
+export function useStartAutoBetSessionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: StartAutoBetSessionInput) =>
+      gameApi.startAutoBetSession(input),
+    onSuccess: async () => {
+      await invalidateGameState(queryClient);
+    },
+  });
+}
+
+export function useStopAutoBetSessionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => gameApi.stopAutoBetSession(),
     onSuccess: async () => {
       await invalidateGameState(queryClient);
     },

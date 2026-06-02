@@ -6,6 +6,7 @@ import { Input } from "../ui/input";
 const AUTO_CASHOUT_PRESETS = ["1.50", "2.00", "3.00"];
 
 type AutoCashoutControlProps = {
+  disabled?: boolean;
   enabled: boolean;
   parseResult: AutoCashoutParseResult;
   target: string;
@@ -14,6 +15,7 @@ type AutoCashoutControlProps = {
 };
 
 export function AutoCashoutControl({
+  disabled = false,
   enabled,
   parseResult,
   target,
@@ -29,6 +31,7 @@ export function AutoCashoutControl({
           enabled ? "text-cyan-100" : "text-zinc-300",
         )}
         onClick={() => onEnabledChange(!enabled)}
+        disabled={disabled}
         type="button"
       >
         <span>Auto cashout</span>
@@ -55,6 +58,7 @@ export function AutoCashoutControl({
           </label>
           <Input
             className="h-10 border-cyan-300/25 bg-black/45 font-mono"
+            disabled={disabled}
             id="auto-cashout-target"
             inputMode="decimal"
             onChange={(event) => onTargetChange(event.target.value)}
@@ -64,6 +68,7 @@ export function AutoCashoutControl({
             {AUTO_CASHOUT_PRESETS.map((preset) => (
               <Button
                 className="px-2 font-mono text-xs"
+                disabled={disabled}
                 key={preset}
                 onClick={() => onTargetChange(preset)}
                 size="sm"

@@ -7,6 +7,9 @@ export const gameRoutes = {
   myBets: "/games/bets/me",
   bet: "/games/bet",
   cashout: "/games/bet/cashout",
+  autoBetSessions: "/games/auto-bet/sessions",
+  myAutoBetSession: "/games/auto-bet/sessions/me",
+  stopMyAutoBetSession: "/games/auto-bet/sessions/me/stop",
 } as const;
 
 export const walletRoutes = {

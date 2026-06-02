@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../services/http-client";
 import type {
+  AutoBetSessionResponse,
   BetResponse,
   LeaderboardEntry,
   RoundResponse,
@@ -23,6 +24,11 @@ const hookMocks = vi.hoisted(() => ({
     session: null,
     status: "authenticated",
     username: "player",
+  },
+  autoBetSessionQuery: {
+    data: null as AutoBetSessionResponse | null,
+    error: null as Error | null,
+    isLoading: false,
   },
   cashOutMutation: {
     error: null as Error | null,
@@ -54,6 +60,16 @@ const hookMocks = vi.hoisted(() => ({
     isPending: false,
     mutate: vi.fn(),
   },
+  startAutoBetSessionMutation: {
+    error: null as Error | null,
+    isPending: false,
+    mutate: vi.fn(),
+  },
+  stopAutoBetSessionMutation: {
+    error: null as Error | null,
+    isPending: false,
+    mutate: vi.fn(),
+  },
   realtime: {
     connectionStatus: "LIVE",
     round: null as RoundResponse | null,
@@ -77,9 +93,12 @@ vi.mock("../../hooks/use-game-rest", () => ({
   useCashOutMutation: () => hookMocks.cashOutMutation,
   useCurrentRoundQuery: () => hookMocks.currentRoundQuery,
   useLeaderboardQuery: () => hookMocks.leaderboardQuery,
+  useMyAutoBetSessionQuery: () => hookMocks.autoBetSessionQuery,
   useMyBetsQuery: () => hookMocks.myBetsQuery,
   usePlaceBetMutation: () => hookMocks.placeBetMutation,
   useRoundHistoryQuery: () => hookMocks.historyQuery,
+  useStartAutoBetSessionMutation: () => hookMocks.startAutoBetSessionMutation,
+  useStopAutoBetSessionMutation: () => hookMocks.stopAutoBetSessionMutation,
   useWalletQuery: () => hookMocks.walletQuery,
 }));
 
@@ -158,6 +177,18 @@ describe("game dashboard helpers", () => {
     expect(screen.getAllByText("R$ 40,00").length).toBeGreaterThan(0);
   });
 
+  it("renders the authenticated player's active auto bet session", () => {
+    hookMocks.autoBetSessionQuery.data = createAutoBetSession({
+      maxRounds: 3,
+      roundsPlayed: 1,
+    });
+
+    render(<GameDashboardShell />);
+
+    expect(screen.getByText("Auto Bet ativo")).toBeTruthy();
+    expect(screen.getByText("1 / 3")).toBeTruthy();
+  });
+
   it("normalizes the bet amount field and disables betting for invalid value", () => {
     render(<BetControlsPanel activeBet={null} currentRound={createRound()} />);
 
@@ -202,6 +233,117 @@ describe("game dashboard helpers", () => {
       amountCents: "1000",
       autoCashoutMultiplierBp: 20000,
     });
+  });
+
+  it("starts auto bet with all configured persistent fields", () => {
+    render(
+      <BetControlsPanel
+        activeBet={null}
+        autoBetSession={null}
+        currentRound={createRound()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
+    fireEvent.click(screen.getByRole("button", { name: /Auto cashout/ }));
+    fireEvent.click(screen.getByRole("button", { name: "2.00x" }));
+    fireEvent.change(screen.getByLabelText("Rodadas maximas"), {
+      target: { value: "5" },
+    });
+    fireEvent.change(screen.getByLabelText("Stop-loss em centavos"), {
+      target: { value: "3000" },
+    });
+    fireEvent.change(screen.getByLabelText("Take-profit em centavos"), {
+      target: { value: "5000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar Auto Bet" }));
+
+    expect(hookMocks.startAutoBetSessionMutation.mutate).toHaveBeenCalledWith({
+      amountCents: "1000",
+      autoCashoutMultiplierBp: 20000,
+      maxRounds: 5,
+      stopLossCents: "3000",
+      takeProfitCents: "5000",
+    });
+    expect(hookMocks.placeBetMutation.mutate).not.toHaveBeenCalled();
+  });
+
+  it("disables auto bet when persistent risk fields are invalid", () => {
+    render(
+      <BetControlsPanel
+        activeBet={null}
+        autoBetSession={null}
+        currentRound={createRound()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
+    fireEvent.change(screen.getByLabelText("Rodadas maximas"), {
+      target: { value: "0" },
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Iniciar Auto Bet" }),
+    ).toHaveProperty("disabled", true);
+
+    fireEvent.change(screen.getByLabelText("Rodadas maximas"), {
+      target: { value: "5" },
+    });
+    fireEvent.change(screen.getByLabelText("Stop-loss em centavos"), {
+      target: { value: "0" },
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Iniciar Auto Bet" }),
+    ).toHaveProperty("disabled", true);
+  });
+
+  it("shows active auto bet summary, stops it and keeps cashout available", () => {
+    render(
+      <BetControlsPanel
+        activeBet={createBet()}
+        autoBetSession={createAutoBetSession({
+          autoCashoutMultiplierBp: 20000,
+          maxRounds: 5,
+          netProfitCents: "1500",
+          roundsPlayed: 2,
+          stopLossCents: "3000",
+          takeProfitCents: "5000",
+        })}
+        currentRound={createRound({
+          currentMultiplierBp: 25000,
+          status: "RUNNING",
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Auto Bet ativo")).toBeTruthy();
+    expect(screen.getByText("2 / 5")).toBeTruthy();
+    expect(screen.getByText("+R$ 15,00")).toBeTruthy();
+    expect(screen.getByText("Auto cashout 2.00x")).toBeTruthy();
+    expect(screen.getByLabelText("Valor em centavos")).toHaveProperty(
+      "disabled",
+      true,
+    );
+    expect(screen.getByLabelText("Rodadas maximas")).toHaveProperty(
+      "value",
+      "5",
+    );
+    expect(screen.getByLabelText("Rodadas maximas")).toHaveProperty(
+      "disabled",
+      true,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Parar Auto Bet" }));
+
+    expect(hookMocks.stopAutoBetSessionMutation.mutate).toHaveBeenCalledOnce();
+
+    const cashOutButton = screen.getByRole("button", { name: /Cash Out/ });
+    expect(cashOutButton).toHaveProperty("disabled", false);
+
+    fireEvent.click(cashOutButton);
+
+    expect(hookMocks.cashOutMutation.mutate).toHaveBeenCalledOnce();
   });
 
   it("disables betting when auto cashout target is outside limits", () => {
@@ -272,6 +414,9 @@ function resetMocks() {
   hookMocks.auth.isAuthenticated = true;
   hookMocks.auth.username = "player";
   hookMocks.auth.login.mockReset();
+  hookMocks.autoBetSessionQuery.data = null;
+  hookMocks.autoBetSessionQuery.error = null;
+  hookMocks.autoBetSessionQuery.isLoading = false;
   hookMocks.cashOutMutation.error = null;
   hookMocks.cashOutMutation.isPending = false;
   hookMocks.cashOutMutation.mutate.mockReset();
@@ -290,6 +435,12 @@ function resetMocks() {
   hookMocks.placeBetMutation.error = null;
   hookMocks.placeBetMutation.isPending = false;
   hookMocks.placeBetMutation.mutate.mockReset();
+  hookMocks.startAutoBetSessionMutation.error = null;
+  hookMocks.startAutoBetSessionMutation.isPending = false;
+  hookMocks.startAutoBetSessionMutation.mutate.mockReset();
+  hookMocks.stopAutoBetSessionMutation.error = null;
+  hookMocks.stopAutoBetSessionMutation.isPending = false;
+  hookMocks.stopAutoBetSessionMutation.mutate.mockReset();
   hookMocks.realtime.connectionStatus = "LIVE";
   hookMocks.realtime.round = null;
   hookMocks.walletQuery.data = { balanceCents: "12345", playerId: "player-1" };
@@ -337,6 +488,30 @@ function createBet(overrides: Partial<BetResponse> = {}): BetResponse {
     rejectionReason: null,
     roundId: "round-1",
     status: "ACCEPTED",
+    username: "player",
+    ...overrides,
+  };
+}
+
+function createAutoBetSession(
+  overrides: Partial<AutoBetSessionResponse> = {},
+): AutoBetSessionResponse {
+  return {
+    amountCents: "1000",
+    autoCashoutMultiplierBp: null,
+    createdAt: "2026-06-01T12:00:00.000Z",
+    id: "auto-bet-1",
+    maxRounds: 10,
+    netProfitCents: "0",
+    playerId: "player-1",
+    roundsPlayed: 0,
+    startsAfterRoundId: "round-1",
+    status: "ACTIVE",
+    stopLossCents: null,
+    stopReason: null,
+    stoppedAt: null,
+    takeProfitCents: null,
+    updatedAt: "2026-06-01T12:00:00.000Z",
     username: "player",
     ...overrides,
   };
