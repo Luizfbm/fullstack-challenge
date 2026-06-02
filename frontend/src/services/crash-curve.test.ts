@@ -7,13 +7,13 @@ import {
 
 describe("crash curve helpers", () => {
   it("renders the backend exponential multiplier formula", () => {
-    expect(getCrashCurveFormula(10000, 1200)).toBe(
-      "multiplierBp = floor(10000 * exp(0.12 * elapsedSeconds))",
+    expect(getCrashCurveFormula(10000, 500)).toBe(
+      "multiplierBp = floor(10000 * exp(0.05 * elapsedSeconds))",
     );
   });
 
   it("renders the human-readable exponential growth rate", () => {
-    expect(getCrashCurveHumanRate(1200)).toBe("curva exponencial 12.00%/s");
+    expect(getCrashCurveHumanRate(500)).toBe("curva exponencial 5.00%/s");
   });
 
   it("builds a bounded SVG polyline for the visible curve progress", () => {

@@ -14,7 +14,7 @@ describe("multiplier", () => {
     expect(calculatePayoutCents(101n, 15000)).toBe(151n);
   });
 
-  test("calculates a 12 percent exponential crash multiplier", () => {
+  test("calculates a 5 percent exponential crash multiplier", () => {
     const startedAt = new Date("2026-05-30T10:00:00.000Z");
 
     expect(calculateCurrentMultiplierBp(startedAt, startedAt)).toBe(10000);
@@ -23,25 +23,25 @@ describe("multiplier", () => {
         startedAt,
         new Date("2026-05-30T10:00:01.000Z"),
       ),
-    ).toBe(11274);
+    ).toBe(10512);
     expect(
       calculateCurrentMultiplierBp(
         startedAt,
         new Date("2026-05-30T10:00:05.000Z"),
       ),
-    ).toBe(18221);
+    ).toBe(12840);
     expect(
       calculateCurrentMultiplierBp(
         startedAt,
         new Date("2026-05-30T10:00:10.000Z"),
       ),
-    ).toBe(33201);
+    ).toBe(16487);
     expect(
       calculateCurrentMultiplierBp(
         startedAt,
         new Date("2026-05-30T10:00:20.000Z"),
       ),
-    ).toBe(110231);
+    ).toBe(27182);
   });
 
   test("keeps elapsed time before the start at the base multiplier", () => {

@@ -924,7 +924,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:12.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:14.000Z")),
       new FakeRoundSeedProvider(),
       new FakeWalletClient(),
       { bettingWindowMs: 10000 },
@@ -957,7 +957,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:19.000Z")),
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
@@ -998,7 +998,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:19.000Z")),
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
@@ -1031,7 +1031,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:21.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:25.000Z")),
       new FakeRoundSeedProvider(),
       new FakeWalletClient(),
       { bettingWindowMs: 10000 },
@@ -1059,7 +1059,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const useCase = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:20.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:25.000Z")),
       new FakeRoundSeedProvider(),
       new FakeWalletClient(),
       { bettingWindowMs: 10000 },
@@ -1088,7 +1088,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const autoCashoutAttempt = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:19.000Z")),
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
@@ -1108,7 +1108,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const crashRound = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:16.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:20.000Z")),
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
@@ -1117,7 +1117,7 @@ describe("AdvanceRoundLifecycleUseCase", () => {
     const settleRound = new AdvanceRoundLifecycleUseCase(
       repository,
       new FixedIdGenerator("round-2"),
-      new FixedClock(new Date("2026-05-30T10:00:21.000Z")),
+      new FixedClock(new Date("2026-05-30T10:00:25.000Z")),
       new FakeRoundSeedProvider(),
       walletClient,
       { bettingWindowMs: 10000 },
@@ -2211,7 +2211,7 @@ describe("CashOutUseCase", () => {
       roundId: "round-1",
       betId: "bet-1",
       playerId: "player-1",
-      amountCents: 1822n,
+      amountCents: 1284n,
       referenceId: "round:round-1:player:player-1:cashout-credit",
       reason: "CASHOUT_PAYOUT",
     });
@@ -2248,12 +2248,12 @@ describe("CashOutUseCase", () => {
     const result = await useCase.execute({ playerId: "player-1" });
 
     expect(result.bet.status).toBe("CASHED_OUT");
-    expect(result.bet.cashoutMultiplierBp).toBe(18221);
-    expect(result.bet.payoutCents).toBe(1822n);
+    expect(result.bet.cashoutMultiplierBp).toBe(12840);
+    expect(result.bet.payoutCents).toBe(1284n);
     expect(walletClient.credits).toEqual([
       {
         playerId: "player-1",
-        amountCents: 1822n,
+        amountCents: 1284n,
         referenceId: "round:round-1:player:player-1:cashout-credit",
         reason: "CASHOUT_PAYOUT",
       },
@@ -2265,7 +2265,7 @@ describe("CashOutUseCase", () => {
       "CASHED_OUT",
     );
     expect(metrics.cashouts).toEqual([
-      { mode: "manual", payoutCents: 1822n },
+      { mode: "manual", payoutCents: 1284n },
     ]);
   });
 
@@ -2351,12 +2351,12 @@ describe("CashOutUseCase", () => {
       useCase.execute({ playerId: "player-1" }),
     ).rejects.toThrow(WalletCreditFailedError);
     expect(metrics.cashouts).toEqual([
-      { mode: "manual", payoutCents: 1822n },
+      { mode: "manual", payoutCents: 1284n },
     ]);
   });
 
   test("does not credit cashout at or after the crash point", async () => {
-    const round = openRound(15000);
+    const round = openRound(12000);
     round.placeBet({
       id: "bet-1",
       playerId: "player-1",

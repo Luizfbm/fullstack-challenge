@@ -32,7 +32,7 @@ export class RoundResponseDto {
 
   @ApiProperty({
     description: "Exponential growth rate in basis points per second.",
-    example: 1200,
+    example: 500,
   })
   multiplierGrowthRateBpPerSecond!: number;
 
