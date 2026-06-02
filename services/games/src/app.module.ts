@@ -221,13 +221,20 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         gameRepository: GameRepository,
         autoBetSessionRepository: AutoBetSessionRepository,
         idGenerator: IdGenerator,
+        gameMetrics: GameMetrics,
       ): StartAutoBetSessionUseCase =>
         new StartAutoBetSessionUseCase(
           gameRepository,
           autoBetSessionRepository,
           idGenerator,
+          gameMetrics,
         ),
-      inject: [GAME_REPOSITORY, AUTO_BET_SESSION_REPOSITORY, ID_GENERATOR],
+      inject: [
+        GAME_REPOSITORY,
+        AUTO_BET_SESSION_REPOSITORY,
+        ID_GENERATOR,
+        GameMetrics,
+      ],
     },
     {
       provide: GetMyAutoBetSessionUseCase,
@@ -241,9 +248,10 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
       provide: StopAutoBetSessionUseCase,
       useFactory: (
         autoBetSessionRepository: AutoBetSessionRepository,
+        gameMetrics: GameMetrics,
       ): StopAutoBetSessionUseCase =>
-        new StopAutoBetSessionUseCase(autoBetSessionRepository),
-      inject: [AUTO_BET_SESSION_REPOSITORY],
+        new StopAutoBetSessionUseCase(autoBetSessionRepository, gameMetrics),
+      inject: [AUTO_BET_SESSION_REPOSITORY, GameMetrics],
     },
     {
       provide: ExecuteAutoBetsForRoundUseCase,
@@ -251,16 +259,19 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         autoBetSessionRepository: AutoBetSessionRepository,
         placeBetUseCase: PlaceBetUseCase,
         idGenerator: IdGenerator,
+        gameMetrics: GameMetrics,
       ): ExecuteAutoBetsForRoundUseCase =>
         new ExecuteAutoBetsForRoundUseCase(
           autoBetSessionRepository,
           placeBetUseCase,
           idGenerator,
+          gameMetrics,
         ),
       inject: [
         AUTO_BET_SESSION_REPOSITORY,
         PlaceBetUseCase,
         ID_GENERATOR,
+        GameMetrics,
       ],
     },
     {

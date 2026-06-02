@@ -6,7 +6,15 @@ import {
 import type { AutoBetSessionRepository } from "../ports/auto-bet-session.repository";
 import type { IdGenerator } from "../ports/id-generator";
 import type { Round } from "../../domain/round";
+import type { GameMetrics } from "../../infrastructure/observability/game-metrics";
 import type { PlaceBetUseCase } from "./place-bet.use-case";
+
+type GameMetricsPort = Pick<
+  GameMetrics,
+  | "recordAutoBetFailure"
+  | "recordAutoBetPlaced"
+  | "recordAutoBetSessionStopped"
+>;
 
 type ExecuteAutoBetsForRoundInput = {
   round: Round;
@@ -17,6 +25,7 @@ export class ExecuteAutoBetsForRoundUseCase {
     private readonly autoBetSessionRepository: AutoBetSessionRepository,
     private readonly placeBetUseCase: Pick<PlaceBetUseCase, "execute">,
     private readonly idGenerator: IdGenerator,
+    private readonly gameMetrics?: GameMetricsPort,
   ) {}
 
   async execute(input: ExecuteAutoBetsForRoundInput): Promise<void> {
@@ -59,6 +68,7 @@ export class ExecuteAutoBetsForRoundUseCase {
         status: "BET_PLACED",
         reason: null,
       });
+      this.recordPlaced();
 
       const updatedSession =
         await this.autoBetSessionRepository.incrementRoundsPlayed(session.id);
@@ -68,16 +78,19 @@ export class ExecuteAutoBetsForRoundUseCase {
           sessionId: session.id,
           reason: "MAX_ROUNDS_REACHED",
         });
+        this.recordStopped("MAX_ROUNDS_REACHED");
       }
     } catch (error) {
+      const failureReason = this.failureReason(error);
       await this.autoBetSessionRepository.recordExecution({
         id: this.idGenerator.generate(),
         sessionId: session.id,
         roundId: round.id,
         betId: null,
         status: "FAILED",
-        reason: this.failureReason(error),
+        reason: failureReason,
       });
+      this.recordFailure(failureReason);
       await this.autoBetSessionRepository.stop({
         sessionId: session.id,
         reason:
@@ -85,6 +98,35 @@ export class ExecuteAutoBetsForRoundUseCase {
             ? "WALLET_REJECTED"
             : "WALLET_UNAVAILABLE",
       });
+      this.recordStopped(
+        error instanceof WalletOperationRejectedError
+          ? "WALLET_REJECTED"
+          : "WALLET_UNAVAILABLE",
+      );
+    }
+  }
+
+  private recordPlaced(): void {
+    try {
+      this.gameMetrics?.recordAutoBetPlaced();
+    } catch {
+      // Metrics are best-effort and must not alter auto bet behavior.
+    }
+  }
+
+  private recordFailure(reason: string): void {
+    try {
+      this.gameMetrics?.recordAutoBetFailure(reason);
+    } catch {
+      // Metrics are best-effort and must not alter auto bet behavior.
+    }
+  }
+
+  private recordStopped(reason: string): void {
+    try {
+      this.gameMetrics?.recordAutoBetSessionStopped(reason);
+    } catch {
+      // Metrics are best-effort and must not alter auto bet behavior.
     }
   }
 
