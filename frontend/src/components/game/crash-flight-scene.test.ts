@@ -18,8 +18,11 @@ import { getCrashFlightStoryboard } from "./crash-flight-storyboard";
 import type { DashboardRound } from "./round-formatting";
 import {
   BLACKHOLE_PORTAL_ASSET_PATH,
+  BLACKHOLE_PORTAL_ASSET_ROTATION_X,
+  BLACKHOLE_PORTAL_ASSET_ROTATION_Z,
   createBlackholePortalFallback,
   normalizeBlackholePortalForScene,
+  prepareBlackholePortalMaterialsForScene,
   updateBlackholePortal,
 } from "./blackhole-portal-model";
 import { createWormholeTunnel, updateWormholeTunnel } from "./wormhole-tunnel";
@@ -84,6 +87,48 @@ describe("crash flight scene primitives", () => {
     expect(Math.max(size.x, size.z)).toBeCloseTo(2.9, 1);
     expect(center.x).toBeCloseTo(0, 1);
     expect(center.z).toBeCloseTo(0, 1);
+  });
+
+  it("keeps the imported blackhole portal blue face toward the stage camera", () => {
+    const model = new THREE.Group();
+    const marker = new THREE.Mesh(new THREE.BoxGeometry(11, 2.3, 11));
+
+    model.add(marker);
+
+    normalizeBlackholePortalForScene(model);
+    const importedBlueFaceNormal = new THREE.Vector3(0, 1, 0).applyEuler(
+      model.rotation,
+    );
+
+    expect(model.rotation.x).toBe(BLACKHOLE_PORTAL_ASSET_ROTATION_X);
+    expect(model.rotation.z).toBe(BLACKHOLE_PORTAL_ASSET_ROTATION_Z);
+    expect(importedBlueFaceNormal.x).toBeCloseTo(0);
+    expect(importedBlueFaceNormal.y).toBeCloseTo(0);
+    expect(importedBlueFaceNormal.z).toBeCloseTo(1);
+  });
+
+  it("keeps restored blackhole materials bright enough for the blue texture", () => {
+    const material = new THREE.MeshStandardMaterial({
+      color: "#000000",
+      emissive: "#111111",
+      emissiveIntensity: 0.2,
+      roughness: 0.9,
+    });
+    const model = new THREE.Group();
+    const portalMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+
+    material.name = "Blackhole_01";
+    model.add(portalMesh);
+
+    prepareBlackholePortalMaterialsForScene(model);
+
+    expect(material.transparent).toBe(true);
+    expect(material.color.getHexString()).toBe("ffffff");
+    expect(material.emissive.getHexString()).toBe("ffffff");
+    expect(material.emissiveIntensity).toBeGreaterThanOrEqual(1);
+    expect(material.roughness).toBeLessThanOrEqual(0.46);
+
+    disposeObject(model);
   });
 
   it("updates blackhole portal visibility and scale by phase input", () => {
