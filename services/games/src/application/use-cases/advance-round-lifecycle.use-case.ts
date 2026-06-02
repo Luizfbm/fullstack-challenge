@@ -11,6 +11,7 @@ import type { Bet } from "../../domain/bet";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import { Round } from "../../domain/round";
 import type { GameMetrics } from "../../infrastructure/observability/game-metrics";
+import type { ApplyAutoBetResultUseCase } from "./apply-auto-bet-result.use-case";
 import type { ExecuteAutoBetsForRoundUseCase } from "./execute-auto-bets-for-round.use-case";
 
 type GameMetricsPort = Pick<GameMetrics, "recordCashout" | "recordCrashPoint">;
@@ -51,6 +52,10 @@ export class AdvanceRoundLifecycleUseCase {
     ),
     private readonly executeAutoBetsForRoundUseCase?: Pick<
       ExecuteAutoBetsForRoundUseCase,
+      "execute"
+    >,
+    private readonly applyAutoBetResultUseCase?: Pick<
+      ApplyAutoBetResultUseCase,
       "execute"
     >,
   ) {
@@ -185,6 +190,12 @@ export class AdvanceRoundLifecycleUseCase {
 
       round.completeCashOut(bet.playerId);
       await this.gameRepository.saveRound(round);
+      await this.applyAutoBetResultUseCase?.execute({
+        betId: bet.id,
+        amountCents: bet.amountCents,
+        payoutCents: bet.payoutCents,
+        resultStatus: "CASHED_OUT",
+      });
       this.recordCashout("auto", bet.payoutCents);
       await this.roundEventsPublisher?.publishBetCashedOut(bet);
     }
@@ -205,8 +216,24 @@ export class AdvanceRoundLifecycleUseCase {
 
     round.settle();
     await this.gameRepository.saveRound(round);
+    await this.applyLostAutoBetResults(round);
 
     return { action: "ROUND_SETTLED", round };
+  }
+
+  private async applyLostAutoBetResults(round: Round): Promise<void> {
+    for (const bet of round.bets) {
+      if (bet.status !== "LOST") {
+        continue;
+      }
+
+      await this.applyAutoBetResultUseCase?.execute({
+        betId: bet.id,
+        amountCents: bet.amountCents,
+        payoutCents: null,
+        resultStatus: "LOST",
+      });
+    }
   }
 
   private async retryPendingCashout(

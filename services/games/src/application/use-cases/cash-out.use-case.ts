@@ -15,6 +15,7 @@ import { Bet } from "../../domain/bet";
 import { InvalidRoundStateError } from "../../domain/game.errors";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
 import type { GameMetrics } from "../../infrastructure/observability/game-metrics";
+import type { ApplyAutoBetResultUseCase } from "./apply-auto-bet-result.use-case";
 
 type GameMetricsPort = Pick<GameMetrics, "recordCashout">;
 
@@ -40,6 +41,10 @@ export class CashOutUseCase {
       gameRepository,
       walletClient,
     ),
+    private readonly applyAutoBetResultUseCase?: Pick<
+      ApplyAutoBetResultUseCase,
+      "execute"
+    >,
   ) {}
 
   async execute(input: CashOutInput): Promise<CashOutResult> {
@@ -75,6 +80,12 @@ export class CashOutUseCase {
 
           round.completeCashOut(input.playerId);
           await this.gameRepository.saveRound(round);
+          await this.applyAutoBetResultUseCase?.execute({
+            betId: bet.id,
+            amountCents: bet.amountCents,
+            payoutCents,
+            resultStatus: "CASHED_OUT",
+          });
           this.recordCashout("manual", payoutCents);
           await this.roundEventsPublisher.publishBetCashedOut(bet);
 

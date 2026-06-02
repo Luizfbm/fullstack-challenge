@@ -42,6 +42,7 @@ import type {
 } from "../../../src/application/wallet-outbox/wallet-outbox-message";
 import { CashoutCreditService } from "../../../src/application/services/cashout-credit.service";
 import { AdvanceRoundLifecycleUseCase } from "../../../src/application/use-cases/advance-round-lifecycle.use-case";
+import { ApplyAutoBetResultUseCase } from "../../../src/application/use-cases/apply-auto-bet-result.use-case";
 import { CashOutUseCase } from "../../../src/application/use-cases/cash-out.use-case";
 import { ExecuteAutoBetsForRoundUseCase } from "../../../src/application/use-cases/execute-auto-bets-for-round.use-case";
 import { GetMyAutoBetSessionUseCase } from "../../../src/application/use-cases/get-my-auto-bet-session.use-case";
@@ -325,6 +326,14 @@ class FakeAutoBetSessionRepository implements AutoBetSessionRepository {
         (execution) =>
           execution.sessionId === sessionId && execution.roundId === roundId,
       ) ?? null
+    );
+  }
+
+  async findExecutionByBetId(
+    betId: string,
+  ): Promise<AutoBetRoundExecution | null> {
+    return (
+      this.executions.find((execution) => execution.betId === betId) ?? null
     );
   }
 
@@ -1422,6 +1431,80 @@ describe("AutoBetSession use cases", () => {
       },
     ]);
     expect(autoBetRepository.sessions[0]?.roundsPlayed).toBe(1);
+  });
+
+  test("applies lost auto bet result once and stops on stop loss", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        amountCents: 1000n,
+        netProfitCents: 0n,
+        stopLossCents: 1000n,
+        status: "ACTIVE",
+      }),
+    );
+    autoBetRepository.executions.push(
+      autoBetExecutionFixture({
+        id: "execution-1",
+        betId: "bet-1",
+        sessionId: "auto-session-1",
+      }),
+    );
+    const useCase = new ApplyAutoBetResultUseCase(autoBetRepository);
+
+    await useCase.execute({
+      amountCents: 1000n,
+      betId: "bet-1",
+      payoutCents: null,
+      resultStatus: "LOST",
+    });
+    await useCase.execute({
+      amountCents: 1000n,
+      betId: "bet-1",
+      payoutCents: null,
+      resultStatus: "LOST",
+    });
+
+    expect(autoBetRepository.sessions[0]?.netProfitCents).toBe(-1000n);
+    expect(autoBetRepository.sessions[0]?.status).toBe("STOPPED");
+    expect(autoBetRepository.sessions[0]?.stopReason).toBe(
+      "STOP_LOSS_REACHED",
+    );
+  });
+
+  test("applies cashed out auto bet result and stops on take profit", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        amountCents: 1000n,
+        netProfitCents: 0n,
+        takeProfitCents: 500n,
+        status: "ACTIVE",
+      }),
+    );
+    autoBetRepository.executions.push(
+      autoBetExecutionFixture({
+        id: "execution-1",
+        betId: "bet-1",
+        sessionId: "auto-session-1",
+      }),
+    );
+    const useCase = new ApplyAutoBetResultUseCase(autoBetRepository);
+
+    await useCase.execute({
+      amountCents: 1000n,
+      betId: "bet-1",
+      payoutCents: 1500n,
+      resultStatus: "CASHED_OUT",
+    });
+
+    expect(autoBetRepository.sessions[0]?.netProfitCents).toBe(500n);
+    expect(autoBetRepository.sessions[0]?.status).toBe("STOPPED");
+    expect(autoBetRepository.sessions[0]?.stopReason).toBe(
+      "TAKE_PROFIT_REACHED",
+    );
   });
 });
 

@@ -24,6 +24,7 @@ import {
 } from "./application/ports/wallet-outbox.repository";
 import { CashOutUseCase } from "./application/use-cases/cash-out.use-case";
 import { AdvanceRoundLifecycleUseCase } from "./application/use-cases/advance-round-lifecycle.use-case";
+import { ApplyAutoBetResultUseCase } from "./application/use-cases/apply-auto-bet-result.use-case";
 import { CashoutCreditService } from "./application/services/cashout-credit.service";
 import { ExecuteAutoBetsForRoundUseCase } from "./application/use-cases/execute-auto-bets-for-round.use-case";
 import { GetMyAutoBetSessionUseCase } from "./application/use-cases/get-my-auto-bet-session.use-case";
@@ -130,6 +131,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         gameMetrics: GameMetrics,
         cashoutCreditService: CashoutCreditService,
         executeAutoBetsForRoundUseCase: ExecuteAutoBetsForRoundUseCase,
+        applyAutoBetResultUseCase: ApplyAutoBetResultUseCase,
       ): AdvanceRoundLifecycleUseCase =>
         new AdvanceRoundLifecycleUseCase(
           gameRepository,
@@ -144,6 +146,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
           gameMetrics,
           cashoutCreditService,
           executeAutoBetsForRoundUseCase,
+          applyAutoBetResultUseCase,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -155,6 +158,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         GameMetrics,
         CashoutCreditService,
         ExecuteAutoBetsForRoundUseCase,
+        ApplyAutoBetResultUseCase,
       ],
     },
     {
@@ -260,6 +264,14 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
       ],
     },
     {
+      provide: ApplyAutoBetResultUseCase,
+      useFactory: (
+        autoBetSessionRepository: AutoBetSessionRepository,
+      ): ApplyAutoBetResultUseCase =>
+        new ApplyAutoBetResultUseCase(autoBetSessionRepository),
+      inject: [AUTO_BET_SESSION_REPOSITORY],
+    },
+    {
       provide: PlaceBetUseCase,
       useFactory: (
         gameRepository: GameRepository,
@@ -301,6 +313,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         roundEventsPublisher: RoundEventsPublisher,
         gameMetrics: GameMetrics,
         cashoutCreditService: CashoutCreditService,
+        applyAutoBetResultUseCase: ApplyAutoBetResultUseCase,
       ): CashOutUseCase =>
         new CashOutUseCase(
           gameRepository,
@@ -309,6 +322,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
           roundEventsPublisher,
           gameMetrics,
           cashoutCreditService,
+          applyAutoBetResultUseCase,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -317,6 +331,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         ROUND_EVENTS_PUBLISHER,
         GameMetrics,
         CashoutCreditService,
+        ApplyAutoBetResultUseCase,
       ],
     },
   ],
