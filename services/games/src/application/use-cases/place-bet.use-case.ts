@@ -6,6 +6,7 @@ import {
 import {
   BetAmountOutOfRangeError,
   CurrentRoundNotFoundError,
+  ManualBetBlockedByAutoBetError,
   WalletOperationRejectedError,
 } from "../game.errors";
 import { parseAutoCashoutMultiplierBp } from "../auto-cashout";
@@ -14,6 +15,7 @@ import { GameRepository } from "../ports/game.repository";
 import { IdGenerator } from "../ports/id-generator";
 import { RoundEventsPublisher } from "../ports/round-events.publisher";
 import { WalletClient } from "../ports/wallet.client";
+import type { AutoBetSessionRepository } from "../ports/auto-bet-session.repository";
 import type { WalletOutboxRepository } from "../ports/wallet-outbox.repository";
 import { Bet } from "../../domain/bet";
 import type { WalletOutboxDispatcher } from "../../infrastructure/messaging/wallet-outbox-dispatcher";
@@ -24,11 +26,14 @@ type GameMetricsPort = Pick<
   "recordBetAccepted" | "recordBetRejected"
 >;
 
+export type PlaceBetSource = "MANUAL" | "AUTO_BET";
+
 type PlaceBetInput = {
   playerId: string;
   username: string;
   amountCents: bigint | number | string;
   autoCashoutMultiplierBp?: number | null;
+  source?: PlaceBetSource;
 };
 
 type PlaceBetResult = {
@@ -50,6 +55,10 @@ export class PlaceBetUseCase {
       WalletOutboxDispatcher,
       "dispatchMessage"
     >,
+    private readonly autoBetSessionRepository?: Pick<
+      AutoBetSessionRepository,
+      "findActiveByPlayer"
+    >,
   ) {}
 
   async execute(input: PlaceBetInput): Promise<PlaceBetResult> {
@@ -69,6 +78,17 @@ export class PlaceBetUseCase {
         const autoCashoutMultiplierBp = parseAutoCashoutMultiplierBp(
           input.autoCashoutMultiplierBp,
         );
+
+        if ((input.source ?? "MANUAL") === "MANUAL") {
+          const activeAutoBetSession =
+            await this.autoBetSessionRepository?.findActiveByPlayer(
+              input.playerId,
+            );
+
+          if (activeAutoBetSession) {
+            throw new ManualBetBlockedByAutoBetError();
+          }
+        }
 
         const round = await this.gameRepository.findCurrentRound();
 

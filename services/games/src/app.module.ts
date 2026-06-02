@@ -247,6 +247,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         gameMetrics: GameMetrics,
         walletOutboxRepository: WalletOutboxRepository,
         walletOutboxDispatcher: WalletOutboxDispatcher,
+        autoBetSessionRepository: AutoBetSessionRepository,
       ): PlaceBetUseCase =>
         new PlaceBetUseCase(
           gameRepository,
@@ -256,6 +257,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
           gameMetrics,
           walletOutboxRepository,
           walletOutboxDispatcher,
+          autoBetSessionRepository,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -265,6 +267,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         GameMetrics,
         WALLET_OUTBOX_REPOSITORY,
         WalletOutboxDispatcher,
+        AUTO_BET_SESSION_REPOSITORY,
       ],
     },
     {
