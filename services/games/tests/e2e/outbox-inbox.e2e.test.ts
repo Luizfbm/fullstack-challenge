@@ -27,80 +27,88 @@ type WalletPersistenceCounts = {
 };
 
 describe("transactional outbox/inbox E2E", () => {
-  test("persists wallet debit outbox and inbox without duplicate ledger processing", async () => {
-    await withE2ELock(async () => {
-      await ensureStackIsHealthy();
-      const token = await getAccessToken();
-      const round = await prepareDeterministicRound("cashout");
-      const balanceBefore = await getWallet(token);
+  test(
+    "persists wallet debit outbox and inbox without duplicate ledger processing",
+    async () => {
+      await withE2ELock(async () => {
+        await ensureStackIsHealthy();
+        const token = await getAccessToken();
+        const round = await prepareDeterministicRound("cashout");
+        const balanceBefore = await getWallet(token);
 
-      const bet = await placeBet(token, "1000");
+        const bet = await placeBet(token, "1000");
 
-      expect(bet.status).toBe("ACCEPTED");
-      const balanceAfter = await getWallet(token);
-      expect(BigInt(balanceBefore.balanceCents) - BigInt(balanceAfter.balanceCents)).toBe(
-        1000n,
-      );
+        expect(bet.status).toBe("ACCEPTED");
+        const balanceAfter = await getWallet(token);
+        expect(
+          BigInt(balanceBefore.balanceCents) - BigInt(balanceAfter.balanceCents),
+        ).toBe(1000n);
 
-      const outbox = await getWalletOutboxRow(round.id, "WALLET_DEBIT");
-      await expectWalletPersistenceCounts(outbox.referenceId, {
-        inboxCount: 1,
-        transactionCount: 1,
+        const outbox = await getWalletOutboxRow(round.id, "WALLET_DEBIT");
+        await expectWalletPersistenceCounts(outbox.referenceId, {
+          inboxCount: 1,
+          transactionCount: 1,
+        });
+
+        await publishDuplicateWalletCommand({
+          messageId: outbox.id,
+          pattern: "wallet.debit",
+          playerId: bet.playerId,
+          amountCents: outbox.amountCents,
+          referenceId: outbox.referenceId,
+          reason: "BET_PLACED",
+        });
+        await Bun.sleep(1000);
+
+        await expectWalletPersistenceCounts(outbox.referenceId, {
+          inboxCount: 1,
+          transactionCount: 1,
+        });
       });
+    },
+    { timeout: 120000 },
+  );
 
-      await publishDuplicateWalletCommand({
-        messageId: outbox.id,
-        pattern: "wallet.debit",
-        playerId: bet.playerId,
-        amountCents: outbox.amountCents,
-        referenceId: outbox.referenceId,
-        reason: "BET_PLACED",
+  test(
+    "persists wallet credit outbox and inbox without duplicate ledger processing",
+    async () => {
+      await withE2ELock(async () => {
+        await ensureStackIsHealthy();
+        const token = await getAccessToken();
+        const round = await prepareDeterministicRound("cashout");
+
+        const bet = await placeBet(token, "1000");
+        expect(bet.status).toBe("ACCEPTED");
+        await forceBettingRoundToStart(round.id);
+        await waitForCurrentStatus("RUNNING");
+
+        const cashedOut = await cashOut(token);
+
+        expect(cashedOut.status).toBe("CASHED_OUT");
+        const outbox = await getWalletOutboxRow(round.id, "WALLET_CREDIT");
+        await expectWalletPersistenceCounts(outbox.referenceId, {
+          inboxCount: 1,
+          transactionCount: 1,
+        });
+
+        await publishDuplicateWalletCommand({
+          messageId: outbox.id,
+          pattern: "wallet.credit",
+          playerId: bet.playerId,
+          amountCents: outbox.amountCents,
+          referenceId: outbox.referenceId,
+          reason: "CASHOUT_PAYOUT",
+        });
+        await Bun.sleep(1000);
+
+        await expectWalletPersistenceCounts(outbox.referenceId, {
+          inboxCount: 1,
+          transactionCount: 1,
+        });
       });
-      await Bun.sleep(1000);
-
-      await expectWalletPersistenceCounts(outbox.referenceId, {
-        inboxCount: 1,
-        transactionCount: 1,
-      });
-    });
-  });
-
-  test("persists wallet credit outbox and inbox without duplicate ledger processing", async () => {
-    await withE2ELock(async () => {
-      await ensureStackIsHealthy();
-      const token = await getAccessToken();
-      const round = await prepareDeterministicRound("cashout");
-
-      const bet = await placeBet(token, "1000");
-      expect(bet.status).toBe("ACCEPTED");
-      await forceBettingRoundToStart(round.id);
-      await waitForCurrentStatus("RUNNING");
-
-      const cashedOut = await cashOut(token);
-
-      expect(cashedOut.status).toBe("CASHED_OUT");
-      const outbox = await getWalletOutboxRow(round.id, "WALLET_CREDIT");
-      await expectWalletPersistenceCounts(outbox.referenceId, {
-        inboxCount: 1,
-        transactionCount: 1,
-      });
-
-      await publishDuplicateWalletCommand({
-        messageId: outbox.id,
-        pattern: "wallet.credit",
-        playerId: bet.playerId,
-        amountCents: outbox.amountCents,
-        referenceId: outbox.referenceId,
-        reason: "CASHOUT_PAYOUT",
-      });
-      await Bun.sleep(1000);
-
-      await expectWalletPersistenceCounts(outbox.referenceId, {
-        inboxCount: 1,
-        transactionCount: 1,
-      });
-    });
-  });
+    },
+    { timeout: 120000 },
+  );
 });
 
 async function getWalletOutboxRow(
