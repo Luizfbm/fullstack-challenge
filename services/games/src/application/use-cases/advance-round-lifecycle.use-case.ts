@@ -1,5 +1,6 @@
 import { MULTIPLIER_GROWTH_RATE_BP_PER_SECOND } from "../game.constants";
 import { WalletCreditFailedError } from "../game.errors";
+import { applyLostAutoBetResults } from "../auto-bet/apply-lost-auto-bet-results";
 import { Clock } from "../ports/clock";
 import { GameRepository } from "../ports/game.repository";
 import { IdGenerator } from "../ports/id-generator";
@@ -216,24 +217,9 @@ export class AdvanceRoundLifecycleUseCase {
 
     round.settle();
     await this.gameRepository.saveRound(round);
-    await this.applyLostAutoBetResults(round);
+    await applyLostAutoBetResults(this.applyAutoBetResultUseCase, round.bets);
 
     return { action: "ROUND_SETTLED", round };
-  }
-
-  private async applyLostAutoBetResults(round: Round): Promise<void> {
-    for (const bet of round.bets) {
-      if (bet.status !== "LOST") {
-        continue;
-      }
-
-      await this.applyAutoBetResultUseCase?.execute({
-        betId: bet.id,
-        amountCents: bet.amountCents,
-        payoutCents: null,
-        resultStatus: "LOST",
-      });
-    }
   }
 
   private async retryPendingCashout(
