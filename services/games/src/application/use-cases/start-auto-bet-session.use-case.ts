@@ -5,6 +5,9 @@ import { IdGenerator } from "../ports/id-generator";
 import type {
   AutoBetSessionRepository,
 } from "../ports/auto-bet-session.repository";
+import type { GameMetrics } from "../../infrastructure/observability/game-metrics";
+
+type GameMetricsPort = Pick<GameMetrics, "recordAutoBetSessionStarted">;
 
 type StartAutoBetSessionInput = {
   playerId: string;
@@ -21,6 +24,7 @@ export class StartAutoBetSessionUseCase {
     private readonly gameRepository: GameRepository,
     private readonly autoBetSessionRepository: AutoBetSessionRepository,
     private readonly idGenerator: IdGenerator,
+    private readonly gameMetrics?: GameMetricsPort,
   ) {}
 
   async execute(input: StartAutoBetSessionInput) {
@@ -34,7 +38,7 @@ export class StartAutoBetSessionUseCase {
     const config = parseAutoBetConfig(input);
     const currentRound = await this.gameRepository.findCurrentRound();
 
-    return this.autoBetSessionRepository.create({
+    const session = await this.autoBetSessionRepository.create({
       id: this.idGenerator.generate(),
       playerId: input.playerId,
       username: input.username,
@@ -50,5 +54,17 @@ export class StartAutoBetSessionUseCase {
       startsAfterRoundId: currentRound?.id ?? null,
       stoppedAt: null,
     });
+
+    this.recordStarted();
+
+    return session;
+  }
+
+  private recordStarted(): void {
+    try {
+      this.gameMetrics?.recordAutoBetSessionStarted();
+    } catch {
+      // Metrics are best-effort and must not alter auto bet behavior.
+    }
   }
 }

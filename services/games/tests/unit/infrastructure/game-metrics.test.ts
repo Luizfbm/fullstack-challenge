@@ -73,4 +73,24 @@ describe("GameMetrics", () => {
       'crash_game_wallet_command_duration_ms_count{command="debit"} 1',
     );
   });
+
+  test("exports auto bet session, placement and failure counters", async () => {
+    const metrics = new GameMetrics();
+
+    metrics.recordAutoBetSessionStarted();
+    metrics.recordAutoBetPlaced();
+    metrics.recordAutoBetFailure("WALLET_REJECTED");
+    metrics.recordAutoBetSessionStopped("MAX_ROUNDS_REACHED");
+
+    const text = await metrics.metricsText();
+
+    expect(text).toContain("crash_auto_bet_sessions_started_total 1");
+    expect(text).toContain("crash_auto_bets_placed_total 1");
+    expect(text).toContain(
+      'crash_auto_bet_failures_total{reason="WALLET_REJECTED"} 1',
+    );
+    expect(text).toContain(
+      'crash_auto_bet_sessions_stopped_total{reason="MAX_ROUNDS_REACHED"} 1',
+    );
+  });
 });

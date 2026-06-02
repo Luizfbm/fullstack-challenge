@@ -76,6 +76,32 @@ export class GameMetrics {
     registers: [this.registry],
   });
 
+  private readonly autoBetSessionsStartedTotal = new Counter({
+    name: "crash_auto_bet_sessions_started_total",
+    help: "Total auto bet sessions started.",
+    registers: [this.registry],
+  });
+
+  private readonly autoBetSessionsStoppedTotal = new Counter({
+    name: "crash_auto_bet_sessions_stopped_total",
+    help: "Total auto bet sessions stopped by reason.",
+    labelNames: ["reason"],
+    registers: [this.registry],
+  });
+
+  private readonly autoBetsPlacedTotal = new Counter({
+    name: "crash_auto_bets_placed_total",
+    help: "Total automatic bets placed.",
+    registers: [this.registry],
+  });
+
+  private readonly autoBetFailuresTotal = new Counter({
+    name: "crash_auto_bet_failures_total",
+    help: "Total auto bet failures by reason.",
+    labelNames: ["reason"],
+    registers: [this.registry],
+  });
+
   private readonly rtpRatio = new Gauge({
     name: "crash_game_rtp_ratio",
     help: "Crash game return to player ratio based on accepted wagers and payouts.",
@@ -143,5 +169,21 @@ export class GameMetrics {
     if (result === "failed") {
       this.walletCommandFailuresTotal.inc({ command });
     }
+  }
+
+  recordAutoBetSessionStarted(): void {
+    this.autoBetSessionsStartedTotal.inc();
+  }
+
+  recordAutoBetSessionStopped(reason: string): void {
+    this.autoBetSessionsStoppedTotal.inc({ reason });
+  }
+
+  recordAutoBetPlaced(): void {
+    this.autoBetsPlacedTotal.inc();
+  }
+
+  recordAutoBetFailure(reason: string): void {
+    this.autoBetFailuresTotal.inc({ reason });
   }
 }
