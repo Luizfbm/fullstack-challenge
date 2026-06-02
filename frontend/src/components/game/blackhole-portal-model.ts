@@ -4,6 +4,8 @@ import { disposeObject } from "./crash-flight-stage";
 
 export const BLACKHOLE_PORTAL_ASSET_PATH =
   "/models/blackhole_pixel_pass_3.glb";
+export const BLACKHOLE_PORTAL_ASSET_ROTATION_X = Math.PI / 2;
+export const BLACKHOLE_PORTAL_ASSET_ROTATION_Z = 0;
 const BLACKHOLE_PORTAL_TARGET_DIAMETER = 2.9;
 
 export type LoadedBlackholePortal = {
@@ -42,7 +44,11 @@ export function createBlackholePortalFallback(): THREE.Group {
 }
 
 export function normalizeBlackholePortalForScene(model: THREE.Object3D) {
-  model.rotation.set(-Math.PI / 2, 0, 0);
+  model.rotation.set(
+    BLACKHOLE_PORTAL_ASSET_ROTATION_X,
+    0,
+    BLACKHOLE_PORTAL_ASSET_ROTATION_Z,
+  );
 
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
@@ -65,7 +71,7 @@ export async function loadBlackholePortalAsset(
 
   group.name = "blackhole-portal-model";
   model.name = "blackhole-portal-glb-model";
-  prepareBlackholePortalMaterials(model);
+  prepareBlackholePortalMaterialsForScene(model);
   normalizeBlackholePortalForScene(model);
 
   if (isCancelled()) {
@@ -122,7 +128,7 @@ export function updateBlackholePortal(
     : input.time * 0.18;
 }
 
-function prepareBlackholePortalMaterials(model: THREE.Object3D) {
+export function prepareBlackholePortalMaterialsForScene(model: THREE.Object3D) {
   model.traverse((child) => {
     if (!(child instanceof THREE.Mesh)) {
       return;
@@ -139,8 +145,18 @@ function prepareBlackholePortalMaterials(model: THREE.Object3D) {
       material.transparent = true;
 
       if (material instanceof THREE.MeshStandardMaterial) {
-        material.emissive = material.color.clone();
-        material.emissiveIntensity = Math.max(material.emissiveIntensity, 0.18);
+        if (material.name.startsWith("Blackhole_")) {
+          material.color.set("#ffffff");
+          material.emissive.set("#ffffff");
+          material.emissiveIntensity = Math.max(material.emissiveIntensity, 1);
+        } else {
+          material.emissive.copy(material.color);
+          material.emissiveIntensity = Math.max(
+            material.emissiveIntensity,
+            0.18,
+          );
+        }
+
         material.roughness = Math.min(material.roughness, 0.46);
       }
     });
