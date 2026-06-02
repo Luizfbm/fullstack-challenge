@@ -23,6 +23,7 @@ import {
   TIME_CAR_RUNNING_ASSET_PATH,
 } from "./time-car-model";
 import { animateTimeCarFire } from "./time-car-fire";
+import { createTimeCarTrail, updateTimeCarTrail } from "./time-car-trail";
 import type { DashboardRound } from "./round-formatting";
 export type { StageAnimationPhase } from "./crash-flight-motion";
 
@@ -91,6 +92,7 @@ export function CrashFlightScene({
     const car = new THREE.Group();
     const parkedCar = createTimeCarModel();
     const runningCar = createTimeCarModel();
+    const trail = createTimeCarTrail();
     const portalRoot = new THREE.Group();
     let portal = createBlackholePortalFallback();
     const wormhole = createWormholeTunnel();
@@ -110,7 +112,7 @@ export function CrashFlightScene({
     portalRoot.name = "blackhole-portal-root";
     portalRoot.add(portal);
     car.add(parkedCar, runningCar);
-    scene.add(stage.group, wormhole.group, portalRoot, car);
+    scene.add(stage.group, wormhole.group, trail.group, portalRoot, car);
     loadTimeCarAsset(parkedCar, TIME_CAR_ASSET_PATH, () => disposed).catch(
       () => {
         if (!disposed) {
@@ -184,6 +186,13 @@ export function CrashFlightScene({
       animateTimeCarFire(runningCar, time, frame.showRunningCar && !reducedMotion);
       car.position.set(...frame.car.position);
       car.rotation.set(...frame.car.rotation);
+      updateTimeCarTrail(trail, {
+        carPosition: frame.car.position,
+        carRotation: frame.car.rotation,
+        reducedMotion,
+        time,
+        trail: frame.trail,
+      });
       portalRoot.position.set(...frame.portal.position);
       portalRoot.rotation.set(
         frame.portal.rotation[0],

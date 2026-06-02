@@ -33,6 +33,7 @@ import {
   TIME_CAR_ASSET_ROTATION_Y,
   TIME_CAR_RUNNING_ASSET_PATH,
 } from "./time-car-model";
+import { createTimeCarTrail, updateTimeCarTrail } from "./time-car-trail";
 
 describe("crash flight scene primitives", () => {
   it("builds a procedural time car without external assets", () => {
@@ -246,6 +247,61 @@ describe("crash flight scene primitives", () => {
     disposeObject(wormhole.group);
   });
 
+  it("builds a procedural time-car trail that shifts from boost to crash flare", () => {
+    const trail = createTimeCarTrail();
+
+    expect(trail.group.name).toBe("time-car-trail");
+    expect(trail.ribbon.name).toBe("time-car-trail-ribbon");
+    expect(trail.particles.name).toBe("time-car-trail-particles");
+    expect(trail.group.visible).toBe(false);
+
+    updateTimeCarTrail(trail, {
+      carPosition: [0.4, 0.2, -1.1],
+      carRotation: [0.1, 0.5, 0.2],
+      reducedMotion: true,
+      time: 2,
+      trail: {
+        intensity: 0.7,
+        length: 2.2,
+        spread: 0.34,
+        tone: "boost",
+        visible: true,
+      },
+    });
+
+    expect(trail.group.visible).toBe(true);
+    expect(trail.group.position.x).toBeCloseTo(0.4);
+    expect(
+      (trail.ribbon.material as THREE.MeshBasicMaterial).color.getHexString(),
+    ).toBe("22d3ee");
+    expect(
+      (trail.ribbon.material as THREE.MeshBasicMaterial).opacity,
+    ).toBeGreaterThan(0.25);
+
+    updateTimeCarTrail(trail, {
+      carPosition: [0.4, 0.2, -1.1],
+      carRotation: [0.1, 0.5, 0.2],
+      reducedMotion: true,
+      time: 3,
+      trail: {
+        intensity: 1,
+        length: 2.5,
+        spread: 0.56,
+        tone: "crash",
+        visible: true,
+      },
+    });
+
+    expect(
+      (trail.ribbon.material as THREE.MeshBasicMaterial).color.getHexString(),
+    ).toBe("fb7185");
+    expect(
+      (trail.particles.material as THREE.PointsMaterial).opacity,
+    ).toBeGreaterThan(0.3);
+
+    disposeObject(trail.group);
+  });
+
   it("uses the fire-detail model only while entering or running", () => {
     expect(usesRunningTimeCarAsset("entering")).toBe(true);
     expect(usesRunningTimeCarAsset("running")).toBe(true);
@@ -300,7 +356,9 @@ describe("crash flight scene primitives", () => {
 
     expect(runningFrame.portalVisible).toBe(false);
     expect(runningFrame.wormholeActive).toBe(true);
-    expect("trailProgress" in runningFrame).toBe(false);
+    expect(runningFrame.trail.visible).toBe(true);
+    expect(runningFrame.trail.tone).toBe("boost");
+    expect(runningFrame.trail.length).toBeGreaterThan(2);
 
     const crashedFrame = getCrashFlightStoryboard({
       cameraAspect: 1.2,
@@ -313,6 +371,8 @@ describe("crash flight scene primitives", () => {
 
     expect(crashedFrame.portalVisible).toBe(false);
     expect(crashedFrame.wormholeActive).toBe(true);
+    expect(crashedFrame.trail.visible).toBe(true);
+    expect(crashedFrame.trail.tone).toBe("crash");
     expect(crashedFrame.redFlashOpacity).toBeGreaterThan(0.18);
     expect("roadOpacity" in crashedFrame).toBe(false);
   });
