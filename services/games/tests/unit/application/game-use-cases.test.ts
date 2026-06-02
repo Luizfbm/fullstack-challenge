@@ -10,6 +10,7 @@ import {
   AutoCashoutMultiplierOutOfRangeError,
   AutoBetSessionActiveError,
   BetAmountOutOfRangeError,
+  ManualBetBlockedByAutoBetError,
   WalletCreditFailedError,
 } from "../../../src/application/game.errors";
 import type {
@@ -1500,6 +1501,65 @@ describe("PlaceBetUseCase", () => {
       20000,
     );
     expect(events.betPlacedEvents[0]?.autoCashoutMultiplierBp).toBe(20000);
+  });
+
+  test("blocks manual bet placement while an auto bet session is active", async () => {
+    const round = openRoundFixture();
+    const repository = new InMemoryGameRepository(round);
+    const walletClient = new FakeWalletClient();
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({ playerId: "player-1", status: "ACTIVE" }),
+    );
+    const useCase = new PlaceBetUseCase(
+      repository,
+      walletClient,
+      new FixedIdGenerator("bet-1"),
+      new FakeRoundEventsPublisher(),
+      undefined,
+      undefined,
+      undefined,
+      autoBetRepository,
+    );
+
+    await expect(
+      useCase.execute({
+        playerId: "player-1",
+        username: "player",
+        amountCents: "1000",
+      }),
+    ).rejects.toThrow(ManualBetBlockedByAutoBetError);
+    expect(walletClient.debits).toHaveLength(0);
+  });
+
+  test("allows auto bet source to reuse place bet while the session is active", async () => {
+    const round = openRoundFixture();
+    const repository = new InMemoryGameRepository(round);
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({ playerId: "player-1", status: "ACTIVE" }),
+    );
+    const useCase = new PlaceBetUseCase(
+      repository,
+      new FakeWalletClient(),
+      new FixedIdGenerator("bet-1"),
+      new FakeRoundEventsPublisher(),
+      undefined,
+      undefined,
+      undefined,
+      autoBetRepository,
+    );
+
+    await expect(
+      useCase.execute({
+        playerId: "player-1",
+        username: "player",
+        amountCents: "1000",
+        source: "AUTO_BET",
+      }),
+    ).resolves.toMatchObject({
+      bet: { status: "ACCEPTED" },
+    });
   });
 
   test("rejects auto cashout targets outside the allowed range", async () => {
