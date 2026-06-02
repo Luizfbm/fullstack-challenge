@@ -62,7 +62,7 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
 
   await page.getByRole("tab", { name: "Mesa" }).click();
   await expect(page.getByText("CASHED_OUT")).toBeVisible();
-  await expectTimeCarAssetLoaded(page);
+  await expectStageAssetsLoaded(page);
   await expectCanvasHasPixels(page);
   await expect(page.getByRole("heading", { name: "Chrono Crash" })).toBeVisible();
   await expect(async () => {
@@ -115,7 +115,7 @@ test("player can use auto cashout preset without manual cashout", async ({
   await expect(
     page.getByText(/CASHOUT_PENDING_CREDIT|CASHED_OUT/).first(),
   ).toBeVisible({ timeout: 20000 });
-  await expectTimeCarAssetLoaded(page);
+  await expectStageAssetsLoaded(page);
   await expectCanvasHasPixels(page);
   await expect(async () => {
     const currentBalance = await readDisplayedBalance(page);
@@ -168,15 +168,24 @@ async function readDisplayedBalance(page: Page): Promise<string> {
   return balance.innerText();
 }
 
-async function expectTimeCarAssetLoaded(page: Page) {
+async function expectStageAssetsLoaded(page: Page) {
+  const requiredAssets = [
+    "/models/time-machine-low-poly.glb",
+    "/models/blackhole_pixel_pass_3.glb",
+  ];
+
   await expect(async () => {
-    const assetLoaded = await page.evaluate(() =>
+    const loadedAssets = await page.evaluate(() =>
       performance
         .getEntriesByType("resource")
-        .some((entry) => entry.name.includes("/models/time-machine-low-poly.glb")),
+        .map((entry) => entry.name),
     );
 
-    expect(assetLoaded).toBe(true);
+    for (const requiredAsset of requiredAssets) {
+      expect(
+        loadedAssets.some((assetName) => assetName.includes(requiredAsset)),
+      ).toBe(true);
+    }
   }).toPass();
 }
 

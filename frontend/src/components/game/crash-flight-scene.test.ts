@@ -4,15 +4,25 @@ import {
   easeInOutCubic,
   easeOutCubic,
   getCameraShake,
+  getPortalVisibilityForPhase,
   getSceneProgress,
   getTargetFov,
+  getWormholeVisibilityForPhase,
   lerp,
   usesRunningTimeCarAsset,
 } from "./crash-flight-motion";
 import { createFlightStage, disposeObject } from "./crash-flight-stage";
 import { animateTimeCarFire } from "./time-car-fire";
 import { createGrowthTrail, updateGrowthTrail } from "./growth-trail";
+import { getCrashFlightStoryboard } from "./crash-flight-storyboard";
 import type { DashboardRound } from "./round-formatting";
+import {
+  BLACKHOLE_PORTAL_ASSET_PATH,
+  createBlackholePortalFallback,
+  normalizeBlackholePortalForScene,
+  updateBlackholePortal,
+} from "./blackhole-portal-model";
+import { createWormholeTunnel, updateWormholeTunnel } from "./wormhole-tunnel";
 import {
   createTimeCarModel,
   normalizeTimeCarAssetForScene,
@@ -39,12 +49,191 @@ describe("crash flight scene primitives", () => {
     );
   });
 
+  it("points the runtime scene at the bundled blackhole portal asset", () => {
+    expect(BLACKHOLE_PORTAL_ASSET_PATH).toBe(
+      "/models/blackhole_pixel_pass_3.glb",
+    );
+  });
+
+  it("builds a procedural blackhole portal fallback", () => {
+    const portal = createBlackholePortalFallback();
+
+    expect(portal.name).toBe("blackhole-portal-fallback");
+    expect(portal.children.length).toBeGreaterThan(2);
+    expect(
+      portal.children.every((child) => child instanceof THREE.Mesh),
+    ).toBe(true);
+
+    disposeObject(portal);
+  });
+
+  it("normalizes a blackhole portal model around the scene origin", () => {
+    const model = new THREE.Group();
+    const marker = new THREE.Mesh(new THREE.BoxGeometry(11, 2.3, 11));
+
+    marker.position.set(4, -0.5, 3);
+    model.add(marker);
+
+    normalizeBlackholePortalForScene(model);
+    model.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+
+    expect(Math.max(size.x, size.z)).toBeCloseTo(2.9, 1);
+    expect(center.x).toBeCloseTo(0, 1);
+    expect(center.z).toBeCloseTo(0, 1);
+  });
+
+  it("updates blackhole portal visibility and scale by phase input", () => {
+    const portal = createBlackholePortalFallback();
+
+    updateBlackholePortal(portal, {
+      crashImpact: 0,
+      entering: false,
+      phaseElapsed: 0,
+      reducedMotion: true,
+      time: 0,
+      visible: false,
+    });
+
+    expect(portal.visible).toBe(false);
+
+    updateBlackholePortal(portal, {
+      crashImpact: 0,
+      entering: true,
+      phaseElapsed: 1.4,
+      reducedMotion: true,
+      time: 1,
+      visible: true,
+    });
+
+    expect(portal.visible).toBe(true);
+    expect(portal.scale.x).toBeGreaterThan(1);
+
+    disposeObject(portal);
+  });
+
+  it("creates and disposes the procedural wormhole tunnel", () => {
+    const wormhole = createWormholeTunnel();
+
+    expect(wormhole.group.name).toBe("wormhole-tunnel");
+    expect(wormhole.group.children.length).toBeGreaterThan(5);
+    expect(wormhole.rings.length).toBe(7);
+    expect(wormhole.streaks.length).toBe(24);
+
+    expect(() => disposeObject(wormhole.group)).not.toThrow();
+  });
+
+  it("shows the wormhole only while running or crashed", () => {
+    const wormhole = createWormholeTunnel();
+
+    updateWormholeTunnel(wormhole, {
+      crashImpact: 0,
+      phase: "betting",
+      progress: 0,
+      reducedMotion: true,
+      time: 0,
+    });
+    expect(wormhole.group.visible).toBe(false);
+
+    updateWormholeTunnel(wormhole, {
+      crashImpact: 0,
+      phase: "running",
+      progress: 0.5,
+      reducedMotion: true,
+      time: 2,
+    });
+    expect(wormhole.group.visible).toBe(true);
+    expect(
+      (wormhole.rings[0].material as THREE.LineBasicMaterial).color.getHexString(),
+    ).toBe("22d3ee");
+
+    updateWormholeTunnel(wormhole, {
+      crashImpact: 0.8,
+      phase: "crashed",
+      progress: 1,
+      reducedMotion: true,
+      time: 3,
+    });
+    expect(wormhole.group.visible).toBe(true);
+    expect(
+      (wormhole.rings[0].material as THREE.LineBasicMaterial).color.getHexString(),
+    ).toBe("fb7185");
+
+    disposeObject(wormhole.group);
+  });
+
   it("uses the fire-detail model only while entering or running", () => {
     expect(usesRunningTimeCarAsset("entering")).toBe(true);
     expect(usesRunningTimeCarAsset("running")).toBe(true);
     expect(usesRunningTimeCarAsset("betting")).toBe(false);
     expect(usesRunningTimeCarAsset("crashed")).toBe(false);
     expect(usesRunningTimeCarAsset("idle")).toBe(false);
+  });
+
+  it("shows the 3D portal only before and during entry", () => {
+    expect(getPortalVisibilityForPhase("idle")).toBe(false);
+    expect(getPortalVisibilityForPhase("betting")).toBe(true);
+    expect(getPortalVisibilityForPhase("entering")).toBe(true);
+    expect(getPortalVisibilityForPhase("running")).toBe(false);
+    expect(getPortalVisibilityForPhase("crashed")).toBe(false);
+  });
+
+  it("shows the procedural wormhole while running and crashed", () => {
+    expect(getWormholeVisibilityForPhase("idle")).toBe(false);
+    expect(getWormholeVisibilityForPhase("betting")).toBe(false);
+    expect(getWormholeVisibilityForPhase("entering")).toBe(false);
+    expect(getWormholeVisibilityForPhase("running")).toBe(true);
+    expect(getWormholeVisibilityForPhase("crashed")).toBe(true);
+  });
+
+  it("calculates portal, wormhole and crash flare storyboard frames", () => {
+    const bettingFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "betting",
+      phaseElapsed: 0,
+      reducedMotion: true,
+      round: { status: "BETTING" } as DashboardRound,
+      time: 0,
+    });
+
+    expect(bettingFrame.portalVisible).toBe(true);
+    expect(bettingFrame.car.position[0]).toBeLessThan(
+      bettingFrame.portal.position[0],
+    );
+    expect(bettingFrame.wormholeActive).toBe(false);
+
+    const runningFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "running",
+      phaseElapsed: 2,
+      reducedMotion: true,
+      round: {
+        currentMultiplierBp: 16000,
+        status: "RUNNING",
+      } as DashboardRound,
+      time: 3,
+    });
+
+    expect(runningFrame.portalVisible).toBe(false);
+    expect(runningFrame.wormholeActive).toBe(true);
+    expect(runningFrame.trailProgress).toBeGreaterThanOrEqual(0.15);
+
+    const crashedFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "crashed",
+      phaseElapsed: 0.2,
+      reducedMotion: true,
+      round: { status: "CRASHED" } as DashboardRound,
+      time: 4,
+    });
+
+    expect(crashedFrame.portalVisible).toBe(false);
+    expect(crashedFrame.wormholeActive).toBe(true);
+    expect(crashedFrame.redFlashOpacity).toBeGreaterThan(0.18);
+    expect(crashedFrame.roadOpacity).toBe(0.28);
   });
 
   it("calculates scene progress and easing helpers for storyboard motion", () => {

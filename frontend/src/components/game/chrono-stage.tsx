@@ -1,11 +1,5 @@
 import { RadioTower, Zap } from "lucide-react";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import {
   CrashFlightScene,
@@ -46,23 +40,6 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
         <div className="black-hole-starfield" />
         <div className="black-hole-speed-lines black-hole-speed-lines-horizontal" />
         <div className="black-hole-speed-lines black-hole-speed-lines-radial" />
-        <div className="black-hole-gate">
-          <div className="black-hole-ring black-hole-ring-outer" />
-          <div className="black-hole-ring black-hole-ring-middle" />
-          <div className="black-hole-ring black-hole-ring-inner" />
-          <div className="black-hole-core" />
-          <div className="black-hole-accretion" />
-          <div className="black-hole-shockwave" />
-        </div>
-        <div className="black-hole-explosion">
-          {Array.from({ length: 18 }, (_, index) => (
-            <span
-              className="black-hole-debris"
-              key={index}
-              style={{ "--debris-index": index } as CSSProperties}
-            />
-          ))}
-        </div>
       </div>
       <CrashFlightScene
         animationPhase={phase}

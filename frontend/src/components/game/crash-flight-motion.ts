@@ -12,6 +12,14 @@ export function usesRunningTimeCarAsset(phase: StageAnimationPhase) {
   return phase === "entering" || phase === "running";
 }
 
+export function getPortalVisibilityForPhase(phase: StageAnimationPhase) {
+  return phase === "betting" || phase === "entering";
+}
+
+export function getWormholeVisibilityForPhase(phase: StageAnimationPhase) {
+  return phase === "running" || phase === "crashed";
+}
+
 export function getSceneProgress(round: DashboardRound | null, now: Date) {
   if (!round) {
     return 0;
