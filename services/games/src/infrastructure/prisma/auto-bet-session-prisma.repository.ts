@@ -97,6 +97,18 @@ export class AutoBetSessionPrismaRepository
     return execution ? toAutoBetRoundExecution(execution) : null;
   }
 
+  async findExecutionByBetId(
+    betId: string,
+  ): Promise<AutoBetRoundExecution | null> {
+    const execution = await this.prisma.autoBetRoundExecution.findFirst({
+      where: {
+        betId,
+      },
+    });
+
+    return execution ? toAutoBetRoundExecution(execution) : null;
+  }
+
   async recordExecution(
     input: NewAutoBetRoundExecution,
   ): Promise<AutoBetRoundExecution> {

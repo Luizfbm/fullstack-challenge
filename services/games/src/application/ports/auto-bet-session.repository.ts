@@ -47,6 +47,7 @@ export interface AutoBetSessionRepository {
     sessionId: string,
     roundId: string,
   ): Promise<AutoBetRoundExecution | null>;
+  findExecutionByBetId(betId: string): Promise<AutoBetRoundExecution | null>;
   recordExecution(
     input: NewAutoBetRoundExecution,
   ): Promise<AutoBetRoundExecution>;
