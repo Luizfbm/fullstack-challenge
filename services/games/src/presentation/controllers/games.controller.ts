@@ -23,24 +23,18 @@ import {
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { CashOutUseCase } from "../../application/use-cases/cash-out.use-case";
-import { GetMyAutoBetSessionUseCase } from "../../application/use-cases/get-my-auto-bet-session.use-case";
 import { GetCurrentRoundUseCase } from "../../application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "../../application/use-cases/list-my-bets.use-case";
 import { ListLeaderboardUseCase } from "../../application/use-cases/list-leaderboard.use-case";
 import { ListRoundHistoryUseCase } from "../../application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "../../application/use-cases/place-bet.use-case";
-import { StartAutoBetSessionUseCase } from "../../application/use-cases/start-auto-bet-session.use-case";
-import { StopAutoBetSessionUseCase } from "../../application/use-cases/stop-auto-bet-session.use-case";
 import { VerifyRoundUseCase } from "../../application/use-cases/verify-round.use-case";
 import { Round } from "../../domain/round";
 import { CurrentUser } from "../../infrastructure/auth/current-user.decorator";
 import type { AuthenticatedUser } from "../../infrastructure/auth/authenticated-user";
 import { KeycloakJwtGuard } from "../../infrastructure/auth/keycloak-jwt.guard";
 import { GameMetrics } from "../../infrastructure/observability/game-metrics";
-import { toAutoBetSessionResponse } from "../auto-bet-session-response.mapper";
 import { BetResponseDto } from "../dtos/bet-response.dto";
-import { StartAutoBetSessionRequestDto } from "../dtos/auto-bet-session-request.dto";
-import { AutoBetSessionResponseDto } from "../dtos/auto-bet-session-response.dto";
 import { HealthCheckResponseDto } from "../dtos/health-check-response.dto";
 import { LeaderboardEntryDto } from "../dtos/leaderboard-response.dto";
 import { PlaceBetRequestDto } from "../dtos/place-bet-request.dto";
@@ -68,9 +62,6 @@ export class GamesController {
     private readonly listLeaderboardUseCase: ListLeaderboardUseCase,
     private readonly placeBetUseCase: PlaceBetUseCase,
     private readonly cashOutUseCase: CashOutUseCase,
-    private readonly startAutoBetSessionUseCase: StartAutoBetSessionUseCase,
-    private readonly getMyAutoBetSessionUseCase: GetMyAutoBetSessionUseCase,
-    private readonly stopAutoBetSessionUseCase: StopAutoBetSessionUseCase,
     private readonly gameMetrics: GameMetrics,
   ) {}
 
@@ -191,69 +182,6 @@ export class GamesController {
     });
 
     return entries.map(toLeaderboardEntryResponse);
-  }
-
-  @Post("auto-bet/sessions")
-  @UseGuards(KeycloakJwtGuard)
-  @ApiBearerAuth()
-  @ApiBody({ type: StartAutoBetSessionRequestDto })
-  @ApiOperation({ summary: "Start an auto bet session for the authenticated player" })
-  @ApiBadRequestResponse({
-    description: "Invalid configuration or active auto bet session already exists",
-  })
-  @ApiCreatedResponse({ type: AutoBetSessionResponseDto })
-  @ApiUnauthorizedResponse({ description: "Missing or invalid bearer token" })
-  async startAutoBetSession(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() body: StartAutoBetSessionRequestDto,
-  ): Promise<AutoBetSessionResponseDto> {
-    try {
-      const session = await this.startAutoBetSessionUseCase.execute({
-        playerId: user.playerId,
-        username: user.username,
-        amountCents: body.amountCents,
-        autoCashoutMultiplierBp: body.autoCashoutMultiplierBp ?? null,
-        maxRounds: body.maxRounds,
-        stopLossCents: body.stopLossCents ?? null,
-        takeProfitCents: body.takeProfitCents ?? null,
-      });
-
-      return toAutoBetSessionResponse(session);
-    } catch (error) {
-      throw toGameHttpError(error);
-    }
-  }
-
-  @Get("auto-bet/sessions/me")
-  @UseGuards(KeycloakJwtGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get the authenticated player's auto bet session" })
-  @ApiOkResponse({ type: AutoBetSessionResponseDto })
-  @ApiUnauthorizedResponse({ description: "Missing or invalid bearer token" })
-  async myAutoBetSession(
-    @CurrentUser() user: AuthenticatedUser,
-  ): Promise<AutoBetSessionResponseDto | null> {
-    const session = await this.getMyAutoBetSessionUseCase.execute({
-      playerId: user.playerId,
-    });
-
-    return session ? toAutoBetSessionResponse(session) : null;
-  }
-
-  @Post("auto-bet/sessions/me/stop")
-  @UseGuards(KeycloakJwtGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Stop the authenticated player's active auto bet session" })
-  @ApiCreatedResponse({ type: AutoBetSessionResponseDto })
-  @ApiUnauthorizedResponse({ description: "Missing or invalid bearer token" })
-  async stopAutoBetSession(
-    @CurrentUser() user: AuthenticatedUser,
-  ): Promise<AutoBetSessionResponseDto | null> {
-    const session = await this.stopAutoBetSessionUseCase.execute({
-      playerId: user.playerId,
-    });
-
-    return session ? toAutoBetSessionResponse(session) : null;
   }
 
   @Post("bet")

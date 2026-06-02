@@ -15,6 +15,7 @@ import {
 import type { AutoBetSession } from "../../src/application/auto-bet/auto-bet-session";
 import { Bet } from "../../src/domain/bet";
 import { Round } from "../../src/domain/round";
+import { AutoBetController } from "../../src/presentation/controllers/auto-bet.controller";
 import { GamesController } from "../../src/presentation/controllers/games.controller";
 
 function openRound(): Round {
@@ -81,6 +82,17 @@ function createController(overrides: Record<string, unknown> = {}): GamesControl
     (overrides.cashOutUseCase ?? {
       execute: async () => ({ bet: acceptedBet(), balanceCents: 101000n }),
     }) as never,
+    (overrides.gameMetrics ?? {
+      contentType: () => "text/plain; version=0.0.4; charset=utf-8",
+      metricsText: async () => "",
+    }) as never,
+  );
+}
+
+function createAutoBetController(
+  overrides: Record<string, unknown> = {},
+): AutoBetController {
+  return new AutoBetController(
     (overrides.startAutoBetSessionUseCase ?? {
       execute: async () => autoBetSessionFixture(),
     }) as never,
@@ -89,10 +101,6 @@ function createController(overrides: Record<string, unknown> = {}): GamesControl
     }) as never,
     (overrides.stopAutoBetSessionUseCase ?? {
       execute: async () => null,
-    }) as never,
-    (overrides.gameMetrics ?? {
-      contentType: () => "text/plain; version=0.0.4; charset=utf-8",
-      metricsText: async () => "",
     }) as never,
   );
 }
@@ -304,7 +312,7 @@ describe("GamesController", () => {
   });
 
   test("starts an auto bet session for the authenticated user", async () => {
-    const controller = createController({
+    const controller = createAutoBetController({
       startAutoBetSessionUseCase: {
         execute: async (input: unknown) => {
           expect(input).toEqual({
@@ -323,7 +331,7 @@ describe("GamesController", () => {
     });
 
     await expect(
-      controller.startAutoBetSession(
+      controller.startSession(
         { playerId: "player-1", username: "player" },
         {
           amountCents: "1000",
@@ -343,7 +351,7 @@ describe("GamesController", () => {
   });
 
   test("gets and idempotently stops the authenticated user's auto bet session", async () => {
-    const controller = createController({
+    const controller = createAutoBetController({
       getMyAutoBetSessionUseCase: {
         execute: async () => autoBetSessionFixture(),
       },
@@ -354,15 +362,15 @@ describe("GamesController", () => {
     });
 
     await expect(
-      controller.myAutoBetSession({ playerId: "player-1", username: "player" }),
+      controller.mySession({ playerId: "player-1", username: "player" }),
     ).resolves.toMatchObject({ id: "auto-session-1", status: "ACTIVE" });
     await expect(
-      controller.stopAutoBetSession({ playerId: "player-1", username: "player" }),
+      controller.stopSession({ playerId: "player-1", username: "player" }),
     ).resolves.toMatchObject({ status: "STOPPED", stopReason: "MANUAL" });
   });
 
   test("maps auto bet errors to bad request responses", async () => {
-    const controller = createController({
+    const controller = createAutoBetController({
       startAutoBetSessionUseCase: {
         execute: async () => {
           throw new AutoBetSessionActiveError();
@@ -371,7 +379,7 @@ describe("GamesController", () => {
     });
 
     await expect(
-      controller.startAutoBetSession(
+      controller.startSession(
         { playerId: "player-1", username: "player" },
         { amountCents: "1000", maxRounds: 3 },
       ),
