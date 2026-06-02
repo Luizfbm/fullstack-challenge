@@ -9,6 +9,7 @@ import type { RoundEventsPublisher } from "../../application/ports/round-events.
 import { GetCurrentRoundUseCase } from "../../application/use-cases/get-current-round.use-case";
 import { Bet } from "../../domain/bet";
 import { Round } from "../../domain/round";
+import { GameMetrics } from "../../infrastructure/observability/game-metrics";
 import {
   BET_CASHED_OUT_EVENT,
   BET_PLACED_EVENT,
@@ -22,6 +23,8 @@ import {
 } from "./round-realtime.events";
 import { RoundRealtimeSerializer } from "./round-realtime.serializer";
 
+type GameMetricsPort = Pick<GameMetrics, "recordWebSocketEvent">;
+
 @WebSocketGateway({
   namespace: GAME_REALTIME_NAMESPACE,
   cors: {
@@ -34,11 +37,15 @@ export class RoundsGateway implements OnGatewayConnection, RoundEventsPublisher 
 
   @WebSocketServer()
   private namespace!: Namespace;
+  private readonly gameMetrics?: GameMetricsPort;
 
   constructor(
     private readonly getCurrentRoundUseCase: GetCurrentRoundUseCase,
     private readonly roundRealtimeSerializer: RoundRealtimeSerializer,
-  ) {}
+    gameMetrics?: GameMetrics,
+  ) {
+    this.gameMetrics = gameMetrics;
+  }
 
   async handleConnection(client: Socket): Promise<void> {
     try {
@@ -48,6 +55,7 @@ export class RoundsGateway implements OnGatewayConnection, RoundEventsPublisher 
         ROUND_SNAPSHOT_EVENT,
         this.roundRealtimeSerializer.toSnapshotPayload(round),
       );
+      this.recordWebSocketEvent(ROUND_SNAPSHOT_EVENT);
     } catch (error) {
       this.logger.error(
         error instanceof Error
@@ -98,6 +106,7 @@ export class RoundsGateway implements OnGatewayConnection, RoundEventsPublisher 
         event,
         this.roundRealtimeSerializer.toLifecyclePayload(round),
       );
+      this.recordWebSocketEvent(event);
     } catch (error) {
       this.logger.error(
         error instanceof Error
@@ -117,12 +126,21 @@ export class RoundsGateway implements OnGatewayConnection, RoundEventsPublisher 
         event,
         this.roundRealtimeSerializer.toBetRealtimePayload(bet),
       );
+      this.recordWebSocketEvent(event);
     } catch (error) {
       this.logger.error(
         error instanceof Error
           ? error.message
           : "Bet realtime event publishing failed",
       );
+    }
+  }
+
+  private recordWebSocketEvent(event: string): void {
+    try {
+      this.gameMetrics?.recordWebSocketEvent(event);
+    } catch {
+      // Metrics are best-effort and must not alter realtime delivery.
     }
   }
 }

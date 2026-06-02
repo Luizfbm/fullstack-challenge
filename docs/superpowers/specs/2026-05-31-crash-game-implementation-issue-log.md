@@ -922,6 +922,47 @@ Cada entrada deve conter:
   `269` linhas e sem falhas.
 - Status: resolvido.
 
+### 54. Healthcheck de observabilidade encontrou stack local desatualizada
+
+- Contexto: Task 8 do bonus Observabilidade, ao validar o novo script
+  `scripts/ci/check-observability-health.ts` e o E2E
+  `services/games/tests/e2e/observability.e2e.test.ts`.
+- Sintoma: `bun scripts/ci/check-observability-health.ts` falhou em
+  `http://localhost:8000/games/metrics` com `404 Not Found` e body
+  `{"message":"Cannot GET /metrics","error":"Not Found","statusCode":404}`.
+  O E2E de observabilidade tambem chegou ao cashout, mas falhou aguardando a
+  mesma rota `/games/metrics`.
+- Causa: a stack local ainda estava com containers/Kong da configuracao
+  anterior, sem as novas rotas publicas `/games/metrics` e `/wallets/metrics`
+  nem os servicos Prometheus, Grafana e Jaeger recriados.
+- Correcao: recriar a stack completa com `docker compose up -d --build` antes
+  da validacao final de observabilidade, garantindo que Kong, Games, Wallets e
+  os servicos de observabilidade usem a configuracao atual.
+- Validacao: `docker compose up -d --build` recriou a stack com
+  Prometheus, Grafana, Jaeger e OpenTelemetry Collector; `bun
+  scripts/ci/check-observability-health.ts` passou; `cd services/games && bun
+  test tests/e2e/observability.e2e.test.ts` passou dentro do E2E completo.
+- Status: resolvido.
+
+### 55. Pull inicial das imagens de observabilidade ficou sem progresso
+
+- Contexto: Task 10 do bonus Observabilidade, durante o primeiro
+  `docker compose up -d --build` com Prometheus, Grafana, Jaeger e
+  OpenTelemetry Collector.
+- Sintoma: o comando ficou mais de seis minutos em `Pulling` para as imagens
+  de observabilidade sem baixar camadas nem criar imagens locais. Tentativas
+  sequenciais com `docker pull prom/prometheus:v3.0.1` e com imagem equivalente
+  do Quay tambem ficaram sem progresso visivel.
+- Causa: o cliente/daemon Docker local entrou em estado travado no caminho de
+  pull. A conectividade HTTP com Docker Hub e Quay respondia, indicando que o
+  problema nao era indisponibilidade de rede externa.
+- Correcao: encerrar os clientes `docker compose`/`docker pull` travados e
+  reiniciar o Docker Desktop com `docker desktop restart`.
+- Validacao: apos o restart, `docker pull prom/prometheus:v3.0.1` concluiu, e
+  `docker compose up -d --build` puxou as imagens restantes, buildou
+  `games`, `wallets` e `frontend`, e subiu a stack completa.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`

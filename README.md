@@ -278,6 +278,23 @@ bun run docker:down    # Para os containers
 bun run docker:prune   # Remove tudo (containers, volumes, imagens)
 ```
 
+### Observabilidade
+
+Com a stack Docker ativa:
+
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001` (`admin` / `admin`)
+- Jaeger: `http://localhost:16686`
+- Game metrics via Kong: `http://localhost:8000/games/metrics`
+- Wallet metrics via Kong: `http://localhost:8000/wallets/metrics`
+
+O dashboard `Crash Game Observability` mostra volume de apostas, total
+apostado, payouts, cashouts, crashes por faixa, RTP aproximado, latencia dos
+comandos RabbitMQ e eventos WebSocket.
+
+As rotas `/metrics` ficam publicas para demonstracao local do desafio. Elas nao
+devem expor tokens, secrets, URLs de banco ou dados sensiveis de jogadores.
+
 ---
 
 ## Estrutura do Projeto 📁

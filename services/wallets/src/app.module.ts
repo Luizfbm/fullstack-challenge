@@ -10,6 +10,7 @@ import { DebitWalletUseCase } from "./application/use-cases/debit-wallet.use-cas
 import { GetWalletUseCase } from "./application/use-cases/get-wallet.use-case";
 import { RabbitMqWalletServer } from "./infrastructure/messaging/rabbitmq-wallet-server";
 import { WalletCommandHandler } from "./infrastructure/messaging/wallet-command-handler";
+import { WalletMetrics } from "./infrastructure/observability/wallet-metrics";
 import { WalletPrismaRepository } from "./infrastructure/prisma/wallet-prisma.repository";
 import { DevelopmentWalletSeeder } from "./infrastructure/seed/development-wallet-seeder";
 import { prismaClient } from "./infrastructure/prisma/prisma-client";
@@ -18,6 +19,7 @@ import { randomUUID } from "node:crypto";
 @Module({
   controllers: [WalletsController],
   providers: [
+    WalletMetrics,
     {
       provide: WALLET_REPOSITORY,
       useFactory: (): WalletRepository =>
@@ -52,9 +54,14 @@ import { randomUUID } from "node:crypto";
       useFactory: (
         debitWalletUseCase: DebitWalletUseCase,
         creditWalletUseCase: CreditWalletUseCase,
+        walletMetrics: WalletMetrics,
       ): WalletCommandHandler =>
-        new WalletCommandHandler(debitWalletUseCase, creditWalletUseCase),
-      inject: [DebitWalletUseCase, CreditWalletUseCase],
+        new WalletCommandHandler(
+          debitWalletUseCase,
+          creditWalletUseCase,
+          walletMetrics,
+        ),
+      inject: [DebitWalletUseCase, CreditWalletUseCase, WalletMetrics],
     },
     {
       provide: RabbitMqWalletServer,

@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -24,6 +33,7 @@ import { Round } from "../../domain/round";
 import { CurrentUser } from "../../infrastructure/auth/current-user.decorator";
 import type { AuthenticatedUser } from "../../infrastructure/auth/authenticated-user";
 import { KeycloakJwtGuard } from "../../infrastructure/auth/keycloak-jwt.guard";
+import { GameMetrics } from "../../infrastructure/observability/game-metrics";
 import { BetResponseDto } from "../dtos/bet-response.dto";
 import { HealthCheckResponseDto } from "../dtos/health-check-response.dto";
 import { LeaderboardEntryDto } from "../dtos/leaderboard-response.dto";
@@ -52,6 +62,7 @@ export class GamesController {
     private readonly listLeaderboardUseCase: ListLeaderboardUseCase,
     private readonly placeBetUseCase: PlaceBetUseCase,
     private readonly cashOutUseCase: CashOutUseCase,
+    private readonly gameMetrics: GameMetrics,
   ) {}
 
   @Get("health")
@@ -59,6 +70,13 @@ export class GamesController {
   @ApiOkResponse({ type: HealthCheckResponseDto })
   check(): HealthCheckResponseDto {
     return { status: "ok", service: "games" };
+  }
+
+  @Get("metrics")
+  @Header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+  @ApiOperation({ summary: "Expose Game Service Prometheus metrics" })
+  async metrics(): Promise<string> {
+    return this.gameMetrics.metricsText();
   }
 
   @Get("rounds/current")

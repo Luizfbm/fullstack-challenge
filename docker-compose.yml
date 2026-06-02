@@ -120,6 +120,10 @@ services:
       GAME_CLIENT_SEED: crash-game-client-seed
       ROUND_BETTING_WINDOW_MS: 10000
       ROUND_LIFECYCLE_INTERVAL_MS: 500
+      OTEL_SERVICE_NAME: games
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: "none"
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,6 +154,10 @@ services:
       KEYCLOAK_CLIENT_ID: crash-game-client
       SEED_PLAYER_ID: 9fbd6f4e-4d5e-4e45-9ce0-91f35b72324f
       INITIAL_WALLET_BALANCE_CENTS: 100000
+      OTEL_SERVICE_NAME: wallets
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: "none"
     depends_on:
       postgres:
         condition: service_healthy
@@ -182,6 +190,57 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Observability
+  # ---------------------------------------------------------------------------
+  jaeger:
+    image: jaegertracing/jaeger:latest
+    ports:
+      - "16686:16686"
+    expose:
+      - "4317"
+      - "4318"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    command: ["--config=/etc/otel-collector/config.yml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+    volumes:
+      - ./docker/otel-collector/config.yml:/etc/otel-collector/config.yml:ro
+    depends_on:
+      - jaeger
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      games:
+        condition: service_healthy
+      wallets:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
 
 volumes:
   postgres_data:

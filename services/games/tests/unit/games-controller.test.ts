@@ -55,6 +55,10 @@ function createController(overrides: Record<string, unknown> = {}): GamesControl
     (overrides.cashOutUseCase ?? {
       execute: async () => ({ bet: acceptedBet(), balanceCents: 101000n }),
     }) as never,
+    (overrides.gameMetrics ?? {
+      contentType: () => "text/plain; version=0.0.4; charset=utf-8",
+      metricsText: async () => "",
+    }) as never,
   );
 }
 
@@ -63,6 +67,18 @@ describe("GamesController", () => {
     const controller = createController();
 
     expect(controller.check()).toEqual({ status: "ok", service: "games" });
+  });
+
+  test("returns game metrics in Prometheus text format", async () => {
+    const metrics = {
+      contentType: () => "text/plain; version=0.0.4; charset=utf-8",
+      metricsText: async () => "# HELP crash_game_bets_total Total bets\n",
+    };
+    const controller = createController({ gameMetrics: metrics });
+
+    await expect(controller.metrics()).resolves.toBe(
+      "# HELP crash_game_bets_total Total bets\n",
+    );
   });
 
   test("serializes the current round", async () => {

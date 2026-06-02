@@ -11,6 +11,7 @@ import {
   WalletOperationInput,
   WalletOperationResult,
 } from "../../application/ports/wallet.client";
+import type { GameMetrics } from "../observability/game-metrics";
 
 const WALLET_COMMAND_QUEUE = "wallet.commands";
 const DEFAULT_TIMEOUT_MS = 2000;
@@ -37,6 +38,8 @@ type PendingRequest = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
+type GameMetricsPort = Pick<GameMetrics, "recordWalletCommand">;
+
 export class RabbitMqWalletClient
   implements WalletClient, OnModuleInit, OnModuleDestroy
 {
@@ -50,6 +53,7 @@ export class RabbitMqWalletClient
     private readonly rabbitMqUrl: string,
     private readonly queueName = WALLET_COMMAND_QUEUE,
     private readonly timeoutMs = DEFAULT_TIMEOUT_MS,
+    private readonly gameMetrics?: GameMetricsPort,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -79,49 +83,88 @@ export class RabbitMqWalletClient
     pattern: "wallet.debit" | "wallet.credit",
     input: WalletOperationInput,
   ): Promise<WalletOperationResult> {
-    await this.ensureConnected();
+    const startedAt = performance.now();
+    const command = pattern === "wallet.debit" ? "debit" : "credit";
+    let recorded = false;
+    const recordWalletCommand = (result: "succeeded" | "failed"): void => {
+      if (recorded) {
+        return;
+      }
 
-    const channel = this.channel;
-    const replyQueueName = this.replyQueueName;
-
-    if (!channel || !replyQueueName) {
-      throw new Error("Wallet RPC client is not connected");
-    }
-
-    const correlationId = randomUUID();
-    const payload = {
-      pattern,
-      data: {
-        ...input,
-        amountCents: input.amountCents.toString(),
-      },
+      recorded = true;
+      try {
+        this.gameMetrics?.recordWalletCommand(
+          command,
+          performance.now() - startedAt,
+          result,
+        );
+      } catch {
+        // Metrics are best-effort and must not alter wallet RPC behavior.
+      }
     };
 
-    return new Promise<WalletOperationResult>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pending.delete(correlationId);
-        reject(new WalletOperationTimedOutError(this.timeoutMs));
-      }, this.timeoutMs);
+    try {
+      await this.ensureConnected();
 
-      this.pending.set(correlationId, { resolve, reject, timeout });
+      const channel = this.channel;
+      const replyQueueName = this.replyQueueName;
 
-      try {
-        channel.sendToQueue(
-          this.queueName,
-          Buffer.from(JSON.stringify(payload)),
-          {
-            correlationId,
-            replyTo: replyQueueName,
-            contentType: "application/json",
-            persistent: true,
-          },
-        );
-      } catch (error) {
-        clearTimeout(timeout);
-        this.pending.delete(correlationId);
-        reject(error instanceof Error ? error : new Error("Wallet RPC failed"));
+      if (!channel || !replyQueueName) {
+        throw new Error("Wallet RPC client is not connected");
       }
-    });
+
+      const correlationId = randomUUID();
+      const payload = {
+        pattern,
+        data: {
+          ...input,
+          amountCents: input.amountCents.toString(),
+        },
+      };
+
+      return await new Promise<WalletOperationResult>((resolve, reject) => {
+        const resolveWithMetrics = (result: WalletOperationResult): void => {
+          recordWalletCommand("succeeded");
+          resolve(result);
+        };
+        const rejectWithMetrics = (error: Error): void => {
+          recordWalletCommand("failed");
+          reject(error);
+        };
+        const timeout = setTimeout(() => {
+          this.pending.delete(correlationId);
+          rejectWithMetrics(new WalletOperationTimedOutError(this.timeoutMs));
+        }, this.timeoutMs);
+
+        this.pending.set(correlationId, {
+          resolve: resolveWithMetrics,
+          reject: rejectWithMetrics,
+          timeout,
+        });
+
+        try {
+          channel.sendToQueue(
+            this.queueName,
+            Buffer.from(JSON.stringify(payload)),
+            {
+              correlationId,
+              replyTo: replyQueueName,
+              contentType: "application/json",
+              persistent: true,
+            },
+          );
+        } catch (error) {
+          clearTimeout(timeout);
+          this.pending.delete(correlationId);
+          rejectWithMetrics(
+            error instanceof Error ? error : new Error("Wallet RPC failed"),
+          );
+        }
+      });
+    } catch (error) {
+      recordWalletCommand("failed");
+      throw error;
+    }
   }
 
   private async ensureConnected(): Promise<void> {
