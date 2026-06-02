@@ -1,5 +1,9 @@
 import { Module } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
+import {
+  AUTO_BET_SESSION_REPOSITORY,
+  AutoBetSessionRepository,
+} from "./application/ports/auto-bet-session.repository";
 import { CLOCK, Clock } from "./application/ports/clock";
 import {
   GAME_REPOSITORY,
@@ -21,11 +25,14 @@ import {
 import { CashOutUseCase } from "./application/use-cases/cash-out.use-case";
 import { AdvanceRoundLifecycleUseCase } from "./application/use-cases/advance-round-lifecycle.use-case";
 import { CashoutCreditService } from "./application/services/cashout-credit.service";
+import { GetMyAutoBetSessionUseCase } from "./application/use-cases/get-my-auto-bet-session.use-case";
 import { GetCurrentRoundUseCase } from "./application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "./application/use-cases/list-my-bets.use-case";
 import { ListLeaderboardUseCase } from "./application/use-cases/list-leaderboard.use-case";
 import { ListRoundHistoryUseCase } from "./application/use-cases/list-round-history.use-case";
 import { PlaceBetUseCase } from "./application/use-cases/place-bet.use-case";
+import { StartAutoBetSessionUseCase } from "./application/use-cases/start-auto-bet-session.use-case";
+import { StopAutoBetSessionUseCase } from "./application/use-cases/stop-auto-bet-session.use-case";
 import { VerifyRoundUseCase } from "./application/use-cases/verify-round.use-case";
 import { RoundLifecycleRunner } from "./infrastructure/lifecycle/round-lifecycle-runner";
 import { RabbitMqWalletClient } from "./infrastructure/messaging/rabbitmq-wallet.client";
@@ -33,6 +40,7 @@ import { WalletOutboxDispatcher } from "./infrastructure/messaging/wallet-outbox
 import { GameMetrics } from "./infrastructure/observability/game-metrics";
 import { cashoutCreditServiceProvider } from "./infrastructure/providers/cashout-credit-service.provider";
 import { HashChainRoundSeedProvider } from "./infrastructure/provably-fair/hash-chain-round-seed-provider";
+import { AutoBetSessionPrismaRepository } from "./infrastructure/prisma/auto-bet-session-prisma.repository";
 import { GamePrismaRepository } from "./infrastructure/prisma/game-prisma.repository";
 import { prismaClient } from "./infrastructure/prisma/prisma-client";
 import { WalletOutboxPrismaRepository } from "./infrastructure/prisma/wallet-outbox-prisma.repository";
@@ -49,6 +57,11 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
     {
       provide: GAME_REPOSITORY,
       useFactory: (): GameRepository => new GamePrismaRepository(prismaClient),
+    },
+    {
+      provide: AUTO_BET_SESSION_REPOSITORY,
+      useFactory: (): AutoBetSessionRepository =>
+        new AutoBetSessionPrismaRepository(prismaClient),
     },
     {
       provide: RabbitMqWalletClient,
@@ -193,6 +206,36 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
       ): ListLeaderboardUseCase =>
         new ListLeaderboardUseCase(gameRepository, clock),
       inject: [GAME_REPOSITORY, CLOCK],
+    },
+    {
+      provide: StartAutoBetSessionUseCase,
+      useFactory: (
+        gameRepository: GameRepository,
+        autoBetSessionRepository: AutoBetSessionRepository,
+        idGenerator: IdGenerator,
+      ): StartAutoBetSessionUseCase =>
+        new StartAutoBetSessionUseCase(
+          gameRepository,
+          autoBetSessionRepository,
+          idGenerator,
+        ),
+      inject: [GAME_REPOSITORY, AUTO_BET_SESSION_REPOSITORY, ID_GENERATOR],
+    },
+    {
+      provide: GetMyAutoBetSessionUseCase,
+      useFactory: (
+        autoBetSessionRepository: AutoBetSessionRepository,
+      ): GetMyAutoBetSessionUseCase =>
+        new GetMyAutoBetSessionUseCase(autoBetSessionRepository),
+      inject: [AUTO_BET_SESSION_REPOSITORY],
+    },
+    {
+      provide: StopAutoBetSessionUseCase,
+      useFactory: (
+        autoBetSessionRepository: AutoBetSessionRepository,
+      ): StopAutoBetSessionUseCase =>
+        new StopAutoBetSessionUseCase(autoBetSessionRepository),
+      inject: [AUTO_BET_SESSION_REPOSITORY],
     },
     {
       provide: PlaceBetUseCase,
