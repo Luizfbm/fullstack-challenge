@@ -43,6 +43,7 @@ import type {
 import { CashoutCreditService } from "../../../src/application/services/cashout-credit.service";
 import { AdvanceRoundLifecycleUseCase } from "../../../src/application/use-cases/advance-round-lifecycle.use-case";
 import { CashOutUseCase } from "../../../src/application/use-cases/cash-out.use-case";
+import { ExecuteAutoBetsForRoundUseCase } from "../../../src/application/use-cases/execute-auto-bets-for-round.use-case";
 import { GetMyAutoBetSessionUseCase } from "../../../src/application/use-cases/get-my-auto-bet-session.use-case";
 import { GetCurrentRoundUseCase } from "../../../src/application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "../../../src/application/use-cases/list-my-bets.use-case";
@@ -1363,6 +1364,64 @@ describe("AutoBetSession use cases", () => {
       status: "STOPPED",
       stopReason: "MANUAL",
     });
+  });
+
+  test("auto bet executor skips the activation round and bets once on the next round", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    const firstRound = openRoundFixture({ id: "round-1", chainIndex: 1 });
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        playerId: "player-1",
+        startsAfterRoundId: "round-1",
+        status: "ACTIVE",
+      }),
+    );
+    const placeBetUseCase = {
+      calls: [] as unknown[],
+      execute: async (input: unknown) => {
+        placeBetUseCase.calls.push(input);
+
+        return {
+          balanceCents: 99000n,
+          bet: acceptedBetFixture({ id: "bet-1", roundId: "round-2" }),
+        };
+      },
+    };
+    const executor = new ExecuteAutoBetsForRoundUseCase(
+      autoBetRepository,
+      placeBetUseCase,
+      new SequenceIdGenerator(["execution-1"]),
+    );
+
+    await executor.execute({ round: firstRound });
+    expect(placeBetUseCase.calls).toHaveLength(0);
+
+    await executor.execute({
+      round: openRoundFixture({ id: "round-2", chainIndex: 2 }),
+    });
+    await executor.execute({
+      round: openRoundFixture({ id: "round-2", chainIndex: 2 }),
+    });
+
+    expect(placeBetUseCase.calls).toEqual([
+      {
+        amountCents: 1000n,
+        autoCashoutMultiplierBp: null,
+        playerId: "player-1",
+        source: "AUTO_BET",
+        username: "player",
+      },
+    ]);
+    expect(autoBetRepository.executions).toMatchObject([
+      {
+        betId: "bet-1",
+        roundId: "round-2",
+        sessionId: "auto-session-1",
+        status: "BET_PLACED",
+      },
+    ]);
+    expect(autoBetRepository.sessions[0]?.roundsPlayed).toBe(1);
   });
 });
 

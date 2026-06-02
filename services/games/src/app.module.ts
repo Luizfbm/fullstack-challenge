@@ -25,6 +25,7 @@ import {
 import { CashOutUseCase } from "./application/use-cases/cash-out.use-case";
 import { AdvanceRoundLifecycleUseCase } from "./application/use-cases/advance-round-lifecycle.use-case";
 import { CashoutCreditService } from "./application/services/cashout-credit.service";
+import { ExecuteAutoBetsForRoundUseCase } from "./application/use-cases/execute-auto-bets-for-round.use-case";
 import { GetMyAutoBetSessionUseCase } from "./application/use-cases/get-my-auto-bet-session.use-case";
 import { GetCurrentRoundUseCase } from "./application/use-cases/get-current-round.use-case";
 import { ListMyBetsUseCase } from "./application/use-cases/list-my-bets.use-case";
@@ -128,6 +129,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         roundEventsPublisher: RoundEventsPublisher,
         gameMetrics: GameMetrics,
         cashoutCreditService: CashoutCreditService,
+        executeAutoBetsForRoundUseCase: ExecuteAutoBetsForRoundUseCase,
       ): AdvanceRoundLifecycleUseCase =>
         new AdvanceRoundLifecycleUseCase(
           gameRepository,
@@ -141,6 +143,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
           roundEventsPublisher,
           gameMetrics,
           cashoutCreditService,
+          executeAutoBetsForRoundUseCase,
         ),
       inject: [
         GAME_REPOSITORY,
@@ -151,6 +154,7 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
         ROUND_EVENTS_PUBLISHER,
         GameMetrics,
         CashoutCreditService,
+        ExecuteAutoBetsForRoundUseCase,
       ],
     },
     {
@@ -236,6 +240,24 @@ const DEFAULT_HASH_CHAIN_ROOT_SEED =
       ): StopAutoBetSessionUseCase =>
         new StopAutoBetSessionUseCase(autoBetSessionRepository),
       inject: [AUTO_BET_SESSION_REPOSITORY],
+    },
+    {
+      provide: ExecuteAutoBetsForRoundUseCase,
+      useFactory: (
+        autoBetSessionRepository: AutoBetSessionRepository,
+        placeBetUseCase: PlaceBetUseCase,
+        idGenerator: IdGenerator,
+      ): ExecuteAutoBetsForRoundUseCase =>
+        new ExecuteAutoBetsForRoundUseCase(
+          autoBetSessionRepository,
+          placeBetUseCase,
+          idGenerator,
+        ),
+      inject: [
+        AUTO_BET_SESSION_REPOSITORY,
+        PlaceBetUseCase,
+        ID_GENERATOR,
+      ],
     },
     {
       provide: PlaceBetUseCase,
