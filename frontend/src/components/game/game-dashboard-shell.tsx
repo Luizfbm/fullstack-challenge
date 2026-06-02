@@ -19,6 +19,7 @@ import {
   ArcadeTechnicalTabs,
   type ArcadeTab,
 } from "./arcade-technical-tabs";
+import { RoundHistoryPanel } from "./arcade-tab-panels";
 import { BetControlsPanel } from "./bet-controls-panel";
 import { CrashRoundPanel } from "./crash-round-panel";
 import { getRoundBets } from "./game-dashboard-view-model";
@@ -120,7 +121,12 @@ export function GameDashboardShell() {
           {errorMessage ? <AuthError message={errorMessage} /> : null}
           {apiError ? <AuthError message={getApiErrorMessage(apiError)} /> : null}
 
-          <main className="min-w-0">
+          <main className="min-w-0 space-y-3">
+            <RoundHistoryPanel
+              history={historyQuery.data ?? []}
+              isLoading={historyQuery.isLoading}
+            />
+
             <CrashRoundPanel
               connectionStatus={realtime.connectionStatus}
               isLoading={currentRoundQuery.isLoading}
@@ -140,8 +146,6 @@ export function GameDashboardShell() {
           <ArcadeTechnicalTabs
             activeTab={activeTab}
             bets={roundBets}
-            history={historyQuery.data ?? []}
-            historyIsLoading={historyQuery.isLoading}
             now={now}
             onTabChange={setActiveTab}
             round={currentRound}

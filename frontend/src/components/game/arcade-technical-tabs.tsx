@@ -1,12 +1,12 @@
-import { Clock3, History, ShieldCheck, Table2 } from "lucide-react";
+import { Clock3, ShieldCheck, Table2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import {
   getCrashCurveFormula,
   getCrashCurveHumanRate,
 } from "../../services/crash-curve";
-import type { BetResponse, RoundResponse } from "../../services/game-api";
+import type { BetResponse } from "../../services/game-api";
 import { getRoundTimerLabel } from "../../services/round-timing";
-import { BetsPanel, RoundHistoryPanel } from "./arcade-tab-panels";
+import { BetsPanel } from "./arcade-tab-panels";
 import {
   type DashboardRound,
   formatRoundMultiplier,
@@ -14,13 +14,11 @@ import {
   truncateHash,
 } from "./round-formatting";
 
-export type ArcadeTab = "history" | "proof" | "state" | "table";
+export type ArcadeTab = "proof" | "state" | "table";
 
 export function ArcadeTechnicalTabs({
   activeTab,
   bets,
-  history,
-  historyIsLoading,
   now,
   onTabChange,
   round,
@@ -28,8 +26,6 @@ export function ArcadeTechnicalTabs({
 }: {
   activeTab: ArcadeTab;
   bets: BetResponse[];
-  history: RoundResponse[];
-  historyIsLoading: boolean;
   now: Date;
   onTabChange: (tab: ArcadeTab) => void;
   round: DashboardRound | null;
@@ -42,7 +38,6 @@ export function ArcadeTechnicalTabs({
   }> = [
     { icon: ShieldCheck, id: "proof", label: "Provably Fair" },
     { icon: Clock3, id: "state", label: "Round State" },
-    { icon: History, id: "history", label: "Histórico" },
     { icon: Table2, id: "table", label: "Mesa" },
   ];
 
@@ -50,7 +45,7 @@ export function ArcadeTechnicalTabs({
     <section className="casino-tabs rounded-xl border border-white/10 p-3">
       <div
         aria-label="Evidências técnicas"
-        className="grid grid-cols-2 gap-2 lg:grid-cols-4"
+        className="grid grid-cols-1 gap-2 sm:grid-cols-3"
         role="tablist"
       >
         {tabs.map((tab) => (
@@ -77,9 +72,6 @@ export function ArcadeTechnicalTabs({
         {activeTab === "proof" ? <ProofPanel round={round} /> : null}
         {activeTab === "state" ? (
           <StatePanel isLoading={roundIsLoading} now={now} round={round} />
-        ) : null}
-        {activeTab === "history" ? (
-          <RoundHistoryPanel history={history} isLoading={historyIsLoading} />
         ) : null}
         {activeTab === "table" ? (
           <BetsPanel bets={bets} isLoading={roundIsLoading} />
