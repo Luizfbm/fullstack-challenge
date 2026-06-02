@@ -1,6 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import type {
   AutoBetSessionStatus,
+  AutoBetStrategy,
   AutoBetStopReason,
 } from "../../application/auto-bet/auto-bet-session";
 
@@ -17,8 +18,14 @@ export class AutoBetSessionResponseDto {
   @ApiProperty({ enum: ["ACTIVE", "STOPPED"] })
   status!: AutoBetSessionStatus;
 
+  @ApiProperty({ enum: ["FIXED", "MARTINGALE"] })
+  strategy!: AutoBetStrategy;
+
   @ApiProperty({ example: "1000" })
   amountCents!: string;
+
+  @ApiProperty({ example: "2000" })
+  nextAmountCents!: string;
 
   @ApiProperty({ example: 20000, nullable: true })
   autoCashoutMultiplierBp!: number | null;
@@ -28,6 +35,15 @@ export class AutoBetSessionResponseDto {
 
   @ApiProperty({ example: 3 })
   roundsPlayed!: number;
+
+  @ApiProperty({ example: 2 })
+  martingaleMultiplier!: number;
+
+  @ApiProperty({ example: 3 })
+  martingaleMaxSteps!: number;
+
+  @ApiProperty({ example: 1 })
+  martingaleCurrentStep!: number;
 
   @ApiProperty({ example: "500" })
   netProfitCents!: string;
@@ -44,6 +60,8 @@ export class AutoBetSessionResponseDto {
       "MAX_ROUNDS_REACHED",
       "STOP_LOSS_REACHED",
       "TAKE_PROFIT_REACHED",
+      "MARTINGALE_MAX_STEPS_REACHED",
+      "MARTINGALE_BET_LIMIT_REACHED",
       "WALLET_REJECTED",
       "WALLET_UNAVAILABLE",
       "ROUND_NOT_AVAILABLE",

@@ -19,6 +19,7 @@ import type {
   NewAutoBetRoundExecution,
   NewAutoBetSession,
   StopAutoBetSessionInput,
+  UpdateAutoBetProgressionInput,
 } from "../../../src/application/ports/auto-bet-session.repository";
 import { Clock } from "../../../src/application/ports/clock";
 import {
@@ -392,6 +393,23 @@ class FakeAutoBetSessionRepository implements AutoBetSessionRepository {
 
     return session;
   }
+
+  async updateProgression(
+    input: UpdateAutoBetProgressionInput,
+  ): Promise<AutoBetSession> {
+    const session = this.sessions.find(
+      (candidate) => candidate.id === input.sessionId,
+    );
+
+    if (!session) {
+      throw new Error(`Session not found: ${input.sessionId}`);
+    }
+
+    session.nextAmountCents = input.nextAmountCents;
+    session.martingaleCurrentStep = input.martingaleCurrentStep;
+
+    return session;
+  }
 }
 
 class FakeWalletOutboxDispatcher {
@@ -643,10 +661,15 @@ function autoBetSessionFixture(
     playerId: "player-1",
     username: "player",
     status: "ACTIVE",
+    strategy: "FIXED",
     amountCents: 1000n,
+    nextAmountCents: 1000n,
     autoCashoutMultiplierBp: null,
     maxRounds: 3,
     roundsPlayed: 0,
+    martingaleMultiplier: 2,
+    martingaleMaxSteps: 0,
+    martingaleCurrentStep: 0,
     netProfitCents: 0n,
     stopLossCents: null,
     takeProfitCents: null,
@@ -1321,6 +1344,35 @@ describe("AutoBetSession use cases", () => {
     });
   });
 
+  test("starts a martingale auto bet session with the base stake as next amount", async () => {
+    const gameRepository = new InMemoryGameRepository(openRoundFixture());
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    const useCase = new StartAutoBetSessionUseCase(
+      gameRepository,
+      autoBetRepository,
+      new SequenceIdGenerator(["auto-session-1"]),
+    );
+
+    await expect(
+      useCase.execute({
+        amountCents: "1000",
+        martingaleMaxSteps: 3,
+        martingaleMultiplier: 2,
+        maxRounds: 10,
+        playerId: "player-1",
+        strategy: "MARTINGALE",
+        username: "player",
+      }),
+    ).resolves.toMatchObject({
+      amountCents: 1000n,
+      martingaleCurrentStep: 0,
+      martingaleMaxSteps: 3,
+      martingaleMultiplier: 2,
+      nextAmountCents: 1000n,
+      strategy: "MARTINGALE",
+    });
+  });
+
   test("rejects a second active auto bet session for the same player", async () => {
     const gameRepository = new InMemoryGameRepository(openRoundFixture());
     const autoBetRepository = new FakeAutoBetSessionRepository();
@@ -1433,6 +1485,47 @@ describe("AutoBetSession use cases", () => {
     expect(autoBetRepository.sessions[0]?.roundsPlayed).toBe(1);
   });
 
+  test("auto bet executor uses the session next amount for martingale stakes", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        nextAmountCents: 2000n,
+        strategy: "MARTINGALE",
+      }),
+    );
+    const placeBetUseCase = {
+      calls: [] as unknown[],
+      execute: async (input: unknown) => {
+        placeBetUseCase.calls.push(input);
+
+        return {
+          balanceCents: 98000n,
+          bet: acceptedBetFixture({ id: "bet-1", roundId: "round-1" }),
+        };
+      },
+    };
+    const executor = new ExecuteAutoBetsForRoundUseCase(
+      autoBetRepository,
+      placeBetUseCase,
+      new SequenceIdGenerator(["execution-1"]),
+    );
+
+    await executor.execute({
+      round: openRoundFixture({ id: "round-1", chainIndex: 1 }),
+    });
+
+    expect(placeBetUseCase.calls).toEqual([
+      {
+        amountCents: 2000n,
+        autoCashoutMultiplierBp: null,
+        playerId: "player-1",
+        source: "AUTO_BET",
+        username: "player",
+      },
+    ]);
+  });
+
   test("applies lost auto bet result once and stops on stop loss", async () => {
     const autoBetRepository = new FakeAutoBetSessionRepository();
     autoBetRepository.sessions.push(
@@ -1473,6 +1566,118 @@ describe("AutoBetSession use cases", () => {
     );
   });
 
+  test("applies a lost martingale result and advances the next stake", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        amountCents: 1000n,
+        martingaleCurrentStep: 0,
+        martingaleMaxSteps: 3,
+        martingaleMultiplier: 2,
+        nextAmountCents: 1000n,
+        strategy: "MARTINGALE",
+        status: "ACTIVE",
+      }),
+    );
+    autoBetRepository.executions.push(
+      autoBetExecutionFixture({
+        id: "execution-1",
+        betId: "bet-1",
+        sessionId: "auto-session-1",
+      }),
+    );
+    const useCase = new ApplyAutoBetResultUseCase(autoBetRepository);
+
+    await useCase.execute({
+      amountCents: 1000n,
+      betId: "bet-1",
+      payoutCents: null,
+      resultStatus: "LOST",
+    });
+
+    expect(autoBetRepository.sessions[0]).toMatchObject({
+      martingaleCurrentStep: 1,
+      netProfitCents: -1000n,
+      nextAmountCents: 2000n,
+      status: "ACTIVE",
+    });
+  });
+
+  test("stops a martingale session when the next loss exceeds max steps", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        martingaleCurrentStep: 1,
+        martingaleMaxSteps: 1,
+        martingaleMultiplier: 2,
+        nextAmountCents: 2000n,
+        strategy: "MARTINGALE",
+        status: "ACTIVE",
+      }),
+    );
+    autoBetRepository.executions.push(
+      autoBetExecutionFixture({
+        id: "execution-1",
+        betId: "bet-1",
+        sessionId: "auto-session-1",
+      }),
+    );
+    const useCase = new ApplyAutoBetResultUseCase(autoBetRepository);
+
+    await useCase.execute({
+      amountCents: 2000n,
+      betId: "bet-1",
+      payoutCents: null,
+      resultStatus: "LOST",
+    });
+
+    expect(autoBetRepository.sessions[0]).toMatchObject({
+      martingaleCurrentStep: 1,
+      nextAmountCents: 2000n,
+      status: "STOPPED",
+      stopReason: "MARTINGALE_MAX_STEPS_REACHED",
+    });
+  });
+
+  test("stops a martingale session when the next stake exceeds the bet limit", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        martingaleCurrentStep: 2,
+        martingaleMaxSteps: 3,
+        martingaleMultiplier: 2,
+        nextAmountCents: 100000n,
+        strategy: "MARTINGALE",
+        status: "ACTIVE",
+      }),
+    );
+    autoBetRepository.executions.push(
+      autoBetExecutionFixture({
+        id: "execution-1",
+        betId: "bet-1",
+        sessionId: "auto-session-1",
+      }),
+    );
+    const useCase = new ApplyAutoBetResultUseCase(autoBetRepository);
+
+    await useCase.execute({
+      amountCents: 100000n,
+      betId: "bet-1",
+      payoutCents: null,
+      resultStatus: "LOST",
+    });
+
+    expect(autoBetRepository.sessions[0]).toMatchObject({
+      martingaleCurrentStep: 2,
+      nextAmountCents: 100000n,
+      status: "STOPPED",
+      stopReason: "MARTINGALE_BET_LIMIT_REACHED",
+    });
+  });
+
   test("applies cashed out auto bet result and stops on take profit", async () => {
     const autoBetRepository = new FakeAutoBetSessionRepository();
     autoBetRepository.sessions.push(
@@ -1505,6 +1710,44 @@ describe("AutoBetSession use cases", () => {
     expect(autoBetRepository.sessions[0]?.stopReason).toBe(
       "TAKE_PROFIT_REACHED",
     );
+  });
+
+  test("applies a cashed out martingale result and resets the next stake", async () => {
+    const autoBetRepository = new FakeAutoBetSessionRepository();
+    autoBetRepository.sessions.push(
+      autoBetSessionFixture({
+        id: "auto-session-1",
+        amountCents: 1000n,
+        martingaleCurrentStep: 2,
+        martingaleMaxSteps: 3,
+        martingaleMultiplier: 2,
+        nextAmountCents: 4000n,
+        strategy: "MARTINGALE",
+        status: "ACTIVE",
+      }),
+    );
+    autoBetRepository.executions.push(
+      autoBetExecutionFixture({
+        id: "execution-1",
+        betId: "bet-1",
+        sessionId: "auto-session-1",
+      }),
+    );
+    const useCase = new ApplyAutoBetResultUseCase(autoBetRepository);
+
+    await useCase.execute({
+      amountCents: 4000n,
+      betId: "bet-1",
+      payoutCents: 6000n,
+      resultStatus: "CASHED_OUT",
+    });
+
+    expect(autoBetRepository.sessions[0]).toMatchObject({
+      martingaleCurrentStep: 0,
+      netProfitCents: 2000n,
+      nextAmountCents: 1000n,
+      status: "ACTIVE",
+    });
   });
 });
 

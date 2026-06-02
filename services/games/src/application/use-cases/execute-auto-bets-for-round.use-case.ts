@@ -55,7 +55,7 @@ export class ExecuteAutoBetsForRoundUseCase {
       const result = await this.placeBetUseCase.execute({
         playerId: session.playerId,
         username: session.username,
-        amountCents: session.amountCents,
+        amountCents: session.nextAmountCents,
         autoCashoutMultiplierBp: session.autoCashoutMultiplierBp,
         source: "AUTO_BET",
       });

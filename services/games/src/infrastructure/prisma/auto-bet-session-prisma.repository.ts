@@ -9,6 +9,7 @@ import type {
   NewAutoBetRoundExecution,
   NewAutoBetSession,
   StopAutoBetSessionInput,
+  UpdateAutoBetProgressionInput,
 } from "../../application/ports/auto-bet-session.repository";
 import {
   toAutoBetRoundExecution,
@@ -177,5 +178,21 @@ export class AutoBetSessionPrismaRepository
 
       return toAutoBetSession(session);
     });
+  }
+
+  async updateProgression(
+    input: UpdateAutoBetProgressionInput,
+  ): Promise<AutoBetSession> {
+    const session = await this.prisma.autoBetSession.update({
+      where: {
+        id: input.sessionId,
+      },
+      data: {
+        nextAmountCents: input.nextAmountCents,
+        martingaleCurrentStep: input.martingaleCurrentStep,
+      },
+    });
+
+    return toAutoBetSession(session);
   }
 }
