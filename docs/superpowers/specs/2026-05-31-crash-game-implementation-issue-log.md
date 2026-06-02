@@ -963,6 +963,33 @@ Cada entrada deve conter:
   `games`, `wallets` e `frontend`, e subiu a stack completa.
 - Status: resolvido.
 
+### 56. Quality gate falhou apos extracao inicial de Outbox/Inbox
+
+- Contexto: bonus Outbox/Inbox transacional, apos implementar outbox no
+  servico `games`, inbox no servico `wallets` e E2E Docker/Postgres para
+  idempotencia de comandos financeiros.
+- Sintoma: `bun run test:coverage && bun run quality:gate` passou todos os
+  testes de cobertura, mas falhou na catraca de qualidade. Primeiro por
+  aumento de duplicacao (`duplicatedLines` 293 contra baseline 250, `clones`
+  16 contra baseline 15) e maior arquivo (`advance-round-lifecycle.use-case.ts`
+  com 290 linhas contra baseline 269). Apos a primeira correcao, a duplicacao
+  passou, mas `app.module.ts` virou o maior arquivo com 279 linhas.
+- Causa: a logica de credito de cashout via outbox estava duplicada entre
+  cashout manual e auto cashout/retry, os mapeamentos Prisma de outbox estavam
+  repetidos entre repositorios, e o provider Nest do servico extraido ficou
+  inline em `app.module.ts`.
+- Correcao: extrair `CashoutCreditService` para compartilhar o fluxo de credito
+  de cashout, extrair mapper Prisma de outbox, consolidar dados de persistencia
+  de round/bet e mover o provider Nest do servico para
+  `cashout-credit-service.provider.ts`.
+- Validacao: `cd services/games && bun test
+  tests/unit/application/game-use-cases.test.ts`, `cd services/games && bun
+  test tests/unit/infrastructure/wallet-outbox-dispatcher.test.ts
+  tests/unit/infrastructure/rabbitmq-wallet-client.test.ts`, `bun run
+  check:types` e `bun run quality:gate` passaram. O quality gate voltou para
+  `duplicatedLines` 236, `clones` 12 e maior arquivo no baseline de 269 linhas.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`

@@ -5,11 +5,23 @@ import {
   LeaderboardEntry,
   ListLeaderboardInput,
 } from "../../application/ports/game.repository";
+import type {
+  NewWalletOutboxMessage,
+  WalletOutboxMessage,
+} from "../../application/wallet-outbox/wallet-outbox-message";
 import { Bet, BetStatus } from "../../domain/bet";
 import { Round, RoundStatus } from "../../domain/round";
+import {
+  toWalletOutboxCreateData,
+  toWalletOutboxMessage,
+} from "./wallet-outbox.mapper";
 
 type RoundRecord = Awaited<ReturnType<PrismaClient["round"]["findFirst"]>>;
 type BetRecord = Awaited<ReturnType<PrismaClient["bet"]["findFirst"]>>;
+type GamePrismaTransaction = Omit<
+  PrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
 
 type RoundWithBets = NonNullable<RoundRecord> & {
   bets: NonNullable<BetRecord>[];
@@ -120,66 +132,78 @@ export class GamePrismaRepository implements GameRepository {
 
   async saveRound(round: Round): Promise<void> {
     await this.prisma.$transaction(async (prisma) => {
-      await prisma.round.upsert({
-        where: { id: round.id },
-        create: {
-          id: round.id,
-          status: round.status,
-          bettingStartsAt: round.bettingStartsAt,
-          bettingEndsAt: round.bettingEndsAt,
-          startedAt: round.startedAt,
-          crashedAt: round.crashedAt,
-          crashPointBp: round.crashPointBp,
-          serverSeedHash: round.serverSeedHash,
-          serverSeed: round.serverSeed,
-          clientSeed: round.clientSeed,
-          nonce: round.nonce,
-          chainIndex: round.chainIndex,
-          nextServerSeedHash: round.nextServerSeedHash,
-        },
-        update: {
-          status: round.status,
-          bettingStartsAt: round.bettingStartsAt,
-          bettingEndsAt: round.bettingEndsAt,
-          startedAt: round.startedAt,
-          crashedAt: round.crashedAt,
-          crashPointBp: round.crashPointBp,
-          serverSeedHash: round.serverSeedHash,
-          serverSeed: round.serverSeed,
-          clientSeed: round.clientSeed,
-          nonce: round.nonce,
-          chainIndex: round.chainIndex,
-          nextServerSeedHash: round.nextServerSeedHash,
-        },
+      await this.saveRoundWithTransaction(prisma, round);
+    });
+  }
+
+  async saveRoundWithWalletOutbox(
+    round: Round,
+    message: NewWalletOutboxMessage,
+  ): Promise<WalletOutboxMessage> {
+    return this.prisma.$transaction(async (prisma) => {
+      await this.saveRoundWithTransaction(prisma, round);
+      const created = await prisma.walletOutboxMessage.create({
+        data: toWalletOutboxCreateData(message),
       });
 
-      for (const bet of round.bets) {
-        await prisma.bet.upsert({
-          where: { id: bet.id },
-          create: {
-            id: bet.id,
-            roundId: bet.roundId,
-            playerId: bet.playerId,
-            username: bet.username,
-            amountCents: bet.amountCents,
-            status: bet.status,
-            autoCashoutMultiplierBp: bet.autoCashoutMultiplierBp,
-            cashoutMultiplierBp: bet.cashoutMultiplierBp,
-            payoutCents: bet.payoutCents,
-            rejectionReason: bet.rejectionReason,
-          },
-          update: {
-            username: bet.username,
-            amountCents: bet.amountCents,
-            status: bet.status,
-            autoCashoutMultiplierBp: bet.autoCashoutMultiplierBp,
-            cashoutMultiplierBp: bet.cashoutMultiplierBp,
-            payoutCents: bet.payoutCents,
-            rejectionReason: bet.rejectionReason,
-          },
-        });
-      }
+      return toWalletOutboxMessage(created);
     });
+  }
+
+  private async saveRoundWithTransaction(
+    prisma: GamePrismaTransaction,
+    round: Round,
+  ): Promise<void> {
+    await prisma.round.upsert({
+      where: { id: round.id },
+      create: {
+        id: round.id,
+        ...this.toRoundPersistenceData(round),
+      },
+      update: this.toRoundPersistenceData(round),
+    });
+
+    for (const bet of round.bets) {
+      await prisma.bet.upsert({
+        where: { id: bet.id },
+        create: {
+          id: bet.id,
+          roundId: bet.roundId,
+          ...this.toBetPersistenceData(bet),
+        },
+        update: this.toBetPersistenceData(bet),
+      });
+    }
+  }
+
+  private toRoundPersistenceData(round: Round) {
+    return {
+      status: round.status,
+      bettingStartsAt: round.bettingStartsAt,
+      bettingEndsAt: round.bettingEndsAt,
+      startedAt: round.startedAt,
+      crashedAt: round.crashedAt,
+      crashPointBp: round.crashPointBp,
+      serverSeedHash: round.serverSeedHash,
+      serverSeed: round.serverSeed,
+      clientSeed: round.clientSeed,
+      nonce: round.nonce,
+      chainIndex: round.chainIndex,
+      nextServerSeedHash: round.nextServerSeedHash,
+    };
+  }
+
+  private toBetPersistenceData(bet: Bet) {
+    return {
+      playerId: bet.playerId,
+      username: bet.username,
+      amountCents: bet.amountCents,
+      status: bet.status,
+      autoCashoutMultiplierBp: bet.autoCashoutMultiplierBp,
+      cashoutMultiplierBp: bet.cashoutMultiplierBp,
+      payoutCents: bet.payoutCents,
+      rejectionReason: bet.rejectionReason,
+    };
   }
 
   private toRound(round: RoundWithBets): Round {
@@ -215,4 +239,5 @@ export class GamePrismaRepository implements GameRepository {
       rejectionReason: bet.rejectionReason,
     });
   }
+
 }

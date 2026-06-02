@@ -6,6 +6,7 @@ import {
 import {
   BetAmountOutOfRangeError,
   CurrentRoundNotFoundError,
+  WalletOperationRejectedError,
 } from "../game.errors";
 import { parseAutoCashoutMultiplierBp } from "../auto-cashout";
 import { toCents } from "../cents";
@@ -13,7 +14,9 @@ import { GameRepository } from "../ports/game.repository";
 import { IdGenerator } from "../ports/id-generator";
 import { RoundEventsPublisher } from "../ports/round-events.publisher";
 import { WalletClient } from "../ports/wallet.client";
+import type { WalletOutboxRepository } from "../ports/wallet-outbox.repository";
 import { Bet } from "../../domain/bet";
+import type { WalletOutboxDispatcher } from "../../infrastructure/messaging/wallet-outbox-dispatcher";
 import type { GameMetrics } from "../../infrastructure/observability/game-metrics";
 
 type GameMetricsPort = Pick<
@@ -42,6 +45,11 @@ export class PlaceBetUseCase {
     private readonly idGenerator: IdGenerator,
     private readonly roundEventsPublisher: RoundEventsPublisher,
     private readonly gameMetrics?: GameMetricsPort,
+    private readonly walletOutboxRepository?: WalletOutboxRepository,
+    private readonly walletOutboxDispatcher?: Pick<
+      WalletOutboxDispatcher,
+      "dispatchMessage"
+    >,
   ) {}
 
   async execute(input: PlaceBetInput): Promise<PlaceBetResult> {
@@ -76,12 +84,21 @@ export class PlaceBetUseCase {
           amountCents,
           autoCashoutMultiplierBp,
         });
-        const debitResult = await this.walletClient.debit({
+        const debitInput = {
           playerId: input.playerId,
           amountCents,
           referenceId: `round:${round.id}:player:${input.playerId}:bet-debit`,
-          reason: "BET_PLACED",
-        });
+          reason: "BET_PLACED" as const,
+        };
+        const debitResult =
+          this.walletOutboxRepository && this.walletOutboxDispatcher
+            ? await this.dispatchDebitThroughOutbox({
+                roundId: round.id,
+                betId,
+                username: input.username,
+                ...debitInput,
+              })
+            : await this.walletClient.debit(debitInput);
 
         await this.gameRepository.saveRound(round);
         this.recordBetAccepted(amountCents);
@@ -126,5 +143,48 @@ export class PlaceBetUseCase {
     } catch {
       // Metrics are best-effort and must not alter bet placement.
     }
+  }
+
+  private async dispatchDebitThroughOutbox(input: {
+    amountCents: bigint;
+    betId: string;
+    playerId: string;
+    reason: "BET_PLACED";
+    referenceId: string;
+    roundId: string;
+    username: string;
+  }): Promise<{ applied: boolean; balanceCents: bigint }> {
+    if (!this.walletOutboxRepository || !this.walletOutboxDispatcher) {
+      throw new Error("Wallet outbox dependencies are not configured");
+    }
+
+    const message = await this.walletOutboxRepository.enqueue({
+      id: this.idGenerator.generate(),
+      type: "WALLET_DEBIT",
+      status: "IN_FLIGHT",
+      roundId: input.roundId,
+      betId: input.betId,
+      playerId: input.playerId,
+      username: input.username,
+      amountCents: input.amountCents,
+      referenceId: input.referenceId,
+      reason: input.reason,
+    });
+
+    await this.walletOutboxDispatcher.dispatchMessage(message);
+
+    const stored = await this.walletOutboxRepository.findById(message.id);
+
+    if (stored?.status !== "SUCCEEDED" || stored.responseBalanceCents === null) {
+      throw new WalletOperationRejectedError(
+        stored?.errorCode ?? "WALLET_DEBIT_FAILED",
+        stored?.errorMessage ?? "Wallet debit failed",
+      );
+    }
+
+    return {
+      applied: stored.responseApplied ?? true,
+      balanceCents: stored.responseBalanceCents,
+    };
   }
 }

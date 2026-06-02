@@ -10,6 +10,7 @@ import { Clock } from "../ports/clock";
 import { GameRepository } from "../ports/game.repository";
 import { RoundEventsPublisher } from "../ports/round-events.publisher";
 import { WalletClient } from "../ports/wallet.client";
+import { CashoutCreditService } from "../services/cashout-credit.service";
 import { Bet } from "../../domain/bet";
 import { InvalidRoundStateError } from "../../domain/game.errors";
 import { calculateCurrentMultiplierBp } from "../../domain/multiplier";
@@ -35,6 +36,10 @@ export class CashOutUseCase {
     private readonly clock: Clock,
     private readonly roundEventsPublisher: RoundEventsPublisher,
     private readonly gameMetrics?: GameMetricsPort,
+    private readonly cashoutCreditService = new CashoutCreditService(
+      gameRepository,
+      walletClient,
+    ),
   ) {}
 
   async execute(input: CashOutInput): Promise<CashOutResult> {
@@ -62,15 +67,11 @@ export class CashOutUseCase {
           throw new InvalidRoundStateError("Cashout payout was not calculated");
         }
 
-        await this.gameRepository.saveRound(round);
-
         try {
-          const creditResult = await this.walletClient.credit({
-            playerId: input.playerId,
-            amountCents: payoutCents,
-            referenceId: `round:${round.id}:player:${input.playerId}:cashout-credit`,
-            reason: "CASHOUT_PAYOUT",
-          });
+          const creditResult = await this.cashoutCreditService.creditCashout(
+            round,
+            bet,
+          );
 
           round.completeCashOut(input.playerId);
           await this.gameRepository.saveRound(round);
@@ -87,6 +88,10 @@ export class CashOutUseCase {
             balanceCents: creditResult.balanceCents,
           };
         } catch (error) {
+          if (error instanceof WalletCreditFailedError) {
+            throw error;
+          }
+
           throw new WalletCreditFailedError(error);
         }
       } catch (error) {
@@ -106,4 +111,5 @@ export class CashOutUseCase {
       // Metrics are best-effort and must not alter cashout behavior.
     }
   }
+
 }

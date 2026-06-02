@@ -40,20 +40,25 @@ export class RabbitMqWalletServer implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const response = await this.handlePayload(message.content);
+    try {
+      const response = await this.handlePayload(message.content);
 
-    if (message.properties.replyTo) {
-      this.channel.sendToQueue(
-        message.properties.replyTo,
-        Buffer.from(JSON.stringify(response)),
-        {
-          correlationId: message.properties.correlationId,
-          contentType: "application/json",
-        },
-      );
+      if (message.properties.replyTo) {
+        this.channel.sendToQueue(
+          message.properties.replyTo,
+          Buffer.from(JSON.stringify(response)),
+          {
+            correlationId: message.properties.correlationId,
+            contentType: "application/json",
+            persistent: true,
+          },
+        );
+      }
+
+      this.channel.ack(message);
+    } catch {
+      this.channel.nack(message, false, true);
     }
-
-    this.channel.ack(message);
   }
 
   private async handlePayload(content: Buffer): Promise<WalletCommandResponse> {

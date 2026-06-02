@@ -20,6 +20,14 @@ import {
   RoundSeedProvider,
 } from "../../../src/application/ports/round-seed-provider";
 import { WalletClient, WalletOperationInput, WalletOperationResult } from "../../../src/application/ports/wallet.client";
+import type { WalletOutboxRepository } from "../../../src/application/ports/wallet-outbox.repository";
+import type {
+  WalletOutboxFailure,
+  NewWalletOutboxMessage,
+  WalletOutboxMessage,
+  WalletOutboxSuccess,
+} from "../../../src/application/wallet-outbox/wallet-outbox-message";
+import { CashoutCreditService } from "../../../src/application/services/cashout-credit.service";
 import { AdvanceRoundLifecycleUseCase } from "../../../src/application/use-cases/advance-round-lifecycle.use-case";
 import { CashOutUseCase } from "../../../src/application/use-cases/cash-out.use-case";
 import { GetCurrentRoundUseCase } from "../../../src/application/use-cases/get-current-round.use-case";
@@ -40,6 +48,8 @@ class InMemoryGameRepository implements GameRepository {
   public saveRoundError: unknown = null;
   public lastLeaderboardInput: ListLeaderboardInput | null = null;
   public savedRounds: Round[] = [];
+  public savedBetStatusSnapshots: string[][] = [];
+  public walletOutboxMessages: NewWalletOutboxMessage[] = [];
   public lastBetsByPlayerIdInput: { playerId: string; limit: number } | null =
     null;
   public lastRoundHistoryLimit: number | null = null;
@@ -103,6 +113,148 @@ class InMemoryGameRepository implements GameRepository {
     this.currentRound = round;
     this.rounds.set(round.id, round);
     this.savedRounds.push(round);
+    this.savedBetStatusSnapshots.push(round.bets.map((bet) => bet.status));
+  }
+
+  async saveRoundWithWalletOutbox(
+    round: Round,
+    message: NewWalletOutboxMessage,
+  ): Promise<WalletOutboxMessage> {
+    await this.saveRound(round);
+    this.walletOutboxMessages.push(message);
+
+    return {
+      ...message,
+      status: message.status ?? "PENDING",
+      attempts: 0,
+      availableAt: message.availableAt ?? new Date("2026-05-30T10:00:00.000Z"),
+      responseApplied: null,
+      responseBalanceCents: null,
+      errorCode: null,
+      errorMessage: null,
+    };
+  }
+}
+
+class FakeWalletOutboxRepository implements WalletOutboxRepository {
+  public messages: WalletOutboxMessage[] = [];
+
+  store(message: WalletOutboxMessage): void {
+    if (!this.messages.some((stored) => stored.id === message.id)) {
+      this.messages.push(message);
+    }
+  }
+
+  async enqueue(
+    message: NewWalletOutboxMessage,
+  ): Promise<WalletOutboxMessage> {
+    const stored = this.toStoredMessage(message);
+    this.messages.push(stored);
+
+    return stored;
+  }
+
+  async findById(id: string): Promise<WalletOutboxMessage | null> {
+    return this.messages.find((message) => message.id === id) ?? null;
+  }
+
+  async findByReferenceId(
+    referenceId: string,
+  ): Promise<WalletOutboxMessage | null> {
+    return (
+      this.messages.find((message) => message.referenceId === referenceId) ??
+      null
+    );
+  }
+
+  async claimNext(): Promise<WalletOutboxMessage | null> {
+    return (
+      this.messages.find(
+        (message) =>
+          message.status === "PENDING" || message.status === "RETRYABLE",
+      ) ?? null
+    );
+  }
+
+  async markSucceeded(
+    id: string,
+    result: WalletOutboxSuccess,
+  ): Promise<void> {
+    this.update(id, {
+      status: "SUCCEEDED",
+      responseApplied: result.applied,
+      responseBalanceCents: result.balanceCents,
+      errorCode: null,
+      errorMessage: null,
+    });
+  }
+
+  async markFailed(id: string, failure: WalletOutboxFailure): Promise<void> {
+    this.update(id, {
+      status: "FAILED",
+      errorCode: failure.code,
+      errorMessage: failure.message,
+    });
+  }
+
+  async releaseForRetry(
+    id: string,
+    failure: WalletOutboxFailure,
+    availableAt: Date,
+  ): Promise<void> {
+    this.update(id, {
+      status: "RETRYABLE",
+      availableAt,
+      errorCode: failure.code,
+      errorMessage: failure.message,
+    });
+  }
+
+  private toStoredMessage(
+    message: NewWalletOutboxMessage,
+  ): WalletOutboxMessage {
+    return {
+      ...message,
+      status: message.status ?? "PENDING",
+      attempts: 0,
+      availableAt: message.availableAt ?? new Date("2026-05-30T10:00:00.000Z"),
+      responseApplied: null,
+      responseBalanceCents: null,
+      errorCode: null,
+      errorMessage: null,
+    };
+  }
+
+  private update(
+    id: string,
+    patch: Partial<WalletOutboxMessage>,
+  ): void {
+    const index = this.messages.findIndex((message) => message.id === id);
+
+    if (index < 0) {
+      throw new Error(`Outbox message not found: ${id}`);
+    }
+
+    this.messages[index] = {
+      ...this.messages[index],
+      ...patch,
+    };
+  }
+}
+
+class FakeWalletOutboxDispatcher {
+  public dispatched: WalletOutboxMessage[] = [];
+  public result: WalletOperationResult = {
+    applied: true,
+    balanceCents: 97500n,
+  };
+
+  constructor(private readonly outbox: FakeWalletOutboxRepository) {}
+
+  async dispatchMessage(message: WalletOutboxMessage): Promise<void> {
+    this.dispatched.push(message);
+    this.outbox.store(message);
+    await this.outbox.markSucceeded(message.id, this.result);
   }
 }
 
@@ -889,6 +1041,54 @@ describe("AdvanceRoundLifecycleUseCase", () => {
 });
 
 describe("PlaceBetUseCase", () => {
+  test("persists and dispatches a wallet debit outbox message before saving an accepted bet", async () => {
+    const repository = new InMemoryGameRepository(openRound());
+    const walletClient = new FakeWalletClient();
+    const outbox = new FakeWalletOutboxRepository();
+    const outboxDispatcher = new FakeWalletOutboxDispatcher(outbox);
+    const roundEventsPublisher = new FakeRoundEventsPublisher();
+    const useCase = new PlaceBetUseCase(
+      repository,
+      walletClient,
+      new FixedIdGenerator("bet-1"),
+      roundEventsPublisher,
+      undefined,
+      outbox,
+      outboxDispatcher,
+    );
+
+    const result = await useCase.execute({
+      playerId: "player-1",
+      username: "player",
+      amountCents: 2500n,
+    });
+
+    expect(result.bet.status).toBe("ACCEPTED");
+    expect(result.balanceCents).toBe(97500n);
+    expect(walletClient.debits).toEqual([]);
+    expect(outbox.messages[0]).toMatchObject({
+      id: "bet-1",
+      type: "WALLET_DEBIT",
+      status: "SUCCEEDED",
+      roundId: "round-1",
+      betId: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 2500n,
+      referenceId: "round:round-1:player:player-1:bet-debit",
+      reason: "BET_PLACED",
+      responseApplied: true,
+      responseBalanceCents: 97500n,
+    });
+    expect(outboxDispatcher.dispatched.map((message) => message.id)).toEqual([
+      "bet-1",
+    ]);
+    expect(repository.currentRound?.bets).toHaveLength(1);
+    expect(roundEventsPublisher.betPlacedEvents.map((bet) => bet.id)).toEqual([
+      "bet-1",
+    ]);
+  });
+
   test("debits the wallet with an idempotent reference and saves the accepted bet", async () => {
     const repository = new InMemoryGameRepository(openRound());
     const walletClient = new FakeWalletClient();
@@ -1171,6 +1371,65 @@ describe("PlaceBetUseCase", () => {
 });
 
 describe("CashOutUseCase", () => {
+  test("saves pending cashout with wallet credit outbox before completing cashout", async () => {
+    const round = openRound();
+    round.placeBet({
+      id: "bet-1",
+      playerId: "player-1",
+      username: "player",
+      amountCents: 1000n,
+    });
+    round.start(new Date("2026-05-30T10:00:10.000Z"));
+    const repository = new InMemoryGameRepository(round);
+    const walletClient = new FakeWalletClient();
+    const outbox = new FakeWalletOutboxRepository();
+    const outboxDispatcher = new FakeWalletOutboxDispatcher(outbox);
+    outboxDispatcher.result = {
+      applied: true,
+      balanceCents: 100500n,
+    };
+    const roundEventsPublisher = new FakeRoundEventsPublisher();
+    const cashoutCreditService = new CashoutCreditService(
+      repository,
+      walletClient,
+      new FixedIdGenerator("wallet-outbox-1"),
+      outbox,
+      outboxDispatcher,
+    );
+    const useCase = new CashOutUseCase(
+      repository,
+      walletClient,
+      new FixedClock(new Date("2026-05-30T10:00:15.000Z")),
+      roundEventsPublisher,
+      undefined,
+      cashoutCreditService,
+    );
+
+    const result = await useCase.execute({ playerId: "player-1" });
+
+    expect(result.bet.status).toBe("CASHED_OUT");
+    expect(result.balanceCents).toBe(100500n);
+    expect(walletClient.credits).toEqual([]);
+    expect(repository.walletOutboxMessages[0]).toMatchObject({
+      id: "wallet-outbox-1",
+      type: "WALLET_CREDIT",
+      status: "IN_FLIGHT",
+      roundId: "round-1",
+      betId: "bet-1",
+      playerId: "player-1",
+      amountCents: 2117n,
+      referenceId: "round:round-1:player:player-1:cashout-credit",
+      reason: "CASHOUT_PAYOUT",
+    });
+    expect(repository.savedBetStatusSnapshots).toContainEqual([
+      "CASHOUT_PENDING_CREDIT",
+    ]);
+    expect(repository.currentRound?.bets[0]?.status).toBe("CASHED_OUT");
+    expect(
+      roundEventsPublisher.betCashedOutEvents.map((bet) => bet.id),
+    ).toEqual(["bet-1"]);
+  });
+
   test("credits the calculated payout and completes the cashout", async () => {
     const round = openRound();
     round.placeBet({
