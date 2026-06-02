@@ -124,9 +124,7 @@ input {
 }
 
 .black-hole-starfield,
-.black-hole-speed-lines,
-.black-hole-explosion,
-.black-hole-gate {
+.black-hole-speed-lines {
   position: absolute;
   pointer-events: none;
 }
@@ -141,99 +139,6 @@ input {
     radial-gradient(circle at 52% 72%, rgba(255, 255, 255, 0.44) 0 1px, transparent 1.4px),
     radial-gradient(circle at 76% 18%, rgba(255, 255, 255, 0.72) 0 1px, transparent 1.7px),
     radial-gradient(circle at 88% 66%, rgba(255, 255, 255, 0.56) 0 1px, transparent 1.4px);
-}
-
-.black-hole-gate {
-  left: 50%;
-  top: 46%;
-  width: min(42rem, 76vw);
-  max-width: 88%;
-  aspect-ratio: 1;
-  filter: drop-shadow(0 0 44px rgba(244, 63, 94, 0.22));
-  opacity: 0.82;
-  transform: translate(-50%, -50%);
-  transition:
-    filter 280ms ease,
-    opacity 280ms ease,
-    width 420ms ease;
-}
-
-.black-hole-ring,
-.black-hole-core,
-.black-hole-accretion,
-.black-hole-shockwave {
-  position: absolute;
-  border-radius: 9999px;
-}
-
-.black-hole-ring {
-  inset: 0;
-  border: 2px solid rgba(244, 63, 94, 0.52);
-  background:
-    radial-gradient(circle, transparent 53%, rgba(244, 63, 94, 0.1) 63%, transparent 73%),
-    conic-gradient(
-      from 18deg,
-      transparent 0deg,
-      rgba(244, 63, 94, 0.72) 36deg,
-      transparent 82deg,
-      rgba(255, 255, 255, 0.28) 126deg,
-      transparent 178deg,
-      rgba(34, 211, 238, 0.2) 222deg,
-      transparent 276deg,
-      rgba(244, 63, 94, 0.56) 322deg,
-      transparent 360deg
-    );
-  box-shadow:
-    0 0 74px rgba(244, 63, 94, 0.24),
-    inset 0 0 76px rgba(244, 63, 94, 0.14),
-    inset 0 0 18px rgba(255, 255, 255, 0.12);
-  mask: radial-gradient(circle, transparent 53%, #000 55%, #000 63%, transparent 65%);
-}
-
-.black-hole-ring-outer {
-  opacity: 0.88;
-}
-
-.black-hole-ring-middle {
-  inset: 14%;
-  border-color: rgba(255, 255, 255, 0.28);
-  opacity: 0.58;
-  transform: rotate(-18deg);
-}
-
-.black-hole-ring-inner {
-  inset: 28%;
-  border-color: rgba(34, 211, 238, 0.22);
-  opacity: 0.48;
-  transform: rotate(24deg);
-}
-
-.black-hole-core {
-  inset: 32%;
-  background:
-    radial-gradient(circle, #000 0 43%, rgba(0, 0, 0, 0.84) 48%, transparent 62%),
-    radial-gradient(circle, rgba(244, 63, 94, 0.32), transparent 66%);
-  box-shadow:
-    0 0 84px rgba(244, 63, 94, 0.42),
-    inset 0 0 28px rgba(255, 255, 255, 0.06);
-  opacity: 0.74;
-}
-
-.black-hole-accretion {
-  inset: 20%;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  opacity: 0.5;
-  transform: scaleX(1.28) rotate(-10deg);
-  box-shadow:
-    0 0 28px rgba(255, 255, 255, 0.08),
-    0 0 70px rgba(244, 63, 94, 0.2);
-}
-
-.black-hole-shockwave {
-  inset: 3%;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  opacity: 0;
-  transform: scale(0.72);
 }
 
 .black-hole-speed-lines {
@@ -265,173 +170,13 @@ input {
   mask: radial-gradient(circle at 62% 50%, transparent 0 8%, #000 14%, #000 74%, transparent 88%);
 }
 
-.black-hole-explosion {
-  inset: 0;
-  opacity: 0;
-}
-
-.black-hole-debris {
-  position: absolute;
-  left: 50%;
-  top: 52%;
-  width: 0.7rem;
-  height: 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.38), rgba(244, 63, 94, 0.34));
-  box-shadow: 0 0 24px rgba(244, 63, 94, 0.26);
-  transform: translate(-50%, -50%) rotate(calc(var(--debris-index) * 21deg));
-}
-
-.black-hole-betting .black-hole-gate,
-.black-hole-idle .black-hole-gate {
-  left: 68%;
-  top: 42%;
-  width: min(27rem, 54vw);
-  opacity: 0.64;
-  filter: drop-shadow(0 0 28px rgba(244, 63, 94, 0.14));
-}
-
-.black-hole-betting .black-hole-core,
-.black-hole-idle .black-hole-core {
-  opacity: 0.58;
-}
-
-.black-hole-entering .black-hole-gate {
-  left: 60%;
-  width: min(47rem, 88vw);
-  opacity: 0.94;
-  filter: drop-shadow(0 0 74px rgba(244, 63, 94, 0.42));
-  animation: black-hole-swallow 1.4s cubic-bezier(0.2, 0.75, 0.2, 1) 1;
-}
-
 .black-hole-entering .black-hole-speed-lines-horizontal {
   animation: black-hole-horizontal-speed 1.4s ease-out 1;
-}
-
-.black-hole-running .black-hole-gate {
-  left: 54%;
-  width: min(58rem, 112vw);
-  opacity: 0.88;
-  filter: drop-shadow(0 0 92px rgba(244, 63, 94, 0.4));
 }
 
 .black-hole-running .black-hole-speed-lines-radial {
   opacity: 0.92;
   animation: black-hole-radial-speed 580ms linear infinite;
-}
-
-.black-hole-running .black-hole-ring-outer,
-.black-hole-entering .black-hole-ring-outer {
-  animation: black-hole-ring-spin 9s linear infinite;
-}
-
-.black-hole-running .black-hole-ring-middle,
-.black-hole-entering .black-hole-ring-middle {
-  animation: black-hole-ring-spin 13s linear infinite reverse;
-}
-
-.black-hole-running .black-hole-core,
-.black-hole-entering .black-hole-core {
-  animation: black-hole-core-pulse 1.25s ease-in-out infinite;
-}
-
-.black-hole-crashed .black-hole-gate {
-  left: 52%;
-  width: min(54rem, 104vw);
-  opacity: 0.96;
-  filter: drop-shadow(0 0 70px rgba(244, 63, 94, 0.48));
-}
-
-.black-hole-crashed .black-hole-ring {
-  border-color: rgba(251, 113, 133, 0.72);
-  box-shadow:
-    0 0 110px rgba(244, 63, 94, 0.42),
-    inset 0 0 90px rgba(244, 63, 94, 0.22),
-    inset 0 0 22px rgba(255, 255, 255, 0.16);
-}
-
-.black-hole-crashed .black-hole-core {
-  opacity: 0.7;
-}
-
-.black-hole-crashed .black-hole-shockwave {
-  animation: black-hole-shockwave 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-explosion {
-  animation: black-hole-explosion 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(1) {
-  animation: black-hole-debris-1 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(2) {
-  animation: black-hole-debris-2 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(3) {
-  animation: black-hole-debris-3 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(4) {
-  animation: black-hole-debris-4 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(5) {
-  animation: black-hole-debris-5 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(6) {
-  animation: black-hole-debris-6 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(7) {
-  animation: black-hole-debris-7 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(8) {
-  animation: black-hole-debris-8 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(9) {
-  animation: black-hole-debris-9 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(10) {
-  animation: black-hole-debris-10 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(11) {
-  animation: black-hole-debris-11 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(12) {
-  animation: black-hole-debris-12 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(13) {
-  animation: black-hole-debris-13 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(14) {
-  animation: black-hole-debris-14 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(15) {
-  animation: black-hole-debris-15 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(16) {
-  animation: black-hole-debris-16 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(17) {
-  animation: black-hole-debris-17 1.1s ease-out 1;
-}
-
-.black-hole-crashed .black-hole-debris:nth-child(18) {
-  animation: black-hole-debris-18 1.1s ease-out 1;
 }
 
 .chrono-trail-breathe {
@@ -527,23 +272,6 @@ input {
   }
 }
 
-@keyframes black-hole-swallow {
-  0% {
-    opacity: 0.56;
-    transform: translate(-50%, -50%) scale(0.72);
-  }
-
-  58% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.08);
-  }
-
-  100% {
-    opacity: 0.9;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-
 @keyframes black-hole-horizontal-speed {
   0% {
     opacity: 0;
@@ -570,121 +298,6 @@ input {
   }
 }
 
-@keyframes black-hole-ring-spin {
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes black-hole-core-pulse {
-  0%,
-  100% {
-    opacity: 0.36;
-    transform: scale(0.98);
-  }
-
-  50% {
-    opacity: 0.66;
-    transform: scale(1.05);
-  }
-}
-
-@keyframes black-hole-shockwave {
-  0% {
-    opacity: 0.9;
-    transform: scale(0.68);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.1);
-  }
-}
-
-@keyframes black-hole-explosion {
-  0% {
-    opacity: 0.95;
-    filter: blur(0);
-  }
-
-  100% {
-    opacity: 0;
-    filter: blur(2px);
-  }
-}
-
-@keyframes black-hole-debris-1 {
-  100% { transform: translate(-21rem, -9rem) rotate(210deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-2 {
-  100% { transform: translate(-17rem, 7rem) rotate(150deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-3 {
-  100% { transform: translate(-13rem, -14rem) rotate(280deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-4 {
-  100% { transform: translate(-9rem, 11rem) rotate(120deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-5 {
-  100% { transform: translate(-4rem, -16rem) rotate(340deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-6 {
-  100% { transform: translate(2rem, 15rem) rotate(190deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-7 {
-  100% { transform: translate(7rem, -13rem) rotate(260deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-8 {
-  100% { transform: translate(11rem, 12rem) rotate(90deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-9 {
-  100% { transform: translate(15rem, -10rem) rotate(250deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-10 {
-  100% { transform: translate(19rem, 7rem) rotate(130deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-11 {
-  100% { transform: translate(23rem, -4rem) rotate(310deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-12 {
-  100% { transform: translate(-22rem, 2rem) rotate(75deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-13 {
-  100% { transform: translate(-16rem, -3rem) rotate(220deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-14 {
-  100% { transform: translate(-7rem, 17rem) rotate(170deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-15 {
-  100% { transform: translate(6rem, 18rem) rotate(80deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-16 {
-  100% { transform: translate(13rem, -17rem) rotate(300deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-17 {
-  100% { transform: translate(18rem, 0) rotate(220deg); opacity: 0; }
-}
-
-@keyframes black-hole-debris-18 {
-  100% { transform: translate(0, -18rem) rotate(270deg); opacity: 0; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -694,14 +307,8 @@ input {
     scroll-behavior: auto !important;
   }
 
-  .black-hole-entering .black-hole-gate,
   .black-hole-entering .black-hole-speed-lines-horizontal,
-  .black-hole-running .black-hole-ring,
-  .black-hole-running .black-hole-core,
-  .black-hole-running .black-hole-speed-lines-radial,
-  .black-hole-crashed .black-hole-shockwave,
-  .black-hole-crashed .black-hole-explosion,
-  .black-hole-crashed .black-hole-debris {
+  .black-hole-running .black-hole-speed-lines-radial {
     animation: none !important;
   }
 }

@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { FlightFallback } from "./crash-flight-fallback";
+import {
+  createBlackholePortalFallback,
+  loadBlackholePortalAsset,
+  updateBlackholePortal,
+} from "./blackhole-portal-model";
 import { createFlightStage, disposeObject } from "./crash-flight-stage";
 import {
-  easeInOutCubic,
-  easeOutCubic,
-  getCameraShake,
-  getSceneProgress,
-  getTargetFov,
-  lerp,
   type StageAnimationPhase,
-  usesRunningTimeCarAsset,
 } from "./crash-flight-motion";
+import { getCrashFlightStoryboard } from "./crash-flight-storyboard";
 import { createGrowthTrail, updateGrowthTrail } from "./growth-trail";
+import {
+  createWormholeTunnel,
+  updateWormholeTunnel,
+} from "./wormhole-tunnel";
 import {
   createTimeCarModel,
   loadTimeCarAsset,
@@ -36,8 +39,6 @@ type SceneState = {
   now: Date;
   round: DashboardRound | null;
 };
-
-const ENTERING_BLACK_HOLE_SECONDS = 1.4;
 
 export function CrashFlightScene({
   animationPhase,
@@ -91,10 +92,15 @@ export function CrashFlightScene({
     const parkedCar = createTimeCarModel();
     const runningCar = createTimeCarModel();
     const trail = createGrowthTrail();
+    const portalRoot = new THREE.Group();
+    let portal = createBlackholePortalFallback();
+    const wormhole = createWormholeTunnel();
+    let portalMixer: THREE.AnimationMixer | null = null;
     let frameId = 0;
     let disposed = false;
     let activePhase = stateRef.current.animationPhase;
     let phaseStartedAt = performance.now();
+    const cameraTarget = new THREE.Vector3();
 
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
@@ -102,8 +108,10 @@ export function CrashFlightScene({
     car.name = "time-car-variant-root";
     parkedCar.name = "time-car-model-parked";
     runningCar.name = "time-car-model-running";
+    portalRoot.name = "blackhole-portal-root";
+    portalRoot.add(portal);
     car.add(parkedCar, runningCar);
-    scene.add(stage.group, trail.group, car);
+    scene.add(stage.group, wormhole.group, portalRoot, trail.group, car);
     loadTimeCarAsset(parkedCar, TIME_CAR_ASSET_PATH, () => disposed).catch(
       () => {
         if (!disposed) {
@@ -120,6 +128,24 @@ export function CrashFlightScene({
         runningCar.name = "time-car-model-running-fallback";
       }
     });
+    loadBlackholePortalAsset(undefined, () => disposed)
+      .then((loadedPortal) => {
+        if (disposed) {
+          disposeObject(loadedPortal.group);
+          return;
+        }
+
+        portalRoot.remove(portal);
+        disposeObject(portal);
+        portal = loadedPortal.group;
+        portalMixer = loadedPortal.mixer;
+        portalRoot.add(portal);
+      })
+      .catch(() => {
+        if (!disposed) {
+          portal.name = "blackhole-portal-fallback-active";
+        }
+      });
     camera.position.set(0.2, 1.12, 5.5);
 
     const resize = () => {
@@ -136,11 +162,6 @@ export function CrashFlightScene({
     const animate = () => {
       const current = stateRef.current;
       const phase = current.animationPhase;
-      const showRunningCar = usesRunningTimeCarAsset(phase);
-      const crashed = phase === "crashed";
-      const entering = phase === "entering";
-      const running = phase === "running";
-      const betting = current.round?.status === "BETTING";
       const nowMs = performance.now();
 
       if (phase !== activePhase) {
@@ -148,95 +169,56 @@ export function CrashFlightScene({
         phaseStartedAt = nowMs;
       }
 
-      parkedCar.visible = !showRunningCar;
-      runningCar.visible = showRunningCar;
-
       const phaseElapsed = (nowMs - phaseStartedAt) / 1000;
-      const enteringProgress = Math.min(
-        1,
-        Math.max(0, phaseElapsed / ENTERING_BLACK_HOLE_SECONDS),
-      );
-      const crashImpact = crashed ? Math.max(0, 1 - phaseElapsed / 1.1) : 0;
-      const progress = entering
-        ? enteringProgress
-        : getSceneProgress(current.round, new Date());
-      const eased = easeOutCubic(progress);
       const time = performance.now() / 1000;
-      animateTimeCarFire(runningCar, time, showRunningCar && !reducedMotion);
-      const idle = Math.sin(time * 2.6) * 0.025;
-      const compact = camera.aspect < 0.82;
-      const parkedX = compact ? -0.96 : -2.28;
-      const parkedY = compact ? -0.58 : -0.82;
-      const portalX = compact ? 1.04 : 1.72;
-      const portalY = compact ? 0.18 : 0.12;
-      const warpX = compact ? -0.08 : 0.22;
-      const warpY = compact ? -0.18 : -0.2;
-      const warpAdvance = compact ? 0.32 : 0.48;
-      const warpRise = compact ? 0.46 : 0.58;
-      const shake = reducedMotion
-        ? { x: 0, y: 0 }
-        : getCameraShake(time, running ? 0.028 : crashImpact * 0.1);
+      const frame = getCrashFlightStoryboard({
+        cameraAspect: camera.aspect,
+        phase,
+        phaseElapsed,
+        reducedMotion,
+        round: current.round,
+        time,
+      });
 
-      if (entering) {
-        car.position.set(
-          lerp(parkedX, portalX, eased),
-          lerp(parkedY, portalY, easeInOutCubic(progress)) +
-            (reducedMotion ? 0 : idle),
-          lerp(-0.14, -0.78, eased),
-        );
-        car.rotation.set(
-          lerp(-0.06, 0.1, eased),
-          lerp(0.24, 0.72, eased),
-          lerp(-0.08, 0.32, eased),
-        );
-      } else if (running || crashed) {
-        const speedJitter = reducedMotion ? 0 : Math.sin(time * 22) * 0.035;
-
-        car.position.set(
-          warpX + eased * warpAdvance + Math.sin(time * 2.8) * 0.08,
-          warpY + eased * warpRise + speedJitter,
-          -0.82 - eased * 0.18,
-        );
-        car.rotation.set(
-          0.1 + Math.sin(time * 6) * 0.025,
-          0.62 + Math.sin(time * 3.2) * 0.08,
-          0.32 + Math.sin(time * 9) * 0.05 + crashImpact * 0.18,
-        );
-      } else {
-        car.position.set(parkedX, parkedY + (betting ? idle : 0), -0.14);
-        car.rotation.set(-0.06, 0.24, -0.08);
-      }
-
-      stage.engineLight.intensity =
-        running || entering ? 3 + Math.sin(time * 10) * 0.9 : 1.2;
-      stage.redFlash.material.opacity = crashed
-        ? 0.18 + crashImpact * 0.35 + Math.sin(time * 7) * 0.06
-        : 0;
-      stage.road.material.opacity = crashed ? 0.28 : running ? 0.18 : 0.52;
-      updateGrowthTrail(
-        trail,
-        running || crashed || entering ? Math.max(progress, 0.15) : 0.02,
-        crashed,
+      parkedCar.visible = !frame.showRunningCar;
+      runningCar.visible = frame.showRunningCar;
+      animateTimeCarFire(runningCar, time, frame.showRunningCar && !reducedMotion);
+      car.position.set(...frame.car.position);
+      car.rotation.set(...frame.car.rotation);
+      portalRoot.position.set(...frame.portal.position);
+      portalRoot.rotation.set(
+        frame.portal.rotation[0],
+        frame.portal.rotation[1],
+        portalRoot.rotation.z,
       );
+      updateBlackholePortal(portalRoot, {
+        crashImpact: frame.crashImpact,
+        entering: frame.entering,
+        phaseElapsed,
+        reducedMotion,
+        time,
+        visible: frame.portalVisible,
+      });
+      portalMixer?.update(reducedMotion ? 0 : 1 / 60);
+      updateWormholeTunnel(wormhole, {
+        crashImpact: frame.crashImpact,
+        phase,
+        progress: frame.progress,
+        reducedMotion,
+        time,
+      });
+      wormhole.group.position.set(...frame.wormholePosition);
+      stage.engineLight.intensity = frame.engineLightIntensity;
+      stage.redFlash.material.opacity = frame.redFlashOpacity;
+      stage.road.material.opacity = frame.roadOpacity;
+      updateGrowthTrail(trail, frame.trailProgress, frame.crashed);
 
-      const cameraZoom = entering ? eased : running || crashed ? 1 : 0;
-      const targetFov = getTargetFov({ crashed, eased, entering, running });
-      const targetCamera = new THREE.Vector3(
-        compact ? 0.1 + cameraZoom * 0.2 : 0.05 + cameraZoom * 0.34,
-        compact ? 1.18 + cameraZoom * 0.02 : 1.18 + cameraZoom * 0.04,
-        compact ? lerp(6.45, 5.25, cameraZoom) : lerp(5.55, 4.22, cameraZoom),
-      );
-      targetCamera.x += shake.x;
-      targetCamera.y += shake.y;
-
-      camera.position.lerp(targetCamera, reducedMotion ? 1 : 0.08);
-      camera.fov = lerp(camera.fov, targetFov, reducedMotion ? 1 : 0.08);
+      cameraTarget.set(...frame.camera.position);
+      camera.position.lerp(cameraTarget, reducedMotion ? 1 : 0.08);
+      camera.fov +=
+        (frame.camera.targetFov - camera.fov) * (reducedMotion ? 1 : 0.08);
       camera.updateProjectionMatrix();
-      camera.lookAt(
-        (compact ? 0.1 : 0.02) + cameraZoom * 0.22 + shake.x * 0.6,
-        (compact ? 0.08 : 0.08) + cameraZoom * 0.2 + shake.y * 0.6,
-        -0.42,
-      );
+      camera.lookAt(...frame.camera.lookAt);
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
     };

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { disposeObject } from "./crash-flight-stage";
 
 export const TIME_CAR_ASSET_PATH = "/models/time-machine-low-poly.glb";
 export const TIME_CAR_RUNNING_ASSET_PATH =
@@ -87,7 +88,7 @@ export async function loadTimeCarAsset(
   normalizeTimeCarAssetForScene(model);
 
   if (isCancelled()) {
-    disposeImportedObject(model);
+    disposeObject(model);
     return;
   }
 
@@ -166,27 +167,10 @@ function replaceChildren(car: THREE.Group, model: THREE.Object3D) {
 
   oldChildren.forEach((child) => {
     car.remove(child);
-    disposeImportedObject(child);
+    disposeObject(child);
   });
 
   car.add(model);
-}
-
-function disposeImportedObject(object: THREE.Object3D) {
-  object.traverse((child) => {
-    if (!(child instanceof THREE.Mesh)) {
-      return;
-    }
-
-    child.geometry.dispose();
-
-    if (Array.isArray(child.material)) {
-      child.material.forEach((material) => material.dispose());
-      return;
-    }
-
-    child.material.dispose();
-  });
 }
 
 function addWingDoor(car: THREE.Group, z: number, rotation: number) {

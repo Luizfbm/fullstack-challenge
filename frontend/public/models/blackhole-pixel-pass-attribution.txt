@@ -1,0 +1,2 @@
+Blackhole pixel pass GLB asset used for the Chrono Crash portal stage.
+Source file supplied locally at /Users/luiz_fbm/Downloads/blackhole_pixel_pass_3.glb.
