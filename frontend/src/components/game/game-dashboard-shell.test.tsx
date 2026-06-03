@@ -227,7 +227,7 @@ describe("game dashboard helpers", () => {
     render(<GameDashboardShell />);
 
     const arena = screen.getByLabelText("Arcade arena");
-    const cashier = screen.getByText("Cashier rail");
+    const cashier = screen.getByText("Mesa de aposta");
     const mobileLeaderboardSlot = screen.getByTestId("mobile-leaderboard-slot");
     const technicalTabs = screen.getByRole("tablist", {
       name: "Evidências técnicas",
@@ -253,9 +253,10 @@ describe("game dashboard helpers", () => {
       mobileLeaderboardSlot.compareDocumentPosition(technicalTabs) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(desktopSidebar.className).toContain("xl:row-span-2");
-    expect(technicalSlot.className).toContain("xl:col-start-2");
-    expect(technicalSlot.className).toContain("xl:row-start-2");
+    expect(desktopSidebar.className).toContain("lg:row-span-2");
+    expect(technicalSlot.className).toContain("lg:col-start-1");
+    expect(technicalSlot.className).toContain("lg:row-start-2");
+    expect(desktopSidebar.className).not.toContain("xl:row-span-2");
   });
 
   it("places the desktop cashier rail above the desktop leaderboard without duplicating the form", () => {
@@ -277,16 +278,51 @@ describe("game dashboard helpers", () => {
     const desktopSidebar = screen.getByRole("complementary", {
       name: "Desktop cashier and leaderboard",
     });
-    const cashier = within(desktopSidebar).getByText("Cashier rail");
+    const cashier = within(desktopSidebar).getByText("Mesa de aposta");
     const leaderboard = within(desktopSidebar).getByText("Leaderboard");
 
     expect(
       cashier.compareDocumentPosition(leaderboard) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(screen.getAllByText("Cashier rail")).toHaveLength(1);
+    expect(screen.getAllByText("Mesa de aposta")).toHaveLength(1);
     expect(screen.getAllByLabelText("Valor em reais")).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Apostar" })).toHaveLength(1);
+  });
+
+  it("renders a compact mobile bet dock without duplicating the bet form", () => {
+    render(<BetControlsPanel activeBet={null} currentRound={createRound()} />);
+
+    const betSlip = screen.getByTestId("bet-slip-panel");
+    const dock = within(betSlip).getByTestId("mobile-bet-dock");
+    const details = within(betSlip).getByTestId("bet-slip-details");
+    const configureButton = within(betSlip).getByRole("button", {
+      name: "Configurar aposta",
+    });
+
+    expect(within(dock).getByLabelText("Valor em reais")).toBeTruthy();
+    expect(within(dock).getByRole("button", { name: "Apostar" })).toBeTruthy();
+    expect(configureButton.getAttribute("aria-expanded")).toBe("false");
+    expect(details.className).toContain("max-lg:hidden");
+    expect(screen.getAllByLabelText("Valor em reais")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Apostar" })).toHaveLength(1);
+  });
+
+  it("expands compact bet details from the mobile dock toggle", () => {
+    render(<BetControlsPanel activeBet={null} currentRound={createRound()} />);
+
+    const betSlip = screen.getByTestId("bet-slip-panel");
+    const toggle = within(betSlip).getByRole("button", {
+      name: "Configurar aposta",
+    });
+    const details = within(betSlip).getByTestId("bet-slip-details");
+
+    fireEvent.click(toggle);
+
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(details.className).not.toContain("max-lg:hidden");
+    expect(within(details).getByRole("button", { name: "Manual" })).toBeTruthy();
+    expect(within(details).getByRole("button", { name: "Auto" })).toBeTruthy();
   });
 
   it("renders the authenticated player's active auto bet session", () => {

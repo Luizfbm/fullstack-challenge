@@ -38,7 +38,7 @@ export function BetActionButtons({
   stopAutoBetIsPending,
 }: BetActionButtonsProps) {
   return (
-    <div className="mt-4 grid grid-cols-1 gap-2">
+    <div className="mt-3 grid grid-cols-1 gap-2">
       <Button
         className="min-h-11 w-full min-w-0 whitespace-nowrap px-3 leading-none"
         disabled={
