@@ -1161,6 +1161,42 @@ Cada entrada deve conter:
 - Validacao: `cd frontend && bun run test src/components/game/casino-surface-contracts.test.tsx` e `bunx tsc --noEmit -p frontend/tsconfig.json` passaram apos a correcao.
 - Status: resolvido.
 
+### 66. E2E browser do PR esperava texto antigo do countdown
+
+- Contexto: babysit do PR #21 apos mover o countdown de `BETTING` para um
+  badge junto a margem do palco.
+- Sintoma: os jobs GitHub Actions `Docker Kong Keycloak E2E` falharam em
+  `bun run test:e2e:browser`; os tres fluxos de jogador esperavam o texto
+  visivel `Rodada inicia em`, mas o texto visivel aprovado passou a ser
+  `Largada` / `em`.
+- Causa: o teste browser ficou acoplado ao texto visual antigo. A UI atual
+  preserva o contrato acessivel em `aria-label="Rodada inicia em N segundos"`,
+  mas nao renderiza mais a frase antiga como texto visivel.
+- Correcao: atualizar o helper browser de rodada preparada para aguardar o
+  countdown pelo label acessivel `Rodada inicia em \\d+ segundos`, mantendo a
+  cobertura do estado `BETTING` sem depender da composicao visual interna.
+- Validacao: `bunx playwright test tests/browser/player-flow.spec.ts` passou
+  com 3 testes; `bun run test:e2e:browser` passou com 7 testes apos a
+  correcao do seletor e serializacao do browser E2E.
+- Status: resolvido.
+
+### 67. Browser E2E completo disputava estado global em paralelo
+
+- Contexto: validacao local da correcao do PR #21 com `bun run
+  test:e2e:browser`.
+- Sintoma: o arquivo focado `tests/browser/player-flow.spec.ts` passou com 3
+  testes, mas a suite browser completa falhou no primeiro fluxo de jogador
+  esperando `CASHED_OUT`; a captura mostrava a aposta ainda como `ACCEPTED` e
+  o botao em estado `Sacando`.
+- Causa: a suite Playwright executava com 2 workers contra uma unica stack
+  Docker/Kong/Keycloak, um unico banco de dados e o mesmo usuario `player`.
+  Os fluxos browser alteram rodada e carteira globais, portanto nao sao
+  independentes para paralelismo de processo.
+- Correcao: configurar `workers: 1` no Playwright para executar o browser E2E
+  serialmente contra o ambiente compartilhado.
+- Validacao: `bun run test:e2e:browser` passou com 7 testes usando 1 worker.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`

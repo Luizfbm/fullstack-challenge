@@ -5,6 +5,7 @@ export default defineConfig({
     timeout: 15000,
   },
   outputDir: "quality/reports/playwright",
+  workers: 1,
   projects: [
     {
       name: "chromium",

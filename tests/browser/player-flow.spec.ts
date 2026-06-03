@@ -173,7 +173,8 @@ async function expectPreparedBettingRound(
   preparedRound: PreparedRound,
 ) {
   await expect(page.getByText("connected BETTING").first()).toBeVisible();
-  await expect(page.getByText("Rodada inicia em").first()).toBeVisible();
+  await expect(page.getByLabel(/Rodada inicia em \d+ segundos/).first())
+    .toBeVisible();
   await expect(async () => {
     const response = await page.request.get("/games/rounds/current");
 
