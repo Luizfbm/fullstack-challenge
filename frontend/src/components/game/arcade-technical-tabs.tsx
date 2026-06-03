@@ -42,7 +42,7 @@ export function ArcadeTechnicalTabs({
   ];
 
   return (
-    <section className="casino-tabs rounded-xl border border-white/10 p-3">
+    <section className="casino-tabs casino-audit-panel rounded-xl border border-cyan-200/10 p-3">
       <div
         aria-label="Evidências técnicas"
         className="grid grid-cols-1 gap-2 sm:grid-cols-3"
@@ -52,10 +52,10 @@ export function ArcadeTechnicalTabs({
           <button
             aria-selected={activeTab === tab.id}
             className={cn(
-              "flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-200",
+              "flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200",
               activeTab === tab.id
-                ? "border-rose-300/50 bg-rose-400/15 text-rose-100 shadow-[0_0_24px_rgba(244,63,94,0.2)]"
-                : "border-white/10 bg-black/25 text-zinc-400 hover:border-rose-300/30 hover:text-zinc-100",
+                ? "border-cyan-200/30 bg-cyan-300/10 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
+                : "border-white/10 bg-black/25 text-zinc-400 hover:border-cyan-200/25 hover:text-zinc-100",
             )}
             key={tab.id}
             onClick={() => onTabChange(tab.id)}

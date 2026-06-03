@@ -33,14 +33,14 @@ export function LeaderboardPanel({
   return (
     <section
       className={cn(
-        "casino-mini-panel min-w-0 rounded-lg border border-amber-200/20 bg-black/45 p-3 shadow-[0_0_50px_rgba(251,191,36,0.12)]",
+        "casino-scoreboard casino-mini-panel min-w-0 rounded-lg border border-amber-200/25 bg-black/45 p-3 shadow-[0_0_50px_rgba(250,204,21,0.12)]",
         className,
       )}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200">
-            Net profit
+            Mesa VIP
           </p>
           <h2 className="mt-1 flex items-center gap-2 text-lg font-black text-zinc-50">
             <Trophy className="size-4 text-amber-200" aria-hidden="true" />
