@@ -282,6 +282,7 @@ describe("game dashboard helpers", () => {
       name: "Desktop cashier and leaderboard",
     });
     const cashier = within(desktopSidebar).getByText("Mesa de aposta");
+    const betPanel = screen.getByTestId("bet-slip-panel");
     const leaderboard = within(desktopSidebar).getByText("Leaderboard");
 
     expect(
@@ -289,6 +290,8 @@ describe("game dashboard helpers", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(screen.getAllByText("Mesa de aposta")).toHaveLength(1);
+    expect(within(betPanel).getByRole("heading", { name: "Aposta" })).toBeTruthy();
+    expect(within(betPanel).queryByText("Bet slip")).toBeNull();
     expect(screen.getAllByLabelText("Valor em reais")).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Apostar" })).toHaveLength(1);
     expect(desktopSidebar.className).toContain("lg:sticky");
@@ -372,13 +375,15 @@ describe("game dashboard helpers", () => {
       name: "Resumo compacto do último auto bet",
     });
     expect(within(compactSummary).getByText("Ultimo Auto Bet")).toBeTruthy();
-    expect(within(compactSummary).getByText("Martingale")).toBeTruthy();
+    const strategyBadge = within(compactSummary).getByText("Martingale");
+    expect(strategyBadge.className).not.toContain("font-mono");
     expect(
       within(compactSummary).getByText("Auto cashout 2.00x"),
     ).toBeTruthy();
-    expect(
-      within(compactSummary).getByText("Maximo de passos Martingale"),
-    ).toBeTruthy();
+    const stopReasonBadge = within(compactSummary).getByText(
+      "Maximo de passos Martingale",
+    );
+    expect(stopReasonBadge.className).not.toContain("font-mono");
 
     for (const label of [
       "Rodadas",
@@ -392,7 +397,9 @@ describe("game dashboard helpers", () => {
       expect(within(compactSummary).getByText(label)).toBeTruthy();
     }
 
-    expect(within(compactSummary).getByText("2 / 5")).toBeTruthy();
+    expect(within(compactSummary).getByText("2 / 5").className).toContain(
+      "font-mono",
+    );
     expect(within(compactSummary).getByText("1 / 3")).toBeTruthy();
     expect(within(compactSummary).getByText("-R$ 10,00")).toBeTruthy();
     expect(within(compactSummary).getAllByText("R$ 10,00")).toHaveLength(1);

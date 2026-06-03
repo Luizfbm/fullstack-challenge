@@ -22,6 +22,21 @@ describe("casino surface contracts", () => {
     expect(styles).toContain(".casino-bet-slip");
   });
 
+  it("uses Sora as the global casino UI face while keeping stake values mono", () => {
+    const styles = readFileSync("src/styles.css", "utf8");
+    const rootBlock = extractCssBlock(styles, ":root");
+
+    expect(styles).toContain(
+      "https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap",
+    );
+    expect(rootBlock).toContain('"Sora", "Avenir Next"');
+
+    render(<BetStakePreview entryLabel="R$ 12,50" potentialPayout={2500n} />);
+
+    expect(screen.getByText("R$ 12,50").className).toContain("font-mono");
+    expect(screen.getByText("R$ 25,00").className).toContain("font-mono");
+  });
+
   it("keeps global page chrome on felt and gold instead of red neon", () => {
     const styles = readFileSync("src/styles.css", "utf8");
     const bodyBlock = extractCssBlock(styles, "body");
@@ -33,6 +48,19 @@ describe("casino surface contracts", () => {
     expect(headerFrameBlock).toContain("rgba(6, 78, 59");
     expect(headerFrameBlock).toContain("rgba(250, 204, 21");
     expect(headerFrameBlock).not.toContain("rgba(244, 63, 94");
+  });
+
+  it("keeps the non-crash stage ambient layers off the old red neon palette", () => {
+    const styles = readFileSync("src/styles.css", "utf8");
+    const arenaBlock = extractCssBlock(styles, ".chrono-arena");
+    const gridBlock = extractCssBlock(styles, ".chrono-grid");
+    const riftBlock = extractCssBlock(styles, ".chrono-rift");
+
+    expect(arenaBlock).toContain("rgba(6, 78, 59");
+    expect(arenaBlock).toContain("rgba(250, 204, 21");
+    expect(arenaBlock).not.toContain("rgba(244, 63, 94");
+    expect(gridBlock).not.toContain("rgba(244, 63, 94");
+    expect(riftBlock).not.toContain("rgba(244, 63, 94");
   });
 
   it("uses gold and felt treatments for the primary bet surface controls", () => {

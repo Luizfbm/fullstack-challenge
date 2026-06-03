@@ -28,10 +28,7 @@ test("player can login, bet, cash out, and keep the realtime table visible", asy
 
   await page.reload();
 
-  await expect(page.getByText("LIVE").first()).toBeVisible();
-  await expect(page.getByTestId("metric-rodada")).toContainText(
-    `#${preparedRound.chainIndex} BETTING`,
-  );
+  await expectPreparedBettingRound(page, preparedRound);
   await page.getByRole("tab", { name: "Round State" }).click();
   await expect(
     page.getByText(
@@ -89,10 +86,7 @@ test("player can use auto cashout preset without manual cashout", async ({
 
   await page.reload();
 
-  await expect(page.getByText("LIVE").first()).toBeVisible();
-  await expect(page.getByTestId("metric-rodada")).toContainText(
-    `#${preparedRound.chainIndex} BETTING`,
-  );
+  await expectPreparedBettingRound(page, preparedRound);
   await expect(page.getByText("Limite: 1.01x a 1000.00x")).toBeVisible();
 
   const balanceBeforeBet = await readDisplayedBalance(page);
@@ -141,10 +135,7 @@ test("player can configure and stop a martingale auto bet session", async ({
 
   await page.reload();
 
-  await expect(page.getByText("LIVE").first()).toBeVisible();
-  await expect(page.getByTestId("metric-rodada")).toContainText(
-    `#${preparedRound.chainIndex} BETTING`,
-  );
+  await expectPreparedBettingRound(page, preparedRound);
 
   await page.getByRole("button", { exact: true, name: "Auto" }).click();
   await page.getByRole("button", { name: "Martingale" }).click();
@@ -170,11 +161,36 @@ test("player can configure and stop a martingale auto bet session", async ({
 });
 
 async function readDisplayedBalance(page: Page): Promise<string> {
-  const balance = page.getByTestId("metric-saldo").locator("p").last();
+  const balance = page.getByLabel("Conta do jogador").locator("p").last();
 
-  await expect(balance).toBeVisible();
+  await expect(balance).toHaveText(/^R\$/);
 
   return balance.innerText();
+}
+
+async function expectPreparedBettingRound(
+  page: Page,
+  preparedRound: PreparedRound,
+) {
+  await expect(page.getByText("connected BETTING").first()).toBeVisible();
+  await expect(page.getByText("Rodada inicia em").first()).toBeVisible();
+  await expect(async () => {
+    const response = await page.request.get("/games/rounds/current");
+
+    expect(response.ok()).toBe(true);
+
+    const currentRound = (await response.json()) as {
+      chainIndex: number;
+      id: string;
+      status: string;
+    };
+
+    expect(currentRound).toMatchObject({
+      chainIndex: preparedRound.chainIndex,
+      id: preparedRound.roundId,
+      status: "BETTING",
+    });
+  }).toPass();
 }
 
 async function expectStageAssetsLoaded(page: Page) {

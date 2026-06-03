@@ -35,7 +35,7 @@ describe("ChronoStage", () => {
     vi.useRealTimers();
   });
 
-  it("shows a central countdown while betting", () => {
+  it("pins the betting countdown beside the portal instead of over the center", () => {
     render(
       <ChronoStage
         isLoading={false}
@@ -48,13 +48,28 @@ describe("ChronoStage", () => {
       />,
     );
 
-    expect(screen.getByTestId("stage-multiplier-value").textContent).toBe(
+    const badge = screen.getByTestId("betting-countdown-badge");
+
+    expect(screen.queryByTestId("stage-multiplier-pill")).toBeNull();
+    expect(badge.getAttribute("aria-label")).toBe(
+      "Rodada inicia em 6 segundos",
+    );
+    expect(badge.className).toContain("right-3");
+    expect(badge.className).toContain("top-3");
+    expect(badge.className).toContain("sm:right-4");
+    expect(badge.className).toContain("sm:top-4");
+    expect(badge.className).toContain("items-center");
+    expect(badge.className).not.toContain("left-[");
+    expect(badge.className).not.toContain("inset-0");
+    expect(screen.getByTestId("betting-countdown-value").textContent).toBe(
       "6",
     );
     expect(screen.getByTestId("betting-countdown-number").textContent).toBe(
       "6",
     );
-    expect(screen.getByText("Rodada inicia em")).toBeTruthy();
+    expect(screen.getByText("Largada")).toBeTruthy();
+    expect(screen.getByText("em")).toBeTruthy();
+    expect(screen.queryByText("Rodada inicia em")).toBeNull();
     expect(screen.queryByText("Multiplicador atual")).toBeNull();
     expect(screen.queryByText("6s")).toBeNull();
   });
@@ -72,7 +87,7 @@ describe("ChronoStage", () => {
       />,
     );
 
-    expect(screen.getByTestId("stage-multiplier-value").textContent).toBe(
+    expect(screen.getByTestId("betting-countdown-value").textContent).toBe(
       "0",
     );
     expect(screen.queryByText("0s")).toBeNull();
@@ -178,6 +193,10 @@ describe("ChronoStage", () => {
 
     expect(screen.queryByText("LIVE")).toBeNull();
     expect(screen.queryByText("Arcade run")).toBeNull();
+    expect(screen.getByTestId("chrono-stage").className).toContain(
+      "border-amber-200/35",
+    );
+    expect(screen.getByTestId("chrono-stage").className).not.toContain("rose");
     expect(screen.getByTestId("stage-multiplier").className).toContain(
       "items-center",
     );

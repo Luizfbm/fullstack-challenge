@@ -177,7 +177,7 @@ type SummaryBadgeProps = {
 
 function SummaryBadge({ children }: SummaryBadgeProps) {
   return (
-    <p className="max-w-full rounded-md border border-cyan-200/30 bg-black/35 px-2 py-1 font-mono text-xs leading-tight text-cyan-100">
+    <p className="max-w-full rounded-md border border-cyan-200/30 bg-black/35 px-2 py-1 text-xs font-semibold leading-tight text-cyan-100">
       {children}
     </p>
   );
