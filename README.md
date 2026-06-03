@@ -1,452 +1,347 @@
-# Desafio Full-stack - Crash Game 🎮
+# Chrono Crash - Full-stack Crash Game
 
-## Bem-vindo à Jungle Gaming 🦧
+Este e o README final de entrega do desafio. O enunciado original foi
+preservado em [`DESAFIO_ORIGINAL.md`](DESAFIO_ORIGINAL.md) para que o
+avaliador consiga comparar requisito por requisito.
 
-A **Jungle Gaming** é uma software house especializada em iGaming — desenvolvemos plataformas de cassino online com tecnologia de ponta: NestJS, Bun, TanStack, DDD e arquitetura orientada a eventos. Somos apaixonados por engenharia de software e acreditamos que grandes produtos nascem de grandes times.
+Chrono Crash e um Crash Game full-stack com dois bounded contexts, comunicacao
+financeira via RabbitMQ, Keycloak como IdP, Kong como API Gateway, frontend
+React/Vite responsivo e uma suite de qualidade automatizada cobrindo dominio,
+API, Docker, browser e UI.
 
-Este desafio é a porta de entrada para fazer parte desse time. Ele foi desenhado para refletir problemas reais do nosso dia a dia: sistemas distribuídos, tempo real, precisão monetária, experiência de usuário e arquitetura bem pensada.
+## Stack
 
-Não esperamos perfeição — esperamos raciocínio claro, código limpo e decisões justificadas. Mostre como você pensa e como você constrói.
+| Camada | Implementacao |
+| --- | --- |
+| Runtime | Bun |
+| Backend | NestJS + TypeScript strict |
+| Bancos | PostgreSQL com bancos separados `games` e `wallets` |
+| ORM | Prisma |
+| Mensageria | RabbitMQ |
+| API Gateway | Kong DB-less |
+| IdP | Keycloak realm `crash-game` |
+| Realtime | Socket.IO via `@nestjs/websockets` |
+| Frontend | Vite + React + Tailwind CSS v4 |
+| Estado | TanStack Query + Zustand |
+| Testes | Bun test, Vitest e Playwright |
+| Docs API | Swagger/OpenAPI |
+| Observabilidade | Prometheus, Grafana, Jaeger e OpenTelemetry |
 
----
+## Como rodar
 
-## Visão Geral 📖
+Pre-requisitos:
 
-Um **Crash Game** é um jogo de cassino multiplayer em tempo real: um multiplicador sobe a partir de `1.00x` e pode "crashar" a qualquer momento. Jogadores apostam antes da rodada e precisam sacar (cash out) antes do crash para garantir os ganhos — caso contrário, perdem a aposta.
+- Bun 1.x
+- Docker e Docker Compose
 
-Você deve construir o **backend** (engine do jogo, carteira, comunicação em tempo real) e o **frontend** (UI com animações, interface de apostas, histórico).
+Instalacao:
 
-**Autenticação não faz parte do escopo.** O projeto já vem com Keycloak configurado — fique à vontade para substituí-lo por Auth0 ou Okta se preferir.
-
----
-
-## Regras do Jogo 🎲
-
-1. **Fase de Apostas** — Janela configurável (ex: 10s) para apostar. Cada jogador pode fazer apenas **uma aposta por rodada**.
-2. **Início da Rodada** — O multiplicador começa em `1.00x` e sobe continuamente.
-3. **Cash Out** — O jogador pode sacar a qualquer momento durante a rodada. Pagamento = `aposta × multiplicador atual`. Após sacar, não pode reentrar.
-4. **Crash** — O multiplicador para em um ponto pré-determinado. Quem não sacou perde a aposta.
-5. **Fim da Rodada** — Resultados revelados, saldos atualizados, nova fase de apostas começa.
-
-**Restrições:**
-
-- Aposta mínima: `1.00` / Máxima: `1.000,00`
-- Saldo insuficiente → aposta rejeitada
-- Sem aposta na rodada → não pode sacar
-- Rodada ativa → não pode apostar (apenas na fase de apostas)
-
----
-
-## Arquitetura 🏗️
-
-```
-                        ┌──────────────────────────┐
-                        │        Frontend           │
-                        │   (React + Tailwind CSS)  │
-                        └─────┬────────────┬────────┘
-                           HTTP/REST    WebSocket
-                              │            │
-                        ┌─────▼────────────▼────────┐
-                        │         Kong               │
-                        │      (API Gateway)         │
-                        └─────┬────────────┬────────┘
-                              │            │
-                    ┌─────────▼──┐   ┌─────▼────────┐
-                    │   Game     │   │   Wallet     │
-                    │  Service   │   │   Service    │
-                    │  (NestJS)  │   │   (NestJS)   │
-                    └──┬─────┬──┘   └──────┬───────┘
-                       │     └──────┬──────┘
-                  ┌────▼────┐  ┌────▼──────────┐
-                  │PostgreSQL│  │ RabbitMQ/SQS  │
-                  └─────────┘  └───────────────┘
-
-              ┌─────────────────┐
-              │    Keycloak     │
-              │  (IdP — OIDC)   │
-              └─────────────────┘
+```bash
+bun install
 ```
 
----
+Subir a stack completa:
 
-## Tech Stack Aceita 🛠️
+```bash
+bun run docker:up
+```
 
-| Camada          | Tecnologia                                                        |
-| --------------- | ----------------------------------------------------------------- |
-| **Runtime**     | Bun (latest)                                                      |
-| **Backend**     | NestJS + TypeScript (strict mode)                                 |
-| **Banco**       | PostgreSQL 18+ com ORM (MikroORM, Prisma ou TypeORM)              |
-| **Mensageria**  | RabbitMQ, Kafka Ou AWS SQS (Via LocalStack)                       |
-| **API Gateway** | Kong ou AWS API Gateway                                           |
-| **IdP**         | Keycloak (preferido), Auth0 ou Okta                               |
-| **WebSocket**   | `@nestjs/websockets` + `socket.io` ou `ws`                        |
-| **Frontend**    | Next.js, Vite ou Tanstack Start                                   |
-| **Estilo**      | Tailwind CSS v4 + shadcn/ui                                       |
-| **Estado**      | TanStack Query (server state) + Zustand ou Context (client state) |
-| **Testes**      | Bun test runner ou Vitest                                         |
-| **Docs**        | Swagger / OpenAPI (`@nestjs/swagger`)                             |
-| **Infra**       | Docker Compose                                                    |
+O script acima executa `docker compose up --build` e fica em primeiro plano.
+Para uso local em segundo plano, o equivalente e:
 
----
+```bash
+docker compose up -d --build
+```
 
-## Modelo de Domínio 🧩
+Parar a stack:
 
-O sistema é dividido em dois bounded contexts:
+```bash
+bun run docker:down
+```
 
-### Game Service
+Reset completo de containers, volumes e imagens locais do projeto:
 
-Responsável pelo ciclo de vida da rodada, apostas, lógica de crash, provably fair e WebSocket.
+```bash
+bun run docker:prune
+```
 
-- **Round** — Agregado principal. Gerencia o ciclo de vida completo de uma rodada.
-- **Bet** — Aposta de um jogador em uma rodada.
-- **Crash Point** — Multiplicador pré-determinado onde a rodada termina (gerado via algoritmo provably fair).
+Use `docker:prune` somente quando quiser apagar o estado local de banco e
+fila.
 
-Cabe a você modelar os estados, transições, invariantes e regras de negócio de cada entidade.
+## URLs e credenciais
 
-### Wallet Service
+| Recurso | URL | Credenciais |
+| --- | --- | --- |
+| Aplicacao via Kong | `http://localhost:8000/` | login pelo botao `Entrar` |
+| Game Service via Kong | `http://localhost:8000/games/*` | conforme rota |
+| Wallet Service via Kong | `http://localhost:8000/wallets/*` | conforme rota |
+| Game Swagger direto | `http://localhost:4001/docs` | publico |
+| Wallet Swagger direto | `http://localhost:4002/docs` | publico |
+| Keycloak admin | `http://localhost:8080/admin/master/console/` | `admin` / `admin` |
+| RabbitMQ Management | `http://localhost:15672` | `admin` / `admin` |
+| Prometheus | `http://localhost:9090` | publico local |
+| Grafana | `http://localhost:3001` | `admin` / `admin` |
+| Jaeger | `http://localhost:16686` | publico local |
 
-Responsável pela carteira do jogador: saldo, operações de crédito e débito.
+Usuario de teste:
 
-- **Wallet** — Uma por jogador. **Nunca use ponto flutuante para dinheiro** — use centavos inteiros (`BIGINT`), `NUMERIC` ou biblioteca Decimal.
+| Campo | Valor |
+| --- | --- |
+| Realm | `crash-game` |
+| Client ID | `crash-game-client` |
+| Usuario | `player` |
+| Senha | `player123` |
+| Wallet inicial | `100000` centavos, equivalente a R$ 1.000,00 |
 
-### Comunicação entre serviços
+## Arquitetura
 
-Game e Wallet se comunicam **assincronamente via RabbitMQ/SQS**. Você deve projetar os eventos, fluxos e estratégias de compensação necessários para garantir consistência entre os serviços.
+```text
+Frontend React/Vite
+  | HTTP REST + WebSocket
+Kong API Gateway
+  | REST                         | REST
+Game Service (NestJS)            Wallet Service (NestJS)
+  | PostgreSQL games             | PostgreSQL wallets
+  |                              |
+  +------ RabbitMQ wallet.commands ------+
 
-O design dessa comunicação é **parte central da avaliação**.
+Keycloak emite JWTs; Game e Wallet validam Bearer tokens via JWKS.
+```
 
----
+O Game Service e dono de rodada, aposta, cashout, leaderboard, auto bet,
+auto cashout, provably fair e eventos realtime. O Wallet Service e dono do
+saldo, ledger financeiro, debitos, creditos e idempotencia financeira.
 
-## Algoritmo Provably Fair 🔐
+O Game nunca altera saldo diretamente. Operacoes financeiras passam pelo
+RabbitMQ com comandos `wallet.debit` e `wallet.credit`. O fluxo usa outbox no
+Game e inbox no Wallet para manter idempotencia e tolerar reentregas.
 
-O crash point de cada rodada deve ser **verificável pelo jogador** — garantindo que o resultado foi pré-determinado e não manipulado após as apostas.
+## Dinheiro e multiplicadores
 
-Pesquise como algoritmos provably fair funcionam em crash games. Conceitos relevantes: hash chains, HMAC, seeds, house edge. O jogador deve ser capaz de verificar independentemente o crash point de qualquer rodada passada.
+Dinheiro nunca usa ponto flutuante.
 
-A implementação desse algoritmo (geração, cálculo e verificação) faz parte da avaliação.
+- Valores monetarios sao armazenados como `BigInt`/`BIGINT` em centavos.
+- A API serializa dinheiro como string para evitar perda de precisao em JSON.
+- `100` representa R$ 1,00.
+- Aposta minima: `100` centavos.
+- Aposta maxima: `100000` centavos.
 
----
+Multiplicadores usam basis points:
 
-## Referência da API 📡
+- `10000` representa `1.00x`.
+- `25000` representa `2.50x`.
+- Payout: `floor(amountCents * multiplierBp / 10000)`.
 
-Todos os endpoints são acessados via **Kong** (`http://localhost:8000`).
+## Provably fair
 
-### REST
+Cada rodada tem commitment antes da revelacao:
 
-#### Wallet Service — `/wallets`
+- `serverSeedHash` fica publico antes e durante a rodada.
+- `serverSeed` e `crashPointBp` so sao revelados depois do crash.
+- O crash point e calculado com hash chain + HMAC SHA-256, `clientSeed`,
+  `nonce` e house edge.
+- `GET /games/rounds/:roundId/verify` recalcula o resultado e retorna se a
+  rodada e verificavel.
 
-| Método | Endpoint      | Auth | Descrição                                |
-| ------ | ------------- | ---- | ---------------------------------------- |
-| `POST` | `/wallets`    | Sim  | Cria carteira para o jogador autenticado |
-| `GET`  | `/wallets/me` | Sim  | Retorna carteira e saldo do jogador      |
+Arquivos principais:
 
-> Crédito e débito **não** são expostos via REST — acontecem via message broker.
+- `services/games/src/domain/provably-fair.ts`
+- `services/games/src/application/use-cases/verify-round.use-case.ts`
+- `services/games/tests/unit/domain/game-domain.test.ts`
+- `services/games/tests/e2e/cashout-flow.e2e.test.ts`
+- `services/games/tests/e2e/crash-loss-flow.e2e.test.ts`
 
-#### Game Service — `/games`
+## API
 
-| Método | Endpoint                        | Auth | Descrição                                  |
-| ------ | ------------------------------- | ---- | ------------------------------------------ |
-| `GET`  | `/games/rounds/current`         | Não  | Estado da rodada atual com apostas         |
-| `GET`  | `/games/rounds/history`         | Não  | Histórico paginado de rodadas              |
-| `GET`  | `/games/rounds/:roundId/verify` | Não  | Dados de verificação provably fair         |
-| `GET`  | `/games/bets/me`                | Sim  | Histórico de apostas do jogador (paginado) |
-| `POST` | `/games/bet`                    | Sim  | Fazer aposta na rodada atual               |
-| `POST` | `/games/bet/cashout`            | Sim  | Sacar no multiplicador atual               |
+Todas as rotas principais sao acessadas via Kong em `http://localhost:8000`.
+
+### Wallet
+
+| Metodo | Rota | Auth | Descricao |
+| --- | --- | --- | --- |
+| `POST` | `/wallets` | sim | Cria a wallet do jogador autenticado |
+| `GET` | `/wallets/me` | sim | Retorna saldo do jogador autenticado |
+| `GET` | `/wallets/health` | nao | Healthcheck |
+| `GET` | `/wallets/metrics` | nao | Metricas Prometheus |
+
+Debito e credito nao sao expostos por REST. Eles acontecem via RabbitMQ.
+
+### Game
+
+| Metodo | Rota | Auth | Descricao |
+| --- | --- | --- | --- |
+| `GET` | `/games/rounds/current` | nao | Rodada atual |
+| `GET` | `/games/rounds/history` | nao | Historico de rodadas |
+| `GET` | `/games/rounds/:roundId/verify` | nao | Verificacao provably fair |
+| `GET` | `/games/bets/me` | sim | Historico de apostas do jogador |
+| `POST` | `/games/bet` | sim | Faz uma aposta |
+| `POST` | `/games/bet/cashout` | sim | Executa cashout |
+| `GET` | `/games/leaderboard` | nao | Ranking por lucro liquido |
+| `POST` | `/games/auto-bet/sessions` | sim | Inicia auto bet |
+| `GET` | `/games/auto-bet/sessions/me` | sim | Consulta auto bet do jogador |
+| `POST` | `/games/auto-bet/sessions/me/stop` | sim | Para auto bet ativo |
+| `GET` | `/games/health` | nao | Healthcheck |
+| `GET` | `/games/metrics` | nao | Metricas Prometheus |
 
 ### WebSocket
 
-A conexão WebSocket é usada exclusivamente para **comunicação do servidor para o cliente** (push de eventos em tempo real). Todas as ações do jogador (apostar, sacar) são feitas via REST.
+O WebSocket e usado apenas para server-to-client. Apostas e cashouts continuam
+por REST.
 
-Você deve projetar os eventos que o servidor emite para manter todos os clientes sincronizados em tempo real. Considere quais informações o frontend precisa receber para:
+| Campo | Valor |
+| --- | --- |
+| Namespace | `/games` |
+| Path via Kong | `/games/socket.io` |
 
-- Saber quando uma nova rodada começa e quando a fase de apostas termina
-- Acompanhar o multiplicador durante a rodada
-- Saber quando a rodada crashou (e os dados de verificação)
-- Ver as apostas e cash outs dos outros jogadores em tempo real
+Eventos emitidos:
 
-O design dos eventos WebSocket, seus payloads e a estratégia de sincronização do multiplicador fazem parte da avaliação.
+- `round.snapshot`
+- `round.betting_started`
+- `round.started`
+- `round.tick`
+- `round.crashed`
+- `round.settled`
+- `bet.placed`
+- `bet.cashed_out`
 
----
+O E2E `services/games/tests/e2e/realtime-websocket.e2e.test.ts` valida duas
+conexoes simultaneas recebendo os mesmos eventos e confirma que comandos de
+aposta enviados pelo socket nao produzem apostas.
 
-## Requisitos do Frontend 🖥️
+## Frontend
 
-### Página de Login
+O frontend entrega a experiencia principal do jogo, sem landing page:
 
-Redirect para Keycloak (OIDC authorization code flow). Tratar callback e armazenar tokens.
+- Login Keycloak com authorization code flow + PKCE.
+- Palco 3D com carro, portal, curva do multiplicador e estados de rodada.
+- Controles de aposta, cashout, auto cashout e auto bet Martingale.
+- Historico de rodadas, leaderboard, mesa de apostas e aba provably fair.
+- Saldo e username no header.
+- Dark mode com estetica premium arcade casino em felt green + gold.
+- Responsividade validada por Playwright em mobile, tablet, laptop e desktop.
+- Loading/error states e feedbacks de erro via UI.
 
-### Página do Jogo (Principal)
+Arquivos principais:
 
-**Gráfico do Crash** — Multiplicador animado subindo de `1.00x`, curva visual, indicação clara do crash, exibição do hash da seed antes da rodada.
+- `frontend/src/components/game/game-dashboard-shell.tsx`
+- `frontend/src/components/game/chrono-stage.tsx`
+- `frontend/src/components/game/crash-flight-scene.tsx`
+- `frontend/src/hooks/use-game-rest.ts`
+- `frontend/src/hooks/use-game-realtime.ts`
+- `frontend/src/stores/game-realtime-store.ts`
 
-**Controles de Aposta** — Input de valor com validação, botão "Apostar" (habilitado só na fase de apostas), botão "Cash Out" (habilitado só durante rodada ativa com aposta pendente, exibindo pagamento potencial), timer de contagem regressiva.
+## Requisitos eliminatorios do desafio
 
-**Apostas da Rodada Atual** — Lista em tempo real de todas as apostas, mostrando username, valor e status. Destacar cash outs.
+| Requisito | Status | Evidencia |
+| --- | --- | --- |
+| `bun run docker:up` sobe tudo sem passo manual | Cumprido | `package.json`, `docker-compose.yml`, Dockerfiles com `prisma migrate deploy`, `bun run ci:e2e` |
+| Gameplay apostar -> multiplicador -> cashout/crash -> liquidacao | Cumprido | `cashout-flow.e2e.test.ts`, `crash-loss-flow.e2e.test.ts`, `player-flow.spec.ts` |
+| Dois servicos separados comunicando via RabbitMQ/SQS | Cumprido | `services/games`, `services/wallets`, `rabbitmq-wallet.client.ts`, `wallet-command-handler.ts` |
+| Sincronizacao em tempo real multiaba | Cumprido | `realtime-websocket.e2e.test.ts` |
+| Precisao monetaria sem ponto flutuante | Cumprido | schemas Prisma com `BigInt`, `Money` domain object, testes de wallet e payout |
+| Autenticacao via IdP e backend validando JWT | Cumprido | Keycloak realm importado, `KeycloakJwtGuard` nos dois servicos, E2E com token real |
+| Testes unitarios + E2E | Cumprido | `bun run ci:local`, `bun run ci:e2e`, `bun run test:e2e:browser` |
 
-**Histórico de Rodadas** — Últimos ~20 crash points, com código de cores (vermelho = crash baixo, verde = crash alto).
+## Bonus implementados
 
-**Info do Jogador** — Saldo atual em destaque, username (do JWT).
+- Outbox no Game e inbox no Wallet para comandos financeiros idempotentes.
+- Auto cashout por aposta.
+- Auto bet com estrategia fixed e Martingale, stop-loss e take-profit.
+- Observabilidade com Prometheus, Grafana, Jaeger e OpenTelemetry.
+- Seed deterministica para E2E em `scripts/e2e/prepare-deterministic-state.ts`.
+- Leaderboard por lucro liquido.
+- CI/quality gate com baseline ratchet.
+- Playwright E2E de jogador e responsividade.
+- Rate limiting via Kong em rotas de aposta/cashout/wallet.
+- Formula da curva do multiplicador exibida na UI.
 
-### UI/UX
+Bonus nao implementados:
 
-- **Dark mode** — Estética de cassino (fundo escuro, acentos vibrantes/neon)
-- **Responsivo** — Desktop e mobile
-- **Animações** — Curva suave, feedback de cashout, animação de crash
-- **Loading states** — Skeletons ou spinners
-- **Erros** — Toast notifications (saldo insuficiente, erro de rede, etc.)
+- Storybook.
+- Efeitos sonoros.
 
----
+## Testes e quality gates
 
-## Infraestrutura e Setup 🐳
-
-### Pré-requisitos
-
-- Bun >= 1.x
-- Docker & Docker Compose
-
-### Stack pré-configurada
-
-O repositório já inclui `docker-compose.yml` e arquivos de suporte prontos para uso:
-
-| Serviço        | Imagem                             | Portas                                  |
-| -------------- | ---------------------------------- | --------------------------------------- |
-| PostgreSQL     | `postgres:18.3-alpine`             | `5432` (databases: `games` e `wallets`) |
-| RabbitMQ       | `rabbitmq:4.2.4-management-alpine` | `5672` (AMQP), `15672` (UI)             |
-| Keycloak       | `quay.io/keycloak/keycloak:26.5.5` | `8080`                                  |
-| Kong           | `kong:3.9.1`                       | `8000` (proxy), `8001` (admin)          |
-| Frontend       | —                                  | `http://localhost:3000`                 |
-| Game Service   | —                                  | `http://localhost:4001`                 |
-| Wallet Service | —                                  | `http://localhost:4002`                 |
-
-**Você pode modificar qualquer parte da infra.** Prefere SQS ao invés de RabbitMQ? Outro API Gateway? Outro IdP? Fique à vontade. O único requisito é que **`bun run docker:up` suba tudo sem nenhum passo manual** — incluindo realm do Keycloak, config do Kong e migrations de banco.
-
-### Keycloak
-
-O realm `crash-game` é importado automaticamente no `docker:up`. Nenhuma configuração manual necessária.
-
-| Item           | Valor                                                                      |
-| -------------- | -------------------------------------------------------------------------- |
-| Admin UI       | `http://localhost:8080` (`admin` / `admin`)                                |
-| Realm          | `crash-game`                                                               |
-| Client ID      | `crash-game-client` (public, PKCE S256)                                    |
-| Usuário teste  | `player` / `player123`                                                     |
-| OIDC discovery | `http://localhost:8080/realms/crash-game/.well-known/openid-configuration` |
-
-### Scaffold dos serviços de aplicação
-
-**Backend — pronto.** Ambos os serviços já possuem scaffold NestJS funcional com estrutura DDD e rota `GET /health`. Estão integrados ao `docker-compose.yml` e roteados pelo Kong.
-
-| Serviço        | Porta direta | Via Kong                          |
-| -------------- | ------------ | --------------------------------- |
-| Game Service   | `4001`       | `http://localhost:8000/games/*`   |
-| Wallet Service | `4002`       | `http://localhost:8000/wallets/*` |
-
-Cada serviço tem:
-
-- Estrutura de camadas DDD: `domain/`, `application/`, `infrastructure/`, `presentation/`
-- `tests/unit/` e `tests/e2e/` prontos para receber os testes
-- `packages/` na raiz do monorepo para pacotes compartilhados entre serviços (ex: `@crash/eslint`)
-
-**Frontend — a implementar.** A pasta `frontend/` existe mas o scaffold é responsabilidade do candidato. Use o framework de sua preferência:
-
-- **Vite + React** — opção mais leve, ideal se quiser controle total
-- **Next.js** — SSR out-of-the-box, boa escolha para SEO e rotas
-- **TanStack Start** — preferido na stack da Jungle Gaming
-
-O placeholder no `docker-compose.yml` está comentado — descomente e adapte com seu `Dockerfile` e porta após criar o scaffold.
-
-### Variáveis de ambiente
-
-As credenciais de infraestrutura (PostgreSQL, RabbitMQ, Keycloak) estão hardcoded no `docker-compose.yml` — são valores de desenvolvimento local, sem necessidade de `.env` no root.
-
-Cada serviço possui `.env.example` com as variáveis necessárias. Copie para `.env` antes de rodar fora do Docker:
+Comandos principais:
 
 ```bash
-cp services/games/.env.example services/games/.env
-cp services/wallets/.env.example services/wallets/.env
+bun run ci:local
+bun run ci:e2e
+bun run test:e2e:browser
 ```
 
-**Você pode modificar qualquer parte da infra.** Prefere SQS ao invés de RabbitMQ? Outro API Gateway? Outro IdP? Fique à vontade. O único requisito é que **`bun run docker:up` suba tudo**.
+`bun run ci:local` executa:
 
-### Comandos
+- `bun install --frozen-lockfile`
+- lint
+- typecheck dos servicos, frontend e scripts de qualidade
+- unitarios do Game
+- unitarios do Wallet
+- testes do frontend
+- testes dos scripts de qualidade
+- coverage
+- quality gate por baseline
+- `docker compose config`
 
-```bash
-git clone https://github.com/junglegaming/fullstack-challenge
-cd fullstack-challenge
-bun install
-bun run docker:up      # Sobe tudo (infra + serviços + frontend)
-bun run docker:down    # Para os containers
-bun run docker:prune   # Remove tudo (containers, volumes, imagens)
-```
+`bun run ci:e2e` executa:
 
-### Observabilidade
+- `docker compose up -d --build`
+- healthcheck de Kong
+- healthcheck de Keycloak admin
+- E2E de API em `services/games/tests/e2e`
 
-Com a stack Docker ativa:
+`bun run test:e2e:browser` executa Playwright contra
+`http://localhost:8000`, usando a stack Docker ativa.
 
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3001` (`admin` / `admin`)
-- Jaeger: `http://localhost:16686`
-- Game metrics via Kong: `http://localhost:8000/games/metrics`
-- Wallet metrics via Kong: `http://localhost:8000/wallets/metrics`
-
-O dashboard `Crash Game Observability` mostra volume de apostas, total
-apostado, payouts, cashouts, crashes por faixa, RTP aproximado, latencia dos
-comandos RabbitMQ e eventos WebSocket.
-
-As rotas `/metrics` ficam publicas para demonstracao local do desafio. Elas nao
-devem expor tokens, secrets, URLs de banco ou dados sensiveis de jogadores.
-
----
-
-## Estrutura do Projeto 📁
-
-> Estrutura sugerida — pode adaptar, desde que mantenha a separação de camadas DDD (domain → application → infrastructure → presentation).
-
-```
-fullstack-challenge/
-├── services/
-│   ├── games/
-│   │   ├── src/
-│   │   │   ├── main.ts
-│   │   │   ├── app.module.ts
-│   │   │   ├── domain/
-│   │   │   ├── application/
-│   │   │   ├── infrastructure/
-│   │   │   └── presentation/
-│   │   ├── tests/ (unit/ + e2e/)
-│   │   ├── Dockerfile
-│   │   ├── .env
-│   │   └── package.json
-│   └── wallets/
-│       ├── src/
-│       │   ├── main.ts
-│       │   ├── app.module.ts
-│       │   ├── domain/
-│       │   ├── application/
-│       │   ├── infrastructure/
-│       │   └── presentation/
-│       ├── tests/ (unit/ + e2e/)
-│       ├── Dockerfile
-│       ├── .env
-│       └── package.json
-├── packages/                          # Pacotes compartilhados entre serviços
-│   │                                  # Ex: @crash/eslint
-│   └── (pacotes serão adicionados aqui)
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   └── stores/
-│   ├── Dockerfile
-│   ├── .env
-│   └── package.json
-├── docker/
-│   ├── kong/kong.yml
-│   ├── keycloak/realm-export.json
-│   └── postgres/init-databases.sh
-├── docker-compose.yml
-├── package.json
-└── README.md
-```
-
----
-
-## Testes 🧪
-
-### Obrigatórios
-
-**Unitários (camada de domínio):**
-
-- Ciclo de vida do Round (transições de estado, violação de invariantes)
-- Lógica de Bet (cálculo de cashout, transições de status, validação de valor)
-- Wallet (crédito, débito, saldo insuficiente, precisão monetária)
-- Provably fair (cálculo determinístico do crash point, verificação da hash chain)
-
-**E2E (camada de API):**
-
-- Apostar → multiplicador sobe → cashout → saldo atualizado
-- Apostar → crash → aposta perdida
-- Erros de validação (saldo insuficiente, aposta dupla, aposta durante rodada ativa)
-
-### Comandos
+Comandos focados:
 
 ```bash
 cd services/games && bun test tests/unit
 cd services/wallets && bun test tests/unit
-cd services/games && bun test tests/e2e     # requer docker:up
-cd frontend && bun test
+cd services/games && bun test tests/e2e
+cd frontend && bun run test
+cd frontend && bun run build
+docker compose config
+git diff --check
 ```
 
----
+Ultima auditoria local executada em 2026-06-03:
 
----
+- `bun run ci:local`: passou.
+- `bun run ci:e2e`: passou com 17 testes E2E.
+- `bun run test:e2e:browser`: passou com 7 testes.
+- Quality gate: cobertura global `84.58%`, duplicacao `1.46%`, zero
+  vulnerabilidades high/critical.
 
-## Critérios de Avaliação 📊
+## Mapa para avaliador e IA
 
-### Eliminatórios (todos devem passar)
+Comece por estes arquivos se quiser auditar rapido:
 
-- `bun run docker:up` sobe tudo sem passos manuais
-- Gameplay funciona (apostar → multiplicador → cashout/crash → liquidação)
-- Dois serviços separados comunicando via RabbitMQ/SQS
-- Sincronização em tempo real (múltiplas abas mostram o mesmo estado)
-- Precisão monetária (sem ponto flutuante para dinheiro, saldo nunca negativo)
-- Autenticação via IdP (Keycloak/Auth0/Okta) — backend valida JWTs
-- Testes existem (unitários + E2E)
+- Enunciado original: `DESAFIO_ORIGINAL.md`
+- Plano de execucao: `docs/superpowers/specs/2026-05-31-crash-game-execution-plan.md`
+- Issue log: `docs/superpowers/specs/2026-05-31-crash-game-implementation-issue-log.md`
+- Compose: `docker-compose.yml`
+- Kong: `docker/kong/kong.yml`
+- Keycloak realm: `docker/keycloak/realm-export.json`
+- Game schema: `services/games/prisma/schema.prisma`
+- Wallet schema: `services/wallets/prisma/schema.prisma`
+- Game controller: `services/games/src/presentation/controllers/games.controller.ts`
+- Wallet controller: `services/wallets/src/presentation/controllers/wallets.controller.ts`
+- Realtime gateway: `services/games/src/presentation/realtime/rounds.gateway.ts`
+- Wallet messaging: `services/wallets/src/infrastructure/messaging/wallet-command-handler.ts`
+- Browser E2E: `tests/browser/player-flow.spec.ts`
+- Responsividade: `tests/browser/responsive-layout.spec.ts`
+- Quality gate: `quality/baseline.json` e `scripts/quality`
 
-### Pontuação
+## Trade-offs
 
-| Critério                | Peso | O que é avaliado                                                                  |
-| ----------------------- | ---- | --------------------------------------------------------------------------------- |
-| **DDD e Arquitetura**   | 25%  | Bounded contexts, agregados, value objects, separação de camadas, design de sagas |
-| **Qualidade de Código** | 20%  | TypeScript strict, estilo consistente, nomes significativos, sem código morto     |
-| **Testes**              | 20%  | Cobertura de happy path + cenários de erro                                        |
-| **Frontend/UX**         | 15%  | Animações, responsividade, estética de cassino, loading states                    |
-| **Provably Fair**       | 10%  | Hash chain, endpoint de verificação, cálculo correto                              |
-| **Histórico Git**       | 10%  | Commits atômicos, mensagens claras, progressão lógica                             |
-
-### Desclassificação Imediata
-
-- Aritmética de ponto flutuante para valores monetários
-- `bun run docker:up` não funciona
-- Sem testes
-- Código plagiado/gerado por IA sem entendimento (haverá arguição)
-
----
-
-## Entrega 📦
-
-| Item                 | Requisito                                                |
-| -------------------- | -------------------------------------------------------- |
-| **Repositório**      | GitHub público                                           |
-| **README**           | Instruções de setup, decisões de arquitetura, trade-offs |
-| **Docker Compose**   | `bun run docker:up` sobe tudo                            |
-| **Usuário de teste** | Pré-configurado no Keycloak com saldo na carteira        |
-| **Prazo**            | **5 dias corridos** a partir do recebimento              |
-
----
-
-## Bônus ⭐
-
-Não obrigatórios, mas diferenciam candidatos excepcionais:
-
-- **Outbox/Inbox transacional** — Garantia de at-least-once delivery e exactly-once processing
-- **Auto cashout** — Jogador define multiplicador alvo para saque automático
-- **Auto bet** — Configuração de apostas automáticas com estratégia (ex: Martingale, valor fixo) e stop-loss configurável
-- **Observabilidade** — OpenTelemetry + Prometheus + Grafana para métricas de jogo (RTP, volume de apostas, latência de eventos WebSocket)
-- **Seed determinística para testes E2E** — Script que popula banco e broker com estado consistente e reproduzível, permitindo simular cenários específicos (ex: crash em 1.5x, sequência de rodadas)
-- **Efeitos sonoros** — Feedback de áudio para aposta, cashout, crash
-- **Leaderboard** — Top jogadores por lucro (24h/semana)
-- **CI pipeline** — GitHub Actions rodando testes no push
-- **Playwright** — Testes E2E de ponta a ponta simulando fluxos reais do jogador no browser
-- **Rate limiting** — Via Kong ou na aplicação
-- **Storybook** — Biblioteca de componentes
-- **Fórmula da curva na UI** — Exibir a fórmula para transparência
-
----
-
-## Dúvidas? ❓
-
-Entre em contato com o recrutador.
-
-Boa sorte — e que o multiplicador esteja ao seu favor! 🎲
+- RabbitMQ request/reply foi usado para operacoes financeiras interativas,
+  mantendo comunicacao por broker sem expor a Wallet por HTTP ao Game.
+- O frontend Docker usa Vite dev server para a entrega local do desafio; isso
+  prioriza reproducibilidade local sobre hardening de producao.
+- As rotas `/metrics` ficam publicas para demonstracao local e nao expoem
+  tokens, secrets, URLs de banco ou dados sensiveis.
+- Playwright roda com `workers: 1` porque os testes usam a mesma stack Docker,
+  o mesmo Keycloak e o mesmo usuario `player`.
+- A autenticacao propria nao foi implementada; o projeto usa Keycloak, como
+  permitido pelo desafio.
