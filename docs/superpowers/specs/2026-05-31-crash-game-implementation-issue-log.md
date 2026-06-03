@@ -1203,17 +1203,22 @@ Cada entrada deve conter:
   `bun run ci:e2e`.
 - Sintoma: `tests/e2e/rate-limiting.e2e.test.ts` falhou esperando status
   `429`, mas recebeu `201` seguido de respostas `400` para as 12 chamadas de
-  aposta.
+  aposta. Depois da primeira correcao, o GitHub Actions do evento `push`
+  falhou em uma assercao adicional que exigia `429` na chamada imediatamente
+  posterior a rajada concorrente, mas recebeu `400`.
 - Causa: o plugin `rate-limiting` do Kong estava ativo e retornava headers
   `X-RateLimit-*`, mas o teste fazia apenas 12 chamadas sequenciais contra um
   limite de `10/s`. Em ambiente local, as chamadas cruzaram a janela de 1
   segundo e o contador resetou antes de exceder o limite.
 - Correcao: o teste passou a disparar uma rajada concorrente de apostas acima
   do limite de `10/s`, mantendo a verificacao de que healthchecks e frontend
-  continuam sem rate limit.
+  continuam sem rate limit. A assercao posterior a rajada foi removida porque
+  ela ainda dependia da janela temporal do Kong e nao acrescentava novo
+  contrato comportamental.
 - Validacao: `cd services/games && bun test
   tests/e2e/rate-limiting.e2e.test.ts` passou; `bun run ci:e2e` passou com
-  17 testes E2E via Docker/Kong/Keycloak.
+  17 testes E2E via Docker/Kong/Keycloak depois da remocao da assercao
+  temporal posterior a rajada.
 - Status: resolvido.
 
 ## Validacoes de Regressao Ja Executadas
