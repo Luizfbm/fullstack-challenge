@@ -3,6 +3,7 @@ import * as THREE from "three";
 export type TimeCarTrailFrame = {
   axisRevealProgress: number;
   carPosition: [number, number, number];
+  displayMultiplier?: number;
   elapsedSeconds: number;
   height: number;
   intensity: number;
@@ -18,6 +19,8 @@ export type TimeCarTrail = {
   axisReveal: THREE.Group;
   axisTicks: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   curve: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  currentMultiplierGuide: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  currentMultiplierLabel: THREE.Sprite;
   group: THREE.Group;
   multiplierPillar: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   particles: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
@@ -58,12 +61,14 @@ const CRASH_PARTICLE_COLOR = new THREE.Color("#f472b6");
 const HUD_DISTANCE = 3.45;
 const BASE_TIME_AXIS_SECONDS = 10;
 const EDGE_HOLD_GROWTH_SECONDS = 16;
-const MULTIPLIER_AXIS_EASING_SPAN = 4;
+const INITIAL_MULTIPLIER_AXIS_MAX = 2.5;
+const AXIS_CURRENT_MAX_PROGRESS = 0.9;
+const CURVE_GROWTH_EXPONENT = 3.1;
 const Y_AXIS_TICKS = [
-  { label: "1x", value: 0 },
-  { label: "2x", value: 0.34 },
-  { label: "5x", value: 0.68 },
-  { label: "10x", value: 1 },
+  { label: "1×", value: 0 },
+  { label: "1.50×", value: 1 / 3 },
+  { label: "2×", value: 2 / 3 },
+  { label: "2.50×", value: 1 },
 ] as const;
 const X_AXIS_TICKS = [
   { label: "0s", value: 0 },
@@ -80,6 +85,8 @@ export function createTimeCarTrail(): TimeCarTrail {
   const timeAxis = createTimeAxis();
   const axisTicks = createAxisTicks();
   const axisLabels = createAxisLabels();
+  const currentMultiplierGuide = createCurrentMultiplierGuide();
+  const currentMultiplierLabel = createCurrentMultiplierLabel();
   const multiplierPillar = createMultiplierPillar();
   const particles = createGrowthParticles();
 
@@ -92,8 +99,10 @@ export function createTimeCarTrail(): TimeCarTrail {
     timeAxis,
     axisTicks,
     multiplierPillar,
+    currentMultiplierGuide,
     particles,
     axisLabels,
+    currentMultiplierLabel,
   );
   group.add(axisReveal);
 
@@ -102,6 +111,8 @@ export function createTimeCarTrail(): TimeCarTrail {
     axisReveal,
     axisTicks,
     curve,
+    currentMultiplierGuide,
+    currentMultiplierLabel,
     group,
     multiplierPillar,
     particles,
@@ -145,6 +156,7 @@ export function updateTimeCarTrail(
   updateAreaGeometry(trail.ribbon.geometry, axis, displayInput);
   updateParticleGeometry(trail.particles.geometry, axis, displayInput);
   updateTrailMaterials(trail, displayFrame);
+  updateCurrentMultiplierIndicator(trail, displayFrame, axis, displayInput);
 
   return getTrailCarAnchor(trail, axis, displayInput);
 }
@@ -252,6 +264,37 @@ function createAxisLabels() {
   }
 
   return labels;
+}
+
+function createCurrentMultiplierGuide() {
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.LineBasicMaterial({
+    blending: THREE.AdditiveBlending,
+    color: "#bae6fd",
+    depthTest: false,
+    depthWrite: false,
+    opacity: 0,
+    transparent: true,
+  });
+  const guide = new THREE.Line(geometry, material);
+
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(2 * 3), 3),
+  );
+  guide.name = "time-car-growth-guide-current-multiplier-guide";
+  guide.renderOrder = 7;
+
+  return guide;
+}
+
+function createCurrentMultiplierLabel() {
+  const label = createAxisLabelSprite("1×");
+
+  label.name = "time-car-growth-guide-current-multiplier-label";
+  label.renderOrder = 9;
+
+  return label;
 }
 
 function createAxisLabelSprite(label: string) {
@@ -404,7 +447,7 @@ function updateTimeAxis(
   ) as THREE.BufferAttribute;
 
   position.setXYZ(0, 0, 0, 0);
-  position.setXYZ(1, frame.width * axis.timeProgress, 0, 0);
+  position.setXYZ(1, frame.width, 0, 0);
   position.needsUpdate = true;
   timeAxis.geometry.computeBoundingSphere();
 }
@@ -419,7 +462,7 @@ function updateAxisTicks(
   ) as THREE.BufferAttribute;
   let point = 0;
 
-  point = setSegment(position, point, 0, 0, 0, frame.width * axis.timeProgress, 0, 0);
+  point = setSegment(position, point, 0, 0, 0, frame.width, 0, 0);
   point = setSegment(
     position,
     point,
@@ -501,6 +544,41 @@ function updateMultiplierPillar(
   pillar.visible = false;
   material.opacity = 0;
   material.needsUpdate = true;
+}
+
+function updateCurrentMultiplierIndicator(
+  trail: TimeCarTrail,
+  frame: TimeCarTrailFrame,
+  axis: AxisFrame,
+  input: TimeCarTrailUpdateInput,
+) {
+  const point = getCurvePoint(1, axis, input);
+  const guidePosition = trail.currentMultiplierGuide.geometry.getAttribute(
+    "position",
+  ) as THREE.BufferAttribute;
+  const guideMaterial = trail.currentMultiplierGuide.material as THREE.LineBasicMaterial;
+  const labelMaterial = trail.currentMultiplierLabel.material as THREE.SpriteMaterial;
+  const boost = frame.tone === "boost";
+
+  guidePosition.setXYZ(0, 0, point.y, 0.058);
+  guidePosition.setXYZ(1, point.x, point.y, 0.058);
+  guidePosition.needsUpdate = true;
+  trail.currentMultiplierGuide.geometry.computeBoundingSphere();
+
+  updateAxisLabelSprite(
+    trail.currentMultiplierLabel,
+    formatMultiplierTick(frame.displayMultiplier ?? frame.multiplier),
+  );
+  trail.currentMultiplierLabel.position.set(0.24, point.y, 0.08);
+  trail.currentMultiplierLabel.scale.set(0.42, 0.115, 1);
+
+  guideMaterial.color.set(boost ? "#bae6fd" : "#fecdd3");
+  guideMaterial.opacity = boost ? 0.2 + frame.intensity * 0.14 : 0.24;
+  guideMaterial.needsUpdate = true;
+
+  labelMaterial.color.set(boost ? "#ffffff" : "#fff1f2");
+  labelMaterial.opacity = boost ? 0.96 : 0.9;
+  labelMaterial.needsUpdate = true;
 }
 
 function updateCurveGeometry(
@@ -631,7 +709,7 @@ function getCurvePoint(
   const pulse = input.reducedMotion
     ? 0
     : Math.sin(t * Math.PI) * Math.sin(input.time * 5.2) * 0.024;
-  const growth = Math.pow(t, 1.52);
+  const growth = Math.pow(t, CURVE_GROWTH_EXPONENT);
 
   return {
     x: input.trail.width * axis.timeProgress * t,
@@ -674,40 +752,25 @@ function getAxisFrame(frame: TimeCarTrailFrame): AxisFrame {
 
   return {
     multiplierMax,
-    multiplierProgress: getMultiplierAxisValue(multiplier),
-    multiplierTicks: getMultiplierTicks(multiplier),
+    multiplierProgress: getMultiplierAxisValue(multiplier, multiplierMax),
+    multiplierTicks: getMultiplierTicks(multiplierMax),
     timeMax,
-    timeProgress: getTimeAxisValue(elapsedSeconds),
+    timeProgress: getTimeAxisValue(elapsedSeconds, timeMax),
     timeTicks: getTimeTicks(elapsedSeconds, timeMax),
   };
 }
 
-function getMultiplierTicks(multiplier: number) {
-  const displayMultiplier = floorMultiplierForAxis(multiplier);
-  const supportMultiplier =
-    displayMultiplier < 1.5
-      ? 1.25
-      : floorMultiplierForAxis((1 + displayMultiplier) / 2);
-  const topMultiplier = Math.max(
-    2,
-    Math.ceil((displayMultiplier + 0.01) * 4) / 4,
-  );
+function getMultiplierTicks(multiplierMax: number) {
+  const topMultiplier = multiplierMax;
 
-  return [
-    { label: "1x", value: 0 },
-    {
-      label: formatMultiplierTick(supportMultiplier),
-      value: getMultiplierAxisValue(supportMultiplier),
-    },
-    {
-      label: formatMultiplierTick(displayMultiplier),
-      value: getMultiplierAxisValue(displayMultiplier),
-    },
-    {
-      label: formatMultiplierTick(topMultiplier),
-      value: 1,
-    },
-  ];
+  return Y_AXIS_TICKS.map((tick) => {
+    const multiplier = getMultiplierTickValue(topMultiplier, tick.value);
+
+    return {
+      label: formatMultiplierTick(multiplier),
+      value: getMultiplierAxisValue(multiplier, topMultiplier),
+    };
+  });
 }
 
 function getTimeTicks(elapsedSeconds: number, timeMax: number) {
@@ -716,16 +779,17 @@ function getTimeTicks(elapsedSeconds: number, timeMax: number) {
       { label: "0s", value: 0 },
       {
         label: `${Math.ceil(BASE_TIME_AXIS_SECONDS / 2)}s`,
-        value: getTimeAxisValue(BASE_TIME_AXIS_SECONDS / 2),
+        value: getTimeAxisValue(BASE_TIME_AXIS_SECONDS / 2, timeMax),
       },
       {
         label: `${BASE_TIME_AXIS_SECONDS}s`,
-        value: getTimeAxisValue(BASE_TIME_AXIS_SECONDS),
+        value: getTimeAxisValue(BASE_TIME_AXIS_SECONDS, timeMax),
       },
     ];
   }
 
   const currentSecond = Math.floor(elapsedSeconds);
+  const axisMaxSecond = Math.ceil(timeMax);
 
   return [
     { label: "0s", value: 0 },
@@ -734,15 +798,16 @@ function getTimeTicks(elapsedSeconds: number, timeMax: number) {
         currentSecond >= BASE_TIME_AXIS_SECONDS ? "5s" : `${currentSecond}s`,
       value:
         currentSecond >= BASE_TIME_AXIS_SECONDS
-          ? getTimeAxisValue(BASE_TIME_AXIS_SECONDS / 2)
-          : getTimeAxisValue(currentSecond),
+          ? getTimeAxisValue(BASE_TIME_AXIS_SECONDS / 2, timeMax)
+          : getTimeAxisValue(currentSecond, timeMax),
     },
     {
       label: `${
-        currentSecond >= BASE_TIME_AXIS_SECONDS ? currentSecond : timeMax
+        currentSecond >= BASE_TIME_AXIS_SECONDS ? axisMaxSecond : BASE_TIME_AXIS_SECONDS
       }s`,
       value: getTimeAxisValue(
-        currentSecond >= BASE_TIME_AXIS_SECONDS ? currentSecond : timeMax,
+        currentSecond >= BASE_TIME_AXIS_SECONDS ? axisMaxSecond : BASE_TIME_AXIS_SECONDS,
+        timeMax,
       ),
     },
   ];
@@ -750,37 +815,47 @@ function getTimeTicks(elapsedSeconds: number, timeMax: number) {
 
 function getMultiplierAxisMax(multiplier: number) {
   return Math.max(
-    2,
-    Math.ceil((floorMultiplierForAxis(multiplier) + 0.01) * 4) / 4,
+    INITIAL_MULTIPLIER_AXIS_MAX,
+    1 + (multiplier - 1) / AXIS_CURRENT_MAX_PROGRESS,
   );
 }
 
 function getTimeAxisMax(elapsedSeconds: number) {
   if (elapsedSeconds <= BASE_TIME_AXIS_SECONDS) {
-    return BASE_TIME_AXIS_SECONDS;
+    return BASE_TIME_AXIS_SECONDS / AXIS_CURRENT_MAX_PROGRESS;
   }
 
-  return Math.ceil(elapsedSeconds);
+  return elapsedSeconds / AXIS_CURRENT_MAX_PROGRESS;
 }
 
 function formatMultiplierTick(multiplier: number) {
-  return `${floorMultiplierForAxis(multiplier).toFixed(2)}x`;
+  const displayMultiplier = floorMultiplierForAxis(multiplier);
+
+  return Number.isInteger(displayMultiplier)
+    ? `${displayMultiplier.toFixed(0)}×`
+    : `${displayMultiplier.toFixed(2)}×`;
 }
 
-function getTimeAxisValue(elapsedSeconds: number) {
+function getTimeAxisValue(elapsedSeconds: number, timeMax: number) {
   const seconds = Math.max(0, elapsedSeconds);
 
-  return clamp01(seconds / BASE_TIME_AXIS_SECONDS);
+  return clamp01(seconds / Math.max(1, timeMax));
 }
 
-function getMultiplierAxisValue(multiplier: number) {
-  return (
-    1 -
-    Math.exp(
-      -(floorMultiplierForAxis(multiplier) - 1) /
-        MULTIPLIER_AXIS_EASING_SPAN,
-    )
+function getMultiplierAxisValue(multiplier: number, multiplierMax: number) {
+  const displayMultiplier = Math.max(1, multiplier);
+  const displayMax = Math.max(1.01, floorMultiplierForAxis(multiplierMax));
+
+  return clamp01((displayMultiplier - 1) / (displayMax - 1));
+}
+
+function getMultiplierTickValue(multiplierMax: number, progress: number) {
+  const displayMax = Math.max(
+    INITIAL_MULTIPLIER_AXIS_MAX,
+    floorMultiplierForAxis(multiplierMax),
   );
+
+  return floorMultiplierForAxis(1 + (displayMax - 1) * progress);
 }
 
 function floorMultiplierForAxis(multiplier: number) {
@@ -826,6 +901,7 @@ function normalizeFrame(frame: TimeCarTrailFrame): TimeCarTrailFrame {
   return {
     ...frame,
     axisRevealProgress: clamp01(frame.axisRevealProgress),
+    displayMultiplier: Math.max(1, frame.displayMultiplier ?? frame.multiplier),
     elapsedSeconds: Math.max(0, frame.elapsedSeconds),
     height: Math.max(0.04, frame.height),
     intensity: Math.min(1, Math.max(0, frame.intensity)),

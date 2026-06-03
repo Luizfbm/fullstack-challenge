@@ -10,6 +10,8 @@ export function animateTimeCarFire(
       return;
     }
 
+    child.visible = enabled;
+
     const pulse = enabled ? 0.5 + Math.sin(time * 18) * 0.5 : 0;
     const flicker = enabled ? 0.5 + Math.sin(time * 31.7) * 0.5 : 0;
     const scale = enabled ? 1 + pulse * 0.08 + flicker * 0.035 : 1;

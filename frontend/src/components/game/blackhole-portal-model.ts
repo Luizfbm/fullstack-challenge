@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { disposeObject } from "./crash-flight-stage";
 import type { StageAnimationPhase } from "./crash-flight-motion";
+import { ENTERING_BLACK_HOLE_SECONDS } from "./stage-animation-timing";
 
 export const BLACKHOLE_PORTAL_ASSET_PATH =
   "/models/blackhole_pixel_pass_3.glb";
@@ -122,7 +123,7 @@ export function updateBlackholePortal(
     ? 1
     : 1 + Math.sin(input.time * 1.8) * 0.025;
   const enteringScale = input.entering
-    ? 1 + Math.min(1, input.phaseElapsed / 1.4) * 0.28
+    ? 1 + Math.min(1, input.phaseElapsed / ENTERING_BLACK_HOLE_SECONDS) * 0.28
     : 1;
   const crashScale = 1 + input.crashImpact * 0.08;
   const bettingIdle = input.phase === "betting" && !input.reducedMotion;

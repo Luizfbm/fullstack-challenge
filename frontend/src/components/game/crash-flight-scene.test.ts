@@ -151,14 +151,14 @@ describe("crash flight scene primitives", () => {
       crashImpact: 0,
       entering: true,
       phase: "entering",
-      phaseElapsed: 1.4,
+      phaseElapsed: 0.9,
       reducedMotion: true,
       time: 1,
       visible: true,
     });
 
     expect(portal.visible).toBe(true);
-    expect(portal.scale.x).toBeGreaterThan(1);
+    expect(portal.scale.x).toBeCloseTo(1.28, 2);
 
     disposeObject(portal);
   });
@@ -263,12 +263,18 @@ describe("crash flight scene primitives", () => {
       "time-car-growth-guide-multiplier-pillar",
     );
     expect(trail.multiplierPillar.visible).toBe(false);
+    expect(trail.currentMultiplierGuide.name).toBe(
+      "time-car-growth-guide-current-multiplier-guide",
+    );
+    expect(trail.currentMultiplierLabel.name).toBe(
+      "time-car-growth-guide-current-multiplier-label",
+    );
     expect(trail.timeAxis.name).toBe("time-car-growth-guide-time-axis");
     expect(trail.axisReveal.name).toBe("time-car-growth-guide-axis-reveal");
     expect(
       trail.axisLabels.children.map((label) => label.userData.labelText),
     ).toEqual(
-      expect.arrayContaining(["1x"]),
+      expect.arrayContaining(["1×", "1.50×", "2×", "2.50×"]),
     );
     expect(trail.group.visible).toBe(false);
 
@@ -313,7 +319,7 @@ describe("crash flight scene primitives", () => {
     expect(trail.axisReveal.position.y).toBeLessThan(0);
     expect(
       trail.axisLabels.children.map((label) => label.userData.labelText),
-    ).toEqual(expect.arrayContaining(["1.82x", "4s"]));
+    ).toEqual(expect.arrayContaining(["1×", "1.50×", "2×", "2.50×", "4s"]));
     const firstGuidePosition = trail.group.position.clone();
     const firstAxisPosition = Array.from(
       (trail.timeAxis.geometry.getAttribute("position") as THREE.BufferAttribute)
@@ -383,7 +389,7 @@ describe("crash flight scene primitives", () => {
           "position",
         ) as THREE.BufferAttribute).array,
       ),
-    ).not.toEqual(firstAxisPosition);
+    ).toEqual(firstAxisPosition);
     expect(trail.axisLabels.children[0].position.toArray()).toEqual(
       firstLabelPosition.toArray(),
     );
@@ -391,7 +397,8 @@ describe("crash flight scene primitives", () => {
     expect(trail.axisReveal.position.y).toBeCloseTo(0);
     expect(
       trail.axisLabels.children.map((label) => label.userData.labelText),
-    ).toEqual(expect.arrayContaining(["8.40x", "12s"]));
+    ).toEqual(expect.arrayContaining(["14s"]));
+    expect(trail.currentMultiplierLabel.userData.labelText).toBe("8.40×");
     expect(secondCurveEndpoint.x).toBeGreaterThan(firstCurveEndpoint.x);
     expect(secondCurveEndpoint.y).toBeGreaterThan(firstCurveEndpoint.y);
     expect(secondTrailState?.carAnchor[0]).toBeGreaterThan(
@@ -410,7 +417,7 @@ describe("crash flight scene primitives", () => {
     disposeObject(trail.group);
   });
 
-  it("keeps the trail endpoint pinned to the right edge after ten seconds", () => {
+  it("keeps the trail endpoint inside the right edge after ten seconds", () => {
     const trail = createTimeCarTrail();
     const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
 
@@ -436,41 +443,25 @@ describe("crash flight scene primitives", () => {
       },
     });
 
-    const laterState = updateTimeCarTrail(trail, {
-      camera,
-      reducedMotion: true,
-      time: 12.4,
-      trail: {
-        axisRevealProgress: 1,
-        carPosition: [0, 0, -4],
-        elapsedSeconds: 12.4,
-        height: 0.92,
-        intensity: 0.8,
-        multiplier: 1.82,
-        progress: 1,
-        tone: "boost",
-        visible: true,
-        width: 2.35,
-      },
-    });
-
-    const longRunState = updateTimeCarTrail(trail, {
-      camera,
-      reducedMotion: true,
-      time: 80,
-      trail: {
-        axisRevealProgress: 1,
-        carPosition: [0, 0, -4],
-        elapsedSeconds: 80,
-        height: 0.92,
-        intensity: 0.8,
-        multiplier: 1.82,
-        progress: 1,
-        tone: "boost",
-        visible: true,
-        width: 2.35,
-      },
-    });
+    const laterStates = [10.4, 10.9, 11.1, 12.4].map((elapsedSeconds) =>
+      updateTimeCarTrail(trail, {
+        camera,
+        reducedMotion: true,
+        time: elapsedSeconds,
+        trail: {
+          axisRevealProgress: 1,
+          carPosition: [0, 0, -4],
+          elapsedSeconds,
+          height: 0.92,
+          intensity: 0.8,
+          multiplier: 1.82,
+          progress: 1,
+          tone: "boost",
+          visible: true,
+          width: 2.35,
+        },
+      }),
+    );
     const timeAxisPosition = trail.timeAxis.geometry.getAttribute(
       "position",
     ) as THREE.BufferAttribute;
@@ -478,23 +469,149 @@ describe("crash flight scene primitives", () => {
       timeAxisPosition,
       1,
     );
+    const guideOrigin = trail.group.position.x + trail.axisReveal.position.x;
     const rightGuideEdge =
-      trail.group.position.x +
-      trail.axisReveal.position.x +
-      timeAxisEndpoint.x * trail.axisReveal.scale.x;
+      guideOrigin + timeAxisEndpoint.x * trail.axisReveal.scale.x;
 
-    expect(tenSecondState?.carAnchor[0]).toBeCloseTo(rightGuideEdge, 3);
-    expect(laterState?.carAnchor[0]).toBeCloseTo(rightGuideEdge, 3);
-    expect(longRunState?.carAnchor[0]).toBeCloseTo(rightGuideEdge, 3);
-    expect(laterState?.edgeHoldProgress).toBeGreaterThan(0);
-    expect(longRunState?.edgeHoldProgress).toBeGreaterThan(
-      laterState?.edgeHoldProgress ?? 0,
+    expect(
+      ((tenSecondState?.carAnchor[0] ?? 0) - guideOrigin) /
+        (rightGuideEdge - guideOrigin),
+    ).toBeLessThanOrEqual(0.91);
+    const normalizedPositions = [
+      tenSecondState,
+      ...laterStates,
+    ].map(
+      (state) =>
+        ((state?.carAnchor[0] ?? 0) - guideOrigin) /
+        (rightGuideEdge - guideOrigin),
     );
+
+    for (const normalizedPosition of normalizedPositions) {
+      expect(normalizedPosition).toBeLessThanOrEqual(0.91);
+    }
+
+    for (let index = 1; index < normalizedPositions.length; index += 1) {
+      expect(normalizedPositions[index]).toBeGreaterThanOrEqual(
+        normalizedPositions[index - 1] - 0.001,
+      );
+    }
+
+    expect(laterStates[0]?.edgeHoldProgress).toBeGreaterThan(0);
+    expect(laterStates[3]?.edgeHoldProgress).toBeGreaterThan(
+      laterStates[0]?.edgeHoldProgress ?? 0,
+    );
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(expect.arrayContaining(["14s"]));
 
     disposeObject(trail.group);
   });
 
-  it("floors multiplier axis labels and keeps the y anchor growing around 2x", () => {
+  it("shows the current multiplier on the y axis with a subtle guide line", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const trailState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 6,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 6,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 2.4,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+    const guidePosition = trail.currentMultiplierGuide.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const guideStart = new THREE.Vector3().fromBufferAttribute(guidePosition, 0);
+    const guideEnd = new THREE.Vector3().fromBufferAttribute(guidePosition, 1);
+    const curvePosition = trail.curve.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const curveMidpoint = new THREE.Vector3().fromBufferAttribute(
+      curvePosition,
+      Math.floor(curvePosition.count / 2),
+    );
+    const curveEndpoint = new THREE.Vector3().fromBufferAttribute(
+      curvePosition,
+      curvePosition.count - 1,
+    );
+    const carAnchorY =
+      (trailState?.carAnchor[1] ?? 0) -
+      trail.group.position.y -
+      trail.axisReveal.position.y;
+
+    expect(trail.currentMultiplierLabel.userData.labelText).toBe("2.40×");
+    expect(trail.currentMultiplierLabel.scale.x).toBeGreaterThan(
+      trail.axisLabels.children[0].scale.x,
+    );
+    expect(guideStart.x).toBeCloseTo(0);
+    expect(guideStart.y).toBeCloseTo(carAnchorY, 3);
+    expect(guideEnd.x).toBeGreaterThan(guideStart.x);
+    expect(guideEnd.y).toBeCloseTo(carAnchorY, 3);
+    expect(curveMidpoint.y / curveEndpoint.y).toBeLessThan(0.13);
+
+    disposeObject(trail.group);
+  });
+
+  it("places a 1.90x running point in the upper-middle of the 2.50x y axis", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const trailState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 6,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 6,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 1.9,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+    const axisTicks = trail.axisTicks.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const yAxisTop = new THREE.Vector3().fromBufferAttribute(axisTicks, 3);
+    const carAnchorY =
+      (trailState?.carAnchor[1] ?? 0) -
+      trail.group.position.y -
+      trail.axisReveal.position.y;
+    const normalizedY = carAnchorY / yAxisTop.y;
+
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(expect.arrayContaining(["1×", "1.50×", "2×", "2.50×"]));
+    expect(trail.currentMultiplierLabel.userData.labelText).toBe("1.90×");
+    expect(normalizedY).toBeGreaterThan(0.57);
+    expect(normalizedY).toBeLessThan(0.63);
+
+    disposeObject(trail.group);
+  });
+
+  it("keeps a fixed 2.50x multiplier axis before the initial y limit", () => {
     const trail = createTimeCarTrail();
     const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
 
@@ -522,7 +639,7 @@ describe("crash flight scene primitives", () => {
 
     expect(
       trail.axisLabels.children.map((label) => label.userData.labelText),
-    ).toEqual(expect.arrayContaining(["1.99x"]));
+    ).toEqual(expect.arrayContaining(["1×", "1.50×", "2×", "2.50×"]));
 
     const afterTwoState = updateTimeCarTrail(trail, {
       camera,
@@ -541,22 +658,211 @@ describe("crash flight scene primitives", () => {
         width: 2.35,
       },
     });
+    const afterTwoLabels = trail.axisLabels.children.map(
+      (label) => label.userData.labelText,
+    );
+    const atThreeState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 8,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 8,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 3.009,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+    const axisTicks = trail.axisTicks.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const yAxisTop = new THREE.Vector3().fromBufferAttribute(axisTicks, 3);
+    const afterTwoAnchorY =
+      (afterTwoState?.carAnchor[1] ?? 0) -
+      trail.group.position.y -
+      trail.axisReveal.position.y;
+    const atThreeAnchorY =
+      (atThreeState?.carAnchor[1] ?? 0) -
+      trail.group.position.y -
+      trail.axisReveal.position.y;
 
     expect(
-      trail.axisLabels.children.map((label) => label.userData.labelText),
-    ).toEqual(expect.arrayContaining(["2.00x"]));
+      afterTwoLabels,
+    ).toEqual(expect.arrayContaining(["1×", "1.50×", "2×", "2.50×"]));
     expect(afterTwoState?.carAnchor[1]).toBeGreaterThan(
       beforeTwoState?.carAnchor[1] ?? 0,
+    );
+    expect(afterTwoAnchorY / yAxisTop.y).toBeCloseTo(2 / 3, 2);
+    expect(atThreeAnchorY / yAxisTop.y).toBeLessThanOrEqual(0.91);
+    expect(trail.currentMultiplierLabel.userData.labelText).toBe("3×");
+
+    disposeObject(trail.group);
+  });
+
+  it("keeps the y-axis transition continuous when the multiplier crosses the initial limit", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const normalizedPositions = [2.34, 2.35, 2.36, 2.5, 2.8].map(
+      (multiplier) => {
+        const trailState = updateTimeCarTrail(trail, {
+          camera,
+          reducedMotion: true,
+          time: 6,
+          trail: {
+            axisRevealProgress: 1,
+            carPosition: [0, 0, -4],
+            elapsedSeconds: 8,
+            height: 0.92,
+            intensity: 0.8,
+            multiplier,
+            progress: 1,
+            tone: "boost",
+            visible: true,
+            width: 2.35,
+          },
+        });
+        const axisTicks = trail.axisTicks.geometry.getAttribute(
+          "position",
+        ) as THREE.BufferAttribute;
+        const yAxisTop = new THREE.Vector3().fromBufferAttribute(axisTicks, 3);
+        const carAnchorY =
+          (trailState?.carAnchor[1] ?? 0) -
+          trail.group.position.y -
+          trail.axisReveal.position.y;
+
+        return carAnchorY / yAxisTop.y;
+      },
+    );
+
+    for (const normalizedPosition of normalizedPositions) {
+      expect(normalizedPosition).toBeLessThanOrEqual(0.91);
+    }
+
+    for (let index = 1; index < normalizedPositions.length; index += 1) {
+      expect(normalizedPositions[index]).toBeGreaterThanOrEqual(
+        normalizedPositions[index - 1] - 0.02,
+      );
+    }
+
+    disposeObject(trail.group);
+  });
+
+  it("keeps sub-cent multiplier motion smooth while axis labels stay floored", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const firstState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 6,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 6,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 2.001,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+    const firstLabels = trail.axisLabels.children.map(
+      (label) => label.userData.labelText,
+    );
+
+    const secondState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 6.05,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 6.05,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 2.009,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    expect(trail.axisLabels.children.map((label) => label.userData.labelText)).toEqual(
+      firstLabels,
+    );
+    expect(secondState?.carAnchor[1]).toBeGreaterThan(
+      firstState?.carAnchor[1] ?? 0,
     );
 
     disposeObject(trail.group);
   });
 
-  it("uses the fire-detail model only while entering or running", () => {
+  it("pins the multiplier axis top to the floored current multiplier after 4x", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const trailState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 7,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 7,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 5.459,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+    const axisTicks = trail.axisTicks.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const yAxisTop = new THREE.Vector3().fromBufferAttribute(axisTicks, 3);
+    const carAnchorY =
+      (trailState?.carAnchor[1] ?? 0) -
+      trail.group.position.y -
+      trail.axisReveal.position.y;
+
+    expect(trail.currentMultiplierLabel.userData.labelText).toBe("5.45×");
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(expect.arrayContaining(["1×", "0s", "7s", "10s"]));
+    expect(carAnchorY / yAxisTop.y).toBeLessThanOrEqual(0.91);
+    expect(carAnchorY / yAxisTop.y).toBeGreaterThan(0.86);
+
+    disposeObject(trail.group);
+  });
+
+  it("uses the fire-detail model while entering, running and crashed", () => {
     expect(usesRunningTimeCarAsset("entering")).toBe(true);
     expect(usesRunningTimeCarAsset("running")).toBe(true);
+    expect(usesRunningTimeCarAsset("crashed")).toBe(true);
     expect(usesRunningTimeCarAsset("betting")).toBe(false);
-    expect(usesRunningTimeCarAsset("crashed")).toBe(false);
     expect(usesRunningTimeCarAsset("idle")).toBe(false);
   });
 
@@ -574,6 +880,92 @@ describe("crash flight scene primitives", () => {
     expect(getWormholeVisibilityForPhase("entering")).toBe(false);
     expect(getWormholeVisibilityForPhase("running")).toBe(true);
     expect(getWormholeVisibilityForPhase("crashed")).toBe(true);
+  });
+
+  it("moves the running camera subtly with the car progress", () => {
+    const earlyRunningFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "running",
+      phaseElapsed: 0.4,
+      reducedMotion: true,
+      round: {
+        currentMultiplierBp: 12000,
+        status: "RUNNING",
+      } as DashboardRound,
+      time: 2,
+    });
+    const lateRunningFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "running",
+      phaseElapsed: 0.4,
+      reducedMotion: true,
+      round: {
+        currentMultiplierBp: 50000,
+        status: "RUNNING",
+      } as DashboardRound,
+      time: 2,
+    });
+
+    expect(lateRunningFrame.car.position[0]).toBeGreaterThan(
+      earlyRunningFrame.car.position[0],
+    );
+    expect(lateRunningFrame.camera.lookAt[0]).toBeGreaterThan(
+      earlyRunningFrame.camera.lookAt[0],
+    );
+    expect(lateRunningFrame.camera.position[0]).toBeGreaterThan(
+      earlyRunningFrame.camera.position[0],
+    );
+  });
+
+  it("adds a stronger camera kick at the start of running", () => {
+    const round = {
+      currentMultiplierBp: 16000,
+      status: "RUNNING",
+    } as DashboardRound;
+    const time = 3.2;
+    const launchFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "running",
+      phaseElapsed: 0.12,
+      reducedMotion: false,
+      round,
+      time,
+    });
+    const launchStillFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "running",
+      phaseElapsed: 0.12,
+      reducedMotion: true,
+      round,
+      time,
+    });
+    const steadyFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "running",
+      phaseElapsed: 1.2,
+      reducedMotion: false,
+      round,
+      time,
+    });
+    const steadyStillFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      phase: "running",
+      phaseElapsed: 1.2,
+      reducedMotion: true,
+      round,
+      time,
+    });
+    const launchCameraOffset = Math.hypot(
+      launchFrame.camera.position[0] - launchStillFrame.camera.position[0],
+      launchFrame.camera.position[1] - launchStillFrame.camera.position[1],
+    );
+    const steadyCameraOffset = Math.hypot(
+      steadyFrame.camera.position[0] - steadyStillFrame.camera.position[0],
+      steadyFrame.camera.position[1] - steadyStillFrame.camera.position[1],
+    );
+
+    expect(steadyCameraOffset).toBeGreaterThan(0);
+    expect(launchCameraOffset).toBeGreaterThan(steadyCameraOffset * 1.8);
   });
 
   it("calculates portal, wormhole and crash flare storyboard frames", () => {
@@ -604,6 +996,11 @@ describe("crash flight scene primitives", () => {
     });
 
     expect(enteringFrame.trail.visible).toBe(false);
+    expect(enteringFrame.car).toMatchObject({ followTrail: false });
+    expect(enteringFrame.car.position[0]).toBeCloseTo(
+      enteringFrame.portal.position[0],
+      2,
+    );
 
     const runningFrame = getCrashFlightStoryboard({
       cameraAspect: 1.2,
@@ -630,6 +1027,25 @@ describe("crash flight scene primitives", () => {
     expect(runningFrame.trail.elapsedSeconds).toBe(0.35);
     expect(runningFrame.trail.multiplier).toBe(1.6);
     expect(runningFrame.trail.width).toBeGreaterThan(2.8);
+
+    const smoothNow = new Date("2026-06-01T12:00:20.000Z");
+    const smoothRunningFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.2,
+      now: smoothNow,
+      phase: "running",
+      phaseElapsed: 0.35,
+      reducedMotion: true,
+      round: {
+        currentMultiplierBp: 20000,
+        multiplierBaseBp: 10000,
+        multiplierGrowthRateBpPerSecond: 500,
+        startedAt: "2026-06-01T12:00:00.000Z",
+        status: "RUNNING",
+      } as DashboardRound,
+      time: 3,
+    });
+
+    expect(smoothRunningFrame.trail.multiplier).toBeCloseTo(2.7182);
 
     const longRunningFrame = getCrashFlightStoryboard({
       cameraAspect: 1.2,
@@ -661,6 +1077,8 @@ describe("crash flight scene primitives", () => {
     expect(crashedFrame.trail.tone).toBe("crash");
     expect(crashedFrame.trail.carPosition).toEqual(crashedFrame.car.position);
     expect(crashedFrame.car).toMatchObject({ followTrail: true });
+    expect(crashedFrame.car.scale).toEqual(runningFrame.car.scale);
+    expect(crashedFrame.showRunningCar).toBe(true);
     expect(crashedFrame.trail.axisRevealProgress).toBe(1);
     expect(crashedFrame.redFlashOpacity).toBeGreaterThan(0.18);
     expect("roadOpacity" in crashedFrame).toBe(false);
@@ -728,6 +1146,7 @@ describe("crash flight scene primitives", () => {
 
     animateTimeCarFire(car, 0.21, true);
 
+    expect(fire.visible).toBe(true);
     expect(fire.scale.x).toBeGreaterThan(1);
     expect(body.scale.x).toBe(1);
     expect(
@@ -736,6 +1155,7 @@ describe("crash flight scene primitives", () => {
 
     animateTimeCarFire(car, 0.21, false);
 
+    expect(fire.visible).toBe(false);
     expect(fire.scale.x).toBe(1);
     expect(fire.position.y).toBe(0);
     expect(body.scale.x).toBe(1);

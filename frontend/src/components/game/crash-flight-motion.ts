@@ -9,7 +9,7 @@ export type StageAnimationPhase =
   | "running";
 
 export function usesRunningTimeCarAsset(phase: StageAnimationPhase) {
-  return phase === "entering" || phase === "running";
+  return phase === "entering" || phase === "running" || phase === "crashed";
 }
 
 export function getPortalVisibilityForPhase(phase: StageAnimationPhase) {

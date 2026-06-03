@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import NumberFlow from "@number-flow/react";
 import { cn } from "../../lib/utils";
+import { getSecondsUntilRoundStart } from "../../services/round-timing";
 import {
   CrashFlightScene,
   type StageAnimationPhase,
@@ -8,6 +10,7 @@ import {
   type DashboardRound,
   formatRoundMultiplier,
 } from "./round-formatting";
+import { ENTERING_BLACK_HOLE_MS } from "./stage-animation-timing";
 
 type ChronoStageProps = {
   isLoading: boolean;
@@ -15,12 +18,14 @@ type ChronoStageProps = {
   round: DashboardRound | null;
 };
 
-const ENTERING_BLACK_HOLE_MS = 1400;
-
 export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
+  const betting = round?.status === "BETTING";
   const crashed = round?.status === "CRASHED" || round?.status === "SETTLED";
   const running = round?.status === "RUNNING";
   const phase = useStageAnimationPhase(round?.status);
+  const bettingSeconds = betting ? getSecondsUntilRoundStart(round, now) : 0;
+  const centerValue = formatRoundMultiplier(round, now);
+  const centerLabel = betting ? "Rodada inicia em" : "Multiplicador atual";
 
   return (
     <div
@@ -67,7 +72,13 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
             )}
             data-testid="stage-multiplier-value"
           >
-            {isLoading ? "..." : formatRoundMultiplier(round, now)}
+            {isLoading ? (
+              "..."
+            ) : betting ? (
+              <NumberFlow value={bettingSeconds} />
+            ) : (
+              centerValue
+            )}
           </p>
           <p
             className={cn(
@@ -75,7 +86,7 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
               crashed && "text-rose-100/78",
             )}
           >
-            Multiplicador atual
+            {centerLabel}
           </p>
         </div>
       </div>
