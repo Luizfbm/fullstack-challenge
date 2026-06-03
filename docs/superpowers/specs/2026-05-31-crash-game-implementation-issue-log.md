@@ -1197,6 +1197,25 @@ Cada entrada deve conter:
 - Validacao: `bun run test:e2e:browser` passou com 7 testes usando 1 worker.
 - Status: resolvido.
 
+### 68. E2E de rate limiting era sensivel a janela temporal do Kong
+
+- Contexto: auditoria final antes de criar o README definitivo, executando
+  `bun run ci:e2e`.
+- Sintoma: `tests/e2e/rate-limiting.e2e.test.ts` falhou esperando status
+  `429`, mas recebeu `201` seguido de respostas `400` para as 12 chamadas de
+  aposta.
+- Causa: o plugin `rate-limiting` do Kong estava ativo e retornava headers
+  `X-RateLimit-*`, mas o teste fazia apenas 12 chamadas sequenciais contra um
+  limite de `10/s`. Em ambiente local, as chamadas cruzaram a janela de 1
+  segundo e o contador resetou antes de exceder o limite.
+- Correcao: o teste passou a disparar uma rajada concorrente de apostas acima
+  do limite de `10/s`, mantendo a verificacao de que healthchecks e frontend
+  continuam sem rate limit.
+- Validacao: `cd services/games && bun test
+  tests/e2e/rate-limiting.e2e.test.ts` passou; `bun run ci:e2e` passou com
+  17 testes E2E via Docker/Kong/Keycloak.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -1335,5 +1354,6 @@ Cada entrada deve conter:
 
 ## Validacoes Ainda Pendentes
 
-- Passo 17 envolve README final e esta bloqueado pela instrucao atual de nao
-  alterar `README.md`.
+- Nenhuma validacao pendente conhecida apos a auditoria final. O README
+  original foi preservado como `DESAFIO_ORIGINAL.md` e o README de entrega foi
+  criado em `README.md`.

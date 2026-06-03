@@ -24,22 +24,32 @@ describe("Kong rate limiting E2E", () => {
           expect(frontend.status).toBe(200);
         }
 
-        const statuses: number[] = [];
+        const responses = await Promise.all(
+          Array.from({ length: 16 }, () =>
+            apiResponse("/games/bet", {
+              body: JSON.stringify({ amountCents: "1000" }),
+              headers: {
+                "Content-Type": "application/json",
+              },
+              method: "POST",
+              token,
+            }),
+          ),
+        );
+        const statuses = responses.map((response) => response.status);
 
-        for (let request = 0; request < 12; request += 1) {
-          const response = await apiResponse("/games/bet", {
+        expect(statuses).toContain(429);
+
+        const responseAfterLimit = await apiResponse("/games/bet", {
             method: "POST",
             token,
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({ amountCents: "1000" }),
-          });
+        });
 
-          statuses.push(response.status);
-        }
-
-        expect(statuses).toContain(429);
+        expect(responseAfterLimit.status).toBe(429);
 
         await Bun.sleep(1200);
       });
