@@ -83,7 +83,7 @@ export function RoundHistoryPanel({
   return (
     <section
       aria-label="Histórico de rodadas"
-      className="casino-mini-panel min-w-0 rounded-lg border border-amber-200/20 bg-black/45 p-2.5 shadow-[0_0_42px_rgba(251,191,36,0.1)]"
+      className="casino-chip-rail casino-mini-panel min-w-0 rounded-lg border border-amber-200/25 bg-black/45 p-2.5 shadow-[0_0_42px_rgba(250,204,21,0.12)]"
     >
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-2">

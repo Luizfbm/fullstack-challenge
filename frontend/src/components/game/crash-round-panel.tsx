@@ -17,7 +17,7 @@ export function CrashRoundPanel({
   return (
     <section
       aria-label="Arcade arena"
-      className="casino-stage-shell min-w-0 rounded-2xl border border-rose-300/25 p-3 sm:p-4"
+      className="casino-stage-shell min-w-0 rounded-2xl border border-amber-200/25 p-3 sm:p-4"
     >
       <CrashCurveChart isLoading={isLoading} now={now} round={round} />
       <p className="sr-only">

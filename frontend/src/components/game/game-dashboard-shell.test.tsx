@@ -178,6 +178,9 @@ describe("game dashboard helpers", () => {
     expect(screen.getByLabelText("Arcade arena")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Provably Fair" })).toBeTruthy();
     expect(screen.getByText("Histórico")).toBeTruthy();
+    expect(
+      screen.getByRole("region", { name: "Histórico de rodadas" }).className,
+    ).toContain("casino-chip-rail");
     expect(screen.getByText("Mesa")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Apostar" })).toBeTruthy();
     expect(screen.getAllByText("Leaderboard").length).toBeGreaterThan(0);
@@ -288,6 +291,7 @@ describe("game dashboard helpers", () => {
     expect(screen.getAllByText("Mesa de aposta")).toHaveLength(1);
     expect(screen.getAllByLabelText("Valor em reais")).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Apostar" })).toHaveLength(1);
+    expect(desktopSidebar.className).toContain("lg:sticky");
   });
 
   it("renders a compact mobile bet dock without duplicating the bet form", () => {
