@@ -11,7 +11,7 @@ export function BetStakePreview({
 }: BetStakePreviewProps) {
   return (
     <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2 xl:grid-cols-1">
-      <div className="min-w-0 rounded-md border border-white/5 bg-black/35 px-3 py-2.5 text-sm text-zinc-300">
+      <div className="min-w-0 rounded-md border border-amber-200/15 bg-black/35 px-3 py-2.5 text-sm text-zinc-300">
         <p className="text-xs text-zinc-500">Entrada</p>
         <p className="font-mono text-zinc-50">{entryLabel}</p>
       </div>

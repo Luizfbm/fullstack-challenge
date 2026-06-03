@@ -12,6 +12,14 @@
   --chrono-green: #34d399;
   --casino-pink: #f43f5e;
   --casino-green: #22c55e;
+  --casino-felt: #064e3b;
+  --casino-felt-deep: #052e16;
+  --casino-gold: #facc15;
+  --casino-gold-soft: #fde68a;
+  --casino-risk: #f43f5e;
+  --casino-win: #22c55e;
+  --casino-tech: #22d3ee;
+  --casino-surface: rgba(3, 7, 18, 0.94);
   --chrono-panel: rgba(9, 13, 18, 0.82);
   --chrono-panel-strong: rgba(14, 19, 26, 0.94);
 }
@@ -68,24 +76,34 @@ input {
 .casino-action-dock,
 .casino-stage-shell {
   background:
-    linear-gradient(135deg, rgba(244, 63, 94, 0.13), transparent 36%),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(2, 6, 23, 0.78));
+    linear-gradient(135deg, rgba(250, 204, 21, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(6, 78, 59, 0.42), rgba(2, 6, 23, 0.86));
   backdrop-filter: blur(22px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(253, 230, 138, 0.12),
     0 24px 72px rgba(0, 0, 0, 0.36);
+}
+
+.casino-bet-slip {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(250, 204, 21, 0.18), transparent 18rem),
+    linear-gradient(145deg, rgba(6, 78, 59, 0.82), rgba(2, 6, 23, 0.96) 68%);
+  backdrop-filter: blur(20px);
+  box-shadow:
+    inset 0 1px 0 rgba(253, 230, 138, 0.16),
+    0 24px 72px rgba(0, 0, 0, 0.38);
 }
 
 .casino-action-dock {
   background:
-    linear-gradient(90deg, rgba(244, 63, 94, 0.16), rgba(34, 197, 94, 0.11)),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(2, 6, 23, 0.94));
+    linear-gradient(90deg, rgba(250, 204, 21, 0.14), rgba(34, 197, 94, 0.12)),
+    linear-gradient(180deg, rgba(6, 78, 59, 0.68), rgba(2, 6, 23, 0.94));
 }
 
 .casino-stage-shell {
   background:
-    radial-gradient(circle at 52% 0%, rgba(244, 63, 94, 0.22), transparent 28rem),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.8), rgba(2, 6, 23, 0.96));
+    radial-gradient(circle at 52% 0%, rgba(250, 204, 21, 0.16), transparent 28rem),
+    linear-gradient(180deg, rgba(6, 78, 59, 0.36), rgba(2, 6, 23, 0.96));
 }
 
 .chrono-arena {
