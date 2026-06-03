@@ -44,26 +44,40 @@ export function GameDashboardShell() {
     myBetsQuery.error,
     autoBetSessionQuery.error,
   ].find(Boolean);
+  const renderLeaderboard = ({
+    className,
+    collapsible = false,
+  }: {
+    className?: string;
+    collapsible?: boolean;
+  } = {}) => (
+    <LeaderboardPanel
+      className={className}
+      currentPlayerUsername={username}
+      entries={leaderboardQuery.data ?? []}
+      errorMessage={
+        leaderboardQuery.error
+          ? getApiErrorMessage(leaderboardQuery.error)
+          : null
+      }
+      isCollapsed={collapsible ? !leaderboardOpen : false}
+      isLoading={leaderboardQuery.isLoading}
+      onPeriodChange={setLeaderboardPeriod}
+      onToggleCollapse={
+        collapsible ? () => setLeaderboardOpen((open) => !open) : undefined
+      }
+      period={leaderboardPeriod}
+    />
+  );
 
   return (
     <div className="arcade-dashboard min-w-0 pb-36 lg:pb-0">
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)] xl:gap-y-3">
-        <div className="order-1 min-w-0 space-y-4 xl:order-2">
-          <LeaderboardPanel
-            className="hidden md:block xl:hidden"
-            currentPlayerUsername={username}
-            entries={leaderboardQuery.data ?? []}
-            errorMessage={
-              leaderboardQuery.error
-                ? getApiErrorMessage(leaderboardQuery.error)
-                : null
-            }
-            isCollapsed={!leaderboardOpen}
-            isLoading={leaderboardQuery.isLoading}
-            onPeriodChange={setLeaderboardPeriod}
-            onToggleCollapse={() => setLeaderboardOpen((open) => !open)}
-            period={leaderboardPeriod}
-          />
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:items-start xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-y-3">
+        <div className="order-1 min-w-0 space-y-4">
+          {renderLeaderboard({
+            className: "hidden md:block lg:hidden",
+            collapsible: true,
+          })}
 
           {errorMessage ? <AuthError message={errorMessage} /> : null}
           {apiError ? <AuthError message={getApiErrorMessage(apiError)} /> : null}
@@ -85,50 +99,27 @@ export function GameDashboardShell() {
 
         <aside
           aria-label="Desktop cashier and leaderboard"
-          className="order-2 min-w-0 space-y-4 xl:sticky xl:top-4 xl:order-1 xl:row-span-2 xl:self-start"
+          className="order-2 min-w-0 space-y-4 lg:sticky lg:top-4 lg:row-span-2 lg:self-start"
         >
           <BetControlsPanel
             activeBet={activeBet}
             autoBetSession={autoBetSessionQuery.data ?? null}
-            className="sticky bottom-3 z-30 mx-2 mt-3 shadow-[0_0_60px_rgba(244,63,94,0.28)] lg:static lg:mx-auto lg:-mt-10 lg:max-w-5xl xl:mx-0 xl:mt-0 xl:max-w-none"
+            className="sticky bottom-3 z-30 mx-2 mt-3 shadow-[0_0_54px_rgba(250,204,21,0.16)] lg:static lg:mx-0 lg:mt-0"
             currentRound={currentRound}
             now={now}
           />
-          <LeaderboardPanel
-            className="hidden xl:block"
-            currentPlayerUsername={username}
-            entries={leaderboardQuery.data ?? []}
-            errorMessage={
-              leaderboardQuery.error
-                ? getApiErrorMessage(leaderboardQuery.error)
-                : null
-            }
-            isLoading={leaderboardQuery.isLoading}
-            onPeriodChange={setLeaderboardPeriod}
-            period={leaderboardPeriod}
-          />
+          {renderLeaderboard({ className: "hidden lg:block" })}
         </aside>
 
         <div
           className="order-3 min-w-0 md:hidden"
           data-testid="mobile-leaderboard-slot"
         >
-          <LeaderboardPanel
-            currentPlayerUsername={username}
-            entries={leaderboardQuery.data ?? []}
-            errorMessage={
-              leaderboardQuery.error
-                ? getApiErrorMessage(leaderboardQuery.error)
-                : null
-            }
-            isLoading={leaderboardQuery.isLoading}
-            onPeriodChange={setLeaderboardPeriod}
-            period={leaderboardPeriod}
-          />
+          {renderLeaderboard()}
         </div>
 
         <div
-          className="order-4 min-w-0 xl:col-start-2 xl:row-start-2"
+          className="order-4 min-w-0 lg:col-start-1 lg:row-start-2"
           data-testid="stage-technical-tabs-slot"
         >
           <ArcadeTechnicalTabs
