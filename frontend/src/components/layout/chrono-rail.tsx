@@ -13,9 +13,33 @@ import {
   type RailItemId,
 } from "./chrono-rail-items";
 
+const EVALUATOR_PROMPT_STORAGE_KEY =
+  "chrono-crash:evaluator-prompt-dismissed";
+
+function hasDismissedEvaluatorPrompt(): boolean {
+  try {
+    return (
+      globalThis.localStorage?.getItem(EVALUATOR_PROMPT_STORAGE_KEY) === "true"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function storeEvaluatorPromptDismissal(): void {
+  try {
+    globalThis.localStorage?.setItem(EVALUATOR_PROMPT_STORAGE_KEY, "true");
+  } catch {
+    // The prompt can still be dismissed for the current session.
+  }
+}
+
 export function ChronoRail() {
   const [activePanelId, setActivePanelId] = useState<RailItemId | null>(null);
   const [copiedPanelId, setCopiedPanelId] = useState<RailItemId | null>(null);
+  const [showEvaluatorPrompt, setShowEvaluatorPrompt] = useState(
+    () => !hasDismissedEvaluatorPrompt(),
+  );
   const activePanel =
     railItems.find((item) => item.id === activePanelId) ?? null;
 
@@ -27,6 +51,16 @@ export function ChronoRail() {
     await globalThis.navigator.clipboard.writeText(panel.copyValue);
     setCopiedPanelId(panel.id);
     window.setTimeout(() => setCopiedPanelId(null), 1600);
+  }
+
+  function dismissEvaluatorPrompt(): void {
+    setShowEvaluatorPrompt(false);
+    storeEvaluatorPromptDismissal();
+  }
+
+  function openEvaluatorGuide(): void {
+    setActivePanelId("cockpit");
+    dismissEvaluatorPrompt();
   }
 
   return (
@@ -62,6 +96,54 @@ export function ChronoRail() {
           );
         })}
       </div>
+
+      {showEvaluatorPrompt && !activePanel ? (
+        <aside
+          aria-label="Chamada para avaliadores"
+          className="absolute left-0 top-full mt-2 w-[min(calc(100vw-1.5rem),22rem)] rounded-2xl border border-cyan-200/30 bg-slate-950 p-3 text-left shadow-2xl shadow-cyan-950/50 backdrop-blur lg:left-full lg:top-0 lg:ml-3 lg:mt-0"
+        >
+          <div className="flex items-start gap-3">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-100">
+              <BookOpenCheck className="size-4" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-black uppercase tracking-[0.16em] text-cyan-100">
+                Esta avaliando?
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-zinc-300">
+                A barra lateral reune evidencias, credenciais, APIs e
+                observabilidade da entrega.
+              </p>
+            </div>
+            <button
+              aria-label="Fechar chamada para avaliadores"
+              className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg border border-white/10 bg-white/[0.03] text-zinc-400 transition-colors hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200"
+              onClick={dismissEvaluatorPrompt}
+              type="button"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-cyan-200/35 bg-cyan-300/15 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-cyan-50 transition-colors hover:bg-cyan-300/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200"
+              onClick={openEvaluatorGuide}
+              type="button"
+            >
+              <BookOpenCheck className="size-4" aria-hidden="true" />
+              Ver guia
+            </button>
+            <button
+              className="cursor-pointer rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-zinc-300 transition-colors hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200"
+              onClick={dismissEvaluatorPrompt}
+              type="button"
+            >
+              Agora nao
+            </button>
+          </div>
+        </aside>
+      ) : null}
 
       {activePanel ? (
         <section

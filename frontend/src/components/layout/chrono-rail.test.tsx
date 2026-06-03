@@ -1,12 +1,41 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ChronoRail } from "./chrono-rail";
 
+const evaluatorPromptStorageKey = "chrono-crash:evaluator-prompt-dismissed";
+
 describe("ChronoRail", () => {
+  beforeEach(() => {
+    globalThis.localStorage.clear();
+  });
+
   afterEach(() => {
     cleanup();
+    globalThis.localStorage.clear();
+  });
+
+  it("invites evaluators on first access and opens the delivery guide", async () => {
+    render(<ChronoRail />);
+
+    expect(await screen.findByLabelText("Chamada para avaliadores")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ver guia" }));
+
+    expect(screen.getByLabelText("Entrega do avaliador")).toBeTruthy();
+    expect(screen.queryByLabelText("Chamada para avaliadores")).toBeNull();
+    expect(globalThis.localStorage.getItem(evaluatorPromptStorageKey)).toBe(
+      "true",
+    );
+  });
+
+  it("keeps the evaluator prompt dismissed after the user closes it", () => {
+    globalThis.localStorage.setItem(evaluatorPromptStorageKey, "true");
+
+    render(<ChronoRail />);
+
+    expect(screen.queryByLabelText("Chamada para avaliadores")).toBeNull();
   });
 
   it("opens evaluator access credentials for the game and dashboards", () => {
