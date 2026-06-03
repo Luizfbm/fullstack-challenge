@@ -74,4 +74,24 @@ describe("AppShell", () => {
     expect(playerChip.className).toContain("flex-1");
     expect(playerChip.className).toContain("sm:flex-none");
   });
+
+  it("keeps the application chrome aligned with felt green and gold casino styling", () => {
+    render(
+      <AppShell>
+        <main>Game content</main>
+      </AppShell>,
+    );
+
+    const header = screen.getByRole("banner");
+    const brandMark = screen.getByText("CC");
+    const subtitle = screen.getByText("Arcade casino premium");
+
+    expect(header.className).toContain("border-amber-200/25");
+    expect(header.className).not.toContain("rose");
+    expect(brandMark.className).toContain("border-amber-200/45");
+    expect(brandMark.className).toContain("bg-emerald-950/70");
+    expect(brandMark.className).not.toContain("rose");
+    expect(subtitle.className).toContain("text-amber-200");
+    expect(subtitle.className).not.toContain("rose");
+  });
 });
