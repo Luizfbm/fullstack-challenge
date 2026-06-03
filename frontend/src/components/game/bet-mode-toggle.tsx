@@ -53,10 +53,10 @@ function ModeButton({
     <button
       aria-pressed={selected}
       className={cn(
-        "flex h-9 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold whitespace-nowrap transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-60",
+        "flex h-9 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold whitespace-nowrap transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200 disabled:cursor-not-allowed disabled:opacity-60",
         selected
-          ? "border border-cyan-200/40 bg-cyan-200/15 text-cyan-100"
-          : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",
+          ? "border border-amber-200/45 bg-amber-200/15 text-amber-100"
+          : "text-zinc-400 hover:bg-emerald-950/55 hover:text-zinc-100",
       )}
       disabled={disabled}
       onClick={onClick}

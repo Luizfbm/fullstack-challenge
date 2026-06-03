@@ -23,13 +23,13 @@ const buttonVariants = cva(
         ghost:
           "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 focus-visible:outline-zinc-500",
         neon:
-          "border border-rose-300/35 bg-rose-400/10 text-rose-100 shadow-[0_0_24px_rgba(244,63,94,0.22)] hover:border-rose-200/60 hover:bg-rose-400/20 focus-visible:outline-rose-200",
+          "border border-amber-200/35 bg-amber-200/10 text-amber-100 shadow-[0_0_24px_rgba(250,204,21,0.14)] hover:border-amber-200/60 hover:bg-amber-200/20 focus-visible:outline-amber-200",
         primary:
           "bg-emerald-400 text-zinc-950 hover:bg-emerald-300 focus-visible:outline-emerald-300",
         secondary:
           "bg-sky-400 text-zinc-950 hover:bg-sky-300 focus-visible:outline-sky-300",
         temporal:
-          "border border-rose-300/60 bg-gradient-to-b from-rose-300 to-pink-600 text-zinc-950 shadow-[0_0_38px_rgba(244,63,94,0.36)] hover:from-rose-200 hover:to-pink-500 focus-visible:outline-rose-200",
+          "border border-amber-200/70 bg-gradient-to-b from-amber-200 to-yellow-500 text-zinc-950 shadow-[0_0_34px_rgba(250,204,21,0.28)] hover:from-amber-100 hover:to-yellow-400 focus-visible:outline-amber-200",
       },
     },
   },
