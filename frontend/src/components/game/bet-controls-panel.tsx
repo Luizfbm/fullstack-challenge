@@ -14,7 +14,11 @@ import type {
   AutoBetSessionResponse,
   BetResponse,
 } from "../../services/game-api";
-import { formatCents } from "../../services/money";
+import {
+  formatCents,
+  formatCentsForRealInput,
+  parseRealInputToCents,
+} from "../../services/money";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ActiveBetSummary } from "./active-bet-summary";
@@ -56,6 +60,8 @@ export function BetControlsPanel({
   const amountIsValid = BigInt(betAmountCents) > 0n;
   const activeAutoBetSession =
     autoBetSession?.status === "ACTIVE" ? autoBetSession : null;
+  const stoppedAutoBetSession =
+    autoBetSession && autoBetSession.status !== "ACTIVE" ? autoBetSession : null;
   const autoBetForm = useAutoBetForm({
     activeSession: activeAutoBetSession,
     amountCents: betAmountCents,
@@ -127,16 +133,23 @@ export function BetControlsPanel({
       />
 
       <label className="block text-xs font-medium text-zinc-400" htmlFor="bet">
-        Valor em centavos
+        Valor em reais
       </label>
-      <Input
-        className="mt-2 h-12 border-rose-300/25 bg-black/45 font-mono text-lg"
-        disabled={placeBetMutation.isPending || autoBetFormDisabled}
-        id="bet"
-        inputMode="numeric"
-        onChange={(event) => setBetAmountCents(event.target.value)}
-        value={visibleBetAmountCents}
-      />
+      <div className="mt-2 flex h-12 items-center rounded-md border border-white/5 bg-black/35 px-3 transition-colors focus-within:border-cyan-300 focus-within:shadow-[0_0_24px_rgba(34,211,238,0.16)]">
+        <span className="mr-2 shrink-0 font-mono text-lg font-semibold text-zinc-50">
+          R$
+        </span>
+        <Input
+          className="h-auto border-0 bg-transparent px-0 font-mono text-lg shadow-none focus:border-transparent focus:shadow-none"
+          disabled={placeBetMutation.isPending || autoBetFormDisabled}
+          id="bet"
+          inputMode="decimal"
+          onChange={(event) =>
+            setBetAmountCents(parseRealInputToCents(event.target.value))
+          }
+          value={formatCentsForRealInput(visibleBetAmountCents)}
+        />
+      </div>
 
       <BetStakePreview
         entryLabel={
@@ -154,8 +167,8 @@ export function BetControlsPanel({
         target={autoBetForm.visibleAutoCashoutTarget}
       />
 
-      {autoBetSession ? (
-        <AutoBetSessionSummary session={autoBetSession} />
+      {activeAutoBetSession ? (
+        <AutoBetSessionSummary session={activeAutoBetSession} />
       ) : null}
 
       {selectedBetMode === "auto" ? (
@@ -232,6 +245,10 @@ export function BetControlsPanel({
         >
           Entrar para apostar
         </Button>
+      ) : null}
+
+      {stoppedAutoBetSession ? (
+        <AutoBetSessionSummary session={stoppedAutoBetSession} />
       ) : null}
     </section>
   );

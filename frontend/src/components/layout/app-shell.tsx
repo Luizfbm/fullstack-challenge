@@ -1,11 +1,20 @@
 import { LogIn, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { useAuth } from "../../hooks/use-auth";
+import { useWalletQuery } from "../../hooks/use-game-rest";
+import { formatCents } from "../../services/money";
 import { Button } from "../ui/button";
 import { ChronoRail } from "./chrono-rail";
 
 export function AppShell({ children }: PropsWithChildren) {
   const { isAuthenticated, isLoading, login, logout, username } = useAuth();
+  const walletQuery = useWalletQuery(isAuthenticated);
+  const balanceLabel =
+    isAuthenticated && walletQuery.data
+      ? formatCents(walletQuery.data.balanceCents)
+      : isAuthenticated && walletQuery.isLoading
+        ? "..."
+        : "-";
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#020617] text-zinc-50">
@@ -15,8 +24,8 @@ export function AppShell({ children }: PropsWithChildren) {
 
         <div className="min-w-0 flex-1">
           <header className="chrono-frame rounded-3xl border border-rose-300/20">
-            <div className="flex min-h-16 items-center justify-between gap-4 px-4 py-3 sm:px-6">
-              <div className="flex min-w-0 items-center gap-3">
+            <div className="flex min-h-16 flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:justify-between sm:px-6">
+              <div className="mr-auto flex min-w-0 items-center gap-3">
                 <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-rose-300/45 bg-rose-400/15 text-sm font-black text-rose-100 shadow-[0_0_32px_rgba(244,63,94,0.28)]">
                   CC
                 </div>
@@ -36,10 +45,26 @@ export function AppShell({ children }: PropsWithChildren) {
               </div>
 
               {isAuthenticated ? (
-                <div className="flex items-center gap-2">
-                  <div className="hidden items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-sm text-cyan-100 sm:flex">
-                    <UserRound className="size-4" aria-hidden="true" />
-                    {username}
+                <div
+                  aria-label="Ações da conta"
+                  className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:justify-end"
+                >
+                  <div
+                    aria-label="Conta do jogador"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-2 text-cyan-100 sm:flex-none sm:px-3"
+                  >
+                    <UserRound
+                      className="size-4 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 leading-tight">
+                      <p className="truncate text-sm font-semibold">
+                        {username ?? "-"}
+                      </p>
+                      <p className="truncate font-mono text-[0.68rem] font-semibold text-emerald-100 sm:text-xs">
+                        {balanceLabel}
+                      </p>
+                    </div>
                   </div>
                   <Button onClick={logout} size="sm" type="button" variant="ghost">
                     <LogOut className="size-4" aria-hidden="true" />

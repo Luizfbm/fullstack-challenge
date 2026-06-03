@@ -19,16 +19,16 @@ export function AutoBetNumberField({
   value,
 }: AutoBetNumberFieldProps) {
   return (
-    <div className="rounded-md border border-white/10 bg-black/30 p-3">
+    <div className="min-w-0 rounded-md border border-white/10 bg-black/30 p-3">
       <label
-        className="flex items-center gap-2 text-xs font-medium text-zinc-400"
+        className="flex min-w-0 items-center gap-2 text-xs leading-tight font-medium text-zinc-400"
         htmlFor={id}
       >
-        <Icon className="size-3.5 text-cyan-200" aria-hidden="true" />
+        <Icon className="size-3.5 shrink-0 text-cyan-200" aria-hidden="true" />
         {label}
       </label>
       <Input
-        className="mt-2 h-10 border-cyan-300/20 bg-black/45 font-mono"
+        className="mt-2 h-10 min-w-0 border-cyan-300/20 bg-black/45 font-mono"
         disabled={disabled}
         id={id}
         inputMode="numeric"

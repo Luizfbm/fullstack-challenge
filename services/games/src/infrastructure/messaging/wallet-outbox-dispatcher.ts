@@ -1,4 +1,4 @@
-import { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { WalletOperationRejectedError } from "../../application/game.errors";
 import type { WalletOutboxRepository } from "../../application/ports/wallet-outbox.repository";
 import type { WalletOutboxMessage } from "../../application/wallet-outbox/wallet-outbox-message";
@@ -7,6 +7,7 @@ import type { RabbitMqWalletClient } from "./rabbitmq-wallet.client";
 const DEFAULT_INTERVAL_MS = 500;
 
 export class WalletOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(WalletOutboxDispatcher.name);
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -31,13 +32,21 @@ export class WalletOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
   }
 
   async dispatchNext(): Promise<void> {
-    const message = await this.outboxRepository.claimNext(new Date());
+    try {
+      const message = await this.outboxRepository.claimNext(new Date());
 
-    if (!message) {
-      return;
+      if (!message) {
+        return;
+      }
+
+      await this.dispatchMessage(message);
+    } catch (error) {
+      this.logger.error(
+        error instanceof Error
+          ? error.message
+          : "Wallet outbox dispatch failed",
+      );
     }
-
-    await this.dispatchMessage(message);
   }
 
   async dispatchMessage(message: WalletOutboxMessage): Promise<void> {

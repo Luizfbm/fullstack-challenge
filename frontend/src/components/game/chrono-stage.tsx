@@ -25,13 +25,17 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
   const phase = useStageAnimationPhase(round?.status);
   const bettingSeconds = betting ? getSecondsUntilRoundStart(round, now) : 0;
   const centerValue = formatRoundMultiplier(round, now);
-  const centerLabel = betting ? "Rodada inicia em" : "Multiplicador atual";
+  const centerLabel = crashed
+    ? `A rodada finalizou em ${centerValue}`
+    : betting
+      ? "Rodada inicia em"
+      : "Multiplicador atual";
 
   return (
     <div
       aria-busy={isLoading}
       className={cn(
-        "chrono-arena black-hole-stage relative min-h-[34rem] min-w-0 overflow-hidden rounded-lg border",
+        "chrono-arena black-hole-stage relative h-[clamp(18rem,72vw,34rem)] min-w-0 overflow-hidden rounded-lg border",
         `black-hole-${phase}`,
         crashed
           ? "border-rose-300/60 shadow-[0_0_120px_rgba(244,63,94,0.34)]"
@@ -76,14 +80,17 @@ export function ChronoStage({ isLoading, now, round }: ChronoStageProps) {
               "..."
             ) : betting ? (
               <NumberFlow value={bettingSeconds} />
+            ) : crashed ? (
+              "CRASH!"
             ) : (
               centerValue
             )}
           </p>
           <p
             className={cn(
-              "mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-100/78",
-              crashed && "text-rose-100/78",
+              crashed
+                ? "mt-2 text-sm font-semibold normal-case tracking-normal text-rose-100/86 sm:text-base"
+                : "mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-100/78",
             )}
           >
             {centerLabel}

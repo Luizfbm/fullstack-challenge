@@ -91,6 +91,21 @@ describe("ChronoStage", () => {
     expect(screen.queryByTestId("chrono-stage-curve")).toBeNull();
   });
 
+  it("uses a responsive stage height instead of a desktop-only minimum", () => {
+    render(
+      <ChronoStage
+        isLoading={false}
+        now={new Date("2026-06-02T12:00:00.000Z")}
+        round={{ currentMultiplierBp: 15700, status: "RUNNING" } as DashboardRound}
+      />,
+    );
+
+    const stageClassName = screen.getByTestId("chrono-stage").className;
+
+    expect(stageClassName).toContain("h-[clamp(18rem,72vw,34rem)]");
+    expect(stageClassName).not.toContain("min-h-[34rem]");
+  });
+
   it("keeps the portal entry phase short when betting turns into running", () => {
     vi.useFakeTimers();
 
@@ -175,6 +190,27 @@ describe("ChronoStage", () => {
     );
     expect(screen.getByText("Multiplicador atual")).toBeTruthy();
     expect(screen.getByText("2.14x")).toBeTruthy();
+  });
+
+  it("shows a dedicated crash message with the crash multiplier", () => {
+    render(
+      <ChronoStage
+        isLoading={false}
+        now={new Date("2026-06-02T12:00:16.000Z")}
+        round={roundFixture({
+          crashedAt: "2026-06-02T12:00:16.000Z",
+          crashPointBp: 23600,
+          startedAt: "2026-06-02T12:00:10.000Z",
+          status: "CRASHED",
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("stage-multiplier-value").textContent).toBe(
+      "CRASH!",
+    );
+    expect(screen.getByText("A rodada finalizou em 2.36x")).toBeTruthy();
+    expect(screen.queryByText("Multiplicador atual")).toBeNull();
   });
 });
 

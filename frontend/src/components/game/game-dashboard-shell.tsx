@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Activity, Coins, RadioTower, Users } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 import { useGameRealtime } from "../../hooks/use-game-realtime";
 import {
@@ -8,13 +7,10 @@ import {
   useMyAutoBetSessionQuery,
   useMyBetsQuery,
   useRoundHistoryQuery,
-  useWalletQuery,
 } from "../../hooks/use-game-rest";
 import { useNow } from "../../hooks/use-now";
-import { cn } from "../../lib/utils";
 import { getApiErrorMessage } from "../../services/api-errors";
 import type { BetResponse, RoundResponse } from "../../services/game-api";
-import { formatCents } from "../../services/money";
 import {
   ArcadeTechnicalTabs,
   type ArcadeTab,
@@ -38,70 +34,21 @@ export function GameDashboardShell() {
   const leaderboardQuery = useLeaderboardQuery(leaderboardPeriod, 10);
   const autoBetSessionQuery = useMyAutoBetSessionQuery(isAuthenticated);
   const myBetsQuery = useMyBetsQuery(isAuthenticated, 10);
-  const walletQuery = useWalletQuery(isAuthenticated);
   const realtime = useGameRealtime(currentRoundQuery.data ?? null);
   const currentRound = realtime.round ?? currentRoundQuery.data ?? null;
   const roundBets = getRoundBets(currentRound);
   const activeBet = findActiveBet(currentRound, myBetsQuery.data ?? []);
-  const balanceLabel =
-    isAuthenticated && walletQuery.data
-      ? formatCents(walletQuery.data.balanceCents)
-      : isAuthenticated && walletQuery.isLoading
-        ? "..."
-        : null;
   const apiError = [
     currentRoundQuery.error,
     historyQuery.error,
-    walletQuery.error,
     myBetsQuery.error,
     autoBetSessionQuery.error,
   ].find(Boolean);
 
   return (
     <div className="arcade-dashboard min-w-0 pb-36 lg:pb-0">
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)] xl:gap-y-3">
         <div className="order-1 min-w-0 space-y-4 xl:order-2">
-          <LeaderboardPanel
-            className="block md:hidden"
-            currentPlayerUsername={username}
-            entries={leaderboardQuery.data ?? []}
-            errorMessage={
-              leaderboardQuery.error
-                ? getApiErrorMessage(leaderboardQuery.error)
-                : null
-            }
-            isLoading={leaderboardQuery.isLoading}
-            onPeriodChange={setLeaderboardPeriod}
-            period={leaderboardPeriod}
-          />
-
-          <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
-            <MetricCard
-              icon={RadioTower}
-              label="Realtime"
-              tone="green"
-              value={
-                realtime.connectionStatus === "connected" ? "LIVE" : "REST"
-              }
-            />
-            <MetricCard icon={Coins} label="Saldo" value={balanceLabel ?? "-"} />
-            <MetricCard
-              icon={Users}
-              label="Jogador"
-              value={isAuthenticated ? username ?? "-" : "-"}
-            />
-            <MetricCard
-              icon={Activity}
-              label="Rodada"
-              tone="rose"
-              value={
-                currentRound
-                  ? `#${currentRound.chainIndex} ${currentRound.status}`
-                  : "SYNC"
-              }
-            />
-          </section>
-
           <LeaderboardPanel
             className="hidden md:block xl:hidden"
             currentPlayerUsername={username}
@@ -133,16 +80,57 @@ export function GameDashboardShell() {
               now={now}
               round={currentRound}
             />
-
-            <BetControlsPanel
-              activeBet={activeBet}
-              autoBetSession={autoBetSessionQuery.data ?? null}
-              className="sticky bottom-3 z-30 mx-2 mt-3 shadow-[0_0_60px_rgba(244,63,94,0.28)] lg:static lg:mx-auto lg:-mt-10 lg:max-w-5xl"
-              currentRound={currentRound}
-              now={now}
-            />
           </main>
+        </div>
 
+        <aside
+          aria-label="Desktop cashier and leaderboard"
+          className="order-2 min-w-0 space-y-4 xl:sticky xl:top-4 xl:order-1 xl:row-span-2 xl:self-start"
+        >
+          <BetControlsPanel
+            activeBet={activeBet}
+            autoBetSession={autoBetSessionQuery.data ?? null}
+            className="sticky bottom-3 z-30 mx-2 mt-3 shadow-[0_0_60px_rgba(244,63,94,0.28)] lg:static lg:mx-auto lg:-mt-10 lg:max-w-5xl xl:mx-0 xl:mt-0 xl:max-w-none"
+            currentRound={currentRound}
+            now={now}
+          />
+          <LeaderboardPanel
+            className="hidden xl:block"
+            currentPlayerUsername={username}
+            entries={leaderboardQuery.data ?? []}
+            errorMessage={
+              leaderboardQuery.error
+                ? getApiErrorMessage(leaderboardQuery.error)
+                : null
+            }
+            isLoading={leaderboardQuery.isLoading}
+            onPeriodChange={setLeaderboardPeriod}
+            period={leaderboardPeriod}
+          />
+        </aside>
+
+        <div
+          className="order-3 min-w-0 md:hidden"
+          data-testid="mobile-leaderboard-slot"
+        >
+          <LeaderboardPanel
+            currentPlayerUsername={username}
+            entries={leaderboardQuery.data ?? []}
+            errorMessage={
+              leaderboardQuery.error
+                ? getApiErrorMessage(leaderboardQuery.error)
+                : null
+            }
+            isLoading={leaderboardQuery.isLoading}
+            onPeriodChange={setLeaderboardPeriod}
+            period={leaderboardPeriod}
+          />
+        </div>
+
+        <div
+          className="order-4 min-w-0 xl:col-start-2 xl:row-start-2"
+          data-testid="stage-technical-tabs-slot"
+        >
           <ArcadeTechnicalTabs
             activeTab={activeTab}
             bets={roundBets}
@@ -152,20 +140,6 @@ export function GameDashboardShell() {
             roundIsLoading={currentRoundQuery.isLoading}
           />
         </div>
-
-        <LeaderboardPanel
-          className="order-2 hidden self-start xl:sticky xl:top-4 xl:order-1 xl:block"
-          currentPlayerUsername={username}
-          entries={leaderboardQuery.data ?? []}
-          errorMessage={
-            leaderboardQuery.error
-              ? getApiErrorMessage(leaderboardQuery.error)
-              : null
-          }
-          isLoading={leaderboardQuery.isLoading}
-          onPeriodChange={setLeaderboardPeriod}
-          period={leaderboardPeriod}
-        />
       </div>
     </div>
   );
@@ -176,33 +150,6 @@ function AuthError({ message }: { message: string }) {
     <div className="rounded-md border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">
       {message}
     </div>
-  );
-}
-
-type MetricCardProps = {
-  icon: typeof Coins;
-  label: string;
-  tone?: "cyan" | "green" | "rose";
-  value: string;
-};
-
-function MetricCard({ icon: Icon, label, tone = "cyan", value }: MetricCardProps) {
-  const toneClassName =
-    tone === "green"
-      ? "text-emerald-200"
-      : tone === "rose"
-        ? "text-rose-200"
-        : "text-cyan-200";
-
-  return (
-    <section
-      className="casino-mini-panel min-w-0 rounded-md border border-white/10 p-3"
-      data-testid={`metric-${label.toLowerCase()}`}
-    >
-      <Icon className={cn("mb-2 size-4", toneClassName)} aria-hidden="true" />
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-zinc-50">{value}</p>
-    </section>
   );
 }
 

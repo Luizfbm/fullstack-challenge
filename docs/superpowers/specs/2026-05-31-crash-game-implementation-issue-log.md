@@ -1064,6 +1064,27 @@ Cada entrada deve conter:
 - Validacao: `bun run test:e2e:browser`.
 - Status: resolvido.
 
+### 61. Game Service parou apos falha transiente no polling do outbox
+
+- Contexto: investigacao local em 2026-06-03 apos a UI ficar presa em
+  sincronizacao e a rodada nao avancar no navegador.
+- Sintoma: `docker compose ps` nao listava `games`; `GET /games/health` e
+  `GET /games/rounds/current` via Kong ficavam sem resposta ate timeout.
+  `docker inspect fullstack-challenge-games-1` mostrava `ExitCode=1`.
+- Causa: `WalletOutboxDispatcher.dispatchNext()` deixava escapar erros do
+  reposititorio ao chamar `claimNext()`. Uma falha Prisma `P1001` ao acessar
+  `postgres:5432` dentro do polling de background gerou uma Promise rejeitada
+  sem tratamento e encerrou o processo Bun.
+- Correcao: `WalletOutboxDispatcher.dispatchNext()` agora captura falhas do
+  ciclo completo de polling/despacho, registra o erro e permite que o proximo
+  tick continue tentando. O servico foi recriado com `docker compose up -d
+  --build games` para restaurar a rodada local.
+- Validacao: `cd services/games && bun test
+  tests/unit/infrastructure/wallet-outbox-dispatcher.test.ts` cobre a falha de
+  `claimNext()` sem rejeitar a Promise; `GET /games/health` e
+  `GET /games/rounds/current` via Kong voltaram a responder.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
