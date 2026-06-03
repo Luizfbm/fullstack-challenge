@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../services/http-client";
 import type {
@@ -145,7 +151,7 @@ describe("game dashboard helpers", () => {
     expect(getRoundBets({ bets: [bet] } as RoundResponse)).toEqual([bet]);
   });
 
-  it("renders the main game screen with wallet, player, history and bet controls", () => {
+  it("renders the main game screen without the former metric card grid", () => {
     hookMocks.currentRoundQuery.data = createRound({ bets: [createBet()] });
     hookMocks.historyQuery.data = [
       createRound({ crashPointBp: 25000, id: "round-history" }),
@@ -164,9 +170,10 @@ describe("game dashboard helpers", () => {
 
     render(<GameDashboardShell />);
 
-    expect(screen.getAllByText("Saldo").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("R$ 123,45").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Jogador").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("metric-realtime")).toBeNull();
+    expect(screen.queryByTestId("metric-saldo")).toBeNull();
+    expect(screen.queryByTestId("metric-jogador")).toBeNull();
+    expect(screen.queryByTestId("metric-rodada")).toBeNull();
     expect(screen.getAllByText("player").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Arcade arena")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Provably Fair" })).toBeTruthy();
@@ -201,6 +208,87 @@ describe("game dashboard helpers", () => {
     expect(screen.queryByRole("tab", { name: "Histórico" })).toBeNull();
   });
 
+  it("does not expose technical SYNC text in the round state tab while loading", () => {
+    hookMocks.currentRoundQuery.data = null;
+    hookMocks.currentRoundQuery.isLoading = true;
+    hookMocks.realtime.round = null;
+
+    render(<GameDashboardShell />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Round State" }));
+
+    expect(screen.getByText("Sincronizando")).toBeTruthy();
+    expect(screen.queryByText("SYNC")).toBeNull();
+  });
+
+  it("keeps cashier and mobile leaderboard before technical tabs while reserving the desktop stage row", () => {
+    hookMocks.currentRoundQuery.data = createRound();
+
+    render(<GameDashboardShell />);
+
+    const arena = screen.getByLabelText("Arcade arena");
+    const cashier = screen.getByText("Cashier rail");
+    const mobileLeaderboardSlot = screen.getByTestId("mobile-leaderboard-slot");
+    const technicalTabs = screen.getByRole("tablist", {
+      name: "Evidências técnicas",
+    });
+    const desktopSidebar = screen.getByRole("complementary", {
+      name: "Desktop cashier and leaderboard",
+    });
+    const technicalSlot = screen.getByTestId("stage-technical-tabs-slot");
+
+    expect(
+      arena.compareDocumentPosition(cashier) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      cashier.compareDocumentPosition(technicalTabs) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      cashier.compareDocumentPosition(mobileLeaderboardSlot) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      mobileLeaderboardSlot.compareDocumentPosition(technicalTabs) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(desktopSidebar.className).toContain("xl:row-span-2");
+    expect(technicalSlot.className).toContain("xl:col-start-2");
+    expect(technicalSlot.className).toContain("xl:row-start-2");
+  });
+
+  it("places the desktop cashier rail above the desktop leaderboard without duplicating the form", () => {
+    hookMocks.currentRoundQuery.data = createRound();
+    hookMocks.leaderboardQuery.data = [
+      {
+        betsCount: 3,
+        payoutCents: "9000",
+        playerId: "player-1",
+        profitCents: "4000",
+        rank: 1,
+        username: "player",
+        wageredCents: "5000",
+      },
+    ];
+
+    render(<GameDashboardShell />);
+
+    const desktopSidebar = screen.getByRole("complementary", {
+      name: "Desktop cashier and leaderboard",
+    });
+    const cashier = within(desktopSidebar).getByText("Cashier rail");
+    const leaderboard = within(desktopSidebar).getByText("Leaderboard");
+
+    expect(
+      cashier.compareDocumentPosition(leaderboard) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getAllByText("Cashier rail")).toHaveLength(1);
+    expect(screen.getAllByLabelText("Valor em reais")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Apostar" })).toHaveLength(1);
+  });
+
   it("renders the authenticated player's active auto bet session", () => {
     hookMocks.autoBetSessionQuery.data = createAutoBetSession({
       maxRounds: 3,
@@ -211,10 +299,19 @@ describe("game dashboard helpers", () => {
 
     expect(screen.getByText("Auto Bet ativo")).toBeTruthy();
     expect(screen.getByText("1 / 3")).toBeTruthy();
+
+    const activeSummary = screen.getByRole("region", {
+      name: "Resumo do auto bet ativo",
+    });
+    const detailGrid = within(activeSummary).getByTestId(
+      "auto-bet-session-detail-grid",
+    );
+    expect(detailGrid.className).toContain("xl:grid-cols-1");
   });
 
   it("renders martingale session progression and stop reason", () => {
     hookMocks.autoBetSessionQuery.data = createAutoBetSession({
+      autoCashoutMultiplierBp: 20000,
       martingaleCurrentStep: 1,
       martingaleMaxSteps: 3,
       martingaleMultiplier: 2,
@@ -223,27 +320,119 @@ describe("game dashboard helpers", () => {
       nextAmountCents: "2000",
       roundsPlayed: 2,
       status: "STOPPED",
+      stopLossCents: "3000",
       stopReason: "MARTINGALE_MAX_STEPS_REACHED",
       strategy: "MARTINGALE",
+      takeProfitCents: "5000",
     });
 
     render(<GameDashboardShell />);
 
-    expect(screen.getByText("Ultimo Auto Bet")).toBeTruthy();
-    expect(screen.getByText("Martingale")).toBeTruthy();
-    expect(screen.getByText("R$ 20,00")).toBeTruthy();
-    expect(screen.getByText("1 / 3")).toBeTruthy();
-    expect(screen.getByText("Maximo de passos Martingale")).toBeTruthy();
+    const compactSummary = screen.getByRole("region", {
+      name: "Resumo compacto do último auto bet",
+    });
+    expect(within(compactSummary).getByText("Ultimo Auto Bet")).toBeTruthy();
+    expect(within(compactSummary).getByText("Martingale")).toBeTruthy();
+    expect(
+      within(compactSummary).getByText("Auto cashout 2.00x"),
+    ).toBeTruthy();
+    expect(
+      within(compactSummary).getByText("Maximo de passos Martingale"),
+    ).toBeTruthy();
+
+    for (const label of [
+      "Rodadas",
+      "Proxima aposta",
+      "Passo",
+      "Resultado",
+      "Base",
+      "Stop-loss",
+      "Take-profit",
+    ]) {
+      expect(within(compactSummary).getByText(label)).toBeTruthy();
+    }
+
+    expect(within(compactSummary).getByText("2 / 5")).toBeTruthy();
+    expect(within(compactSummary).getByText("1 / 3")).toBeTruthy();
+    expect(within(compactSummary).getByText("-R$ 10,00")).toBeTruthy();
+    expect(within(compactSummary).getAllByText("R$ 10,00")).toHaveLength(1);
+    expect(within(compactSummary).getByText("R$ 20,00")).toBeTruthy();
+    expect(within(compactSummary).getByText("R$ 30,00")).toBeTruthy();
+    expect(within(compactSummary).getByText("R$ 50,00")).toBeTruthy();
+
+    const compactGrid = within(compactSummary).getByTestId(
+      "compact-auto-bet-summary-grid",
+    );
+    expect(compactGrid.className).toContain("grid-cols-2");
+    expect(compactGrid.className).not.toContain("xl:grid-cols-1");
   });
 
-  it("normalizes the bet amount field and disables betting for invalid value", () => {
+  it("keeps cashier rail controls compact when rendered in the desktop sidebar", () => {
+    render(
+      <BetControlsPanel
+        activeBet={null}
+        autoBetSession={createAutoBetSession({
+          martingaleCurrentStep: 0,
+          martingaleMaxSteps: 3,
+          maxRounds: 4,
+          nextAmountCents: "1000",
+          roundsPlayed: 0,
+          status: "STOPPED",
+          stopReason: "MANUAL",
+          strategy: "MARTINGALE",
+        })}
+        currentRound={createRound()}
+      />,
+    );
+
+    const cashOutButton = screen.getByRole("button", { name: "Cash Out" });
+    const actionGrid = cashOutButton.parentElement;
+    expect(actionGrid?.className).toContain("grid-cols-1");
+    expect(actionGrid?.className).toContain("gap-2");
+    expect(actionGrid?.className).not.toContain("sm:grid-cols-2");
+    expect(cashOutButton.className).toContain("w-full");
+    expect(cashOutButton.className).toContain("whitespace-nowrap");
+
+    const stakePreviewGrid =
+      screen.getByText("Entrada").parentElement?.parentElement;
+    expect(stakePreviewGrid?.className).toContain("xl:grid-cols-1");
+
+    const compactGrid = screen.getByTestId("compact-auto-bet-summary-grid");
+    expect(compactGrid.className).toContain("grid-cols-2");
+    expect(compactGrid.className).not.toContain("xl:grid-cols-1");
+
+    const compactSummary = screen.getByRole("region", {
+      name: "Resumo compacto do último auto bet",
+    });
+    expect(
+      cashOutButton.compareDocumentPosition(compactSummary) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("accepts bet amounts in reais and sends integer cents to the API", () => {
     render(<BetControlsPanel activeBet={null} currentRound={createRound()} />);
 
-    const amountInput = screen.getByLabelText("Valor em centavos");
-    fireEvent.change(amountInput, { target: { value: "abc001250" } });
+    const amountInput = screen.getByLabelText("Valor em reais");
 
-    expect(amountInput).toHaveProperty("value", "1250");
+    expect(amountInput).toHaveProperty("value", "10,00");
+
+    fireEvent.change(amountInput, { target: { value: "12,50" } });
+
+    expect(amountInput).toHaveProperty("value", "12,50");
     expect(screen.getByText("R$ 12,50")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apostar" }));
+
+    expect(hookMocks.placeBetMutation.mutate).toHaveBeenCalledWith({
+      amountCents: "1250",
+    });
+  });
+
+  it("disables betting when the reais amount is invalid", () => {
+    render(<BetControlsPanel activeBet={null} currentRound={createRound()} />);
+
+    const amountInput = screen.getByLabelText("Valor em reais");
 
     fireEvent.change(amountInput, { target: { value: "0" } });
 
@@ -434,7 +623,7 @@ describe("game dashboard helpers", () => {
     expect(screen.getByText("2 / 5")).toBeTruthy();
     expect(screen.getByText("+R$ 15,00")).toBeTruthy();
     expect(screen.getByText("Auto cashout 2.00x")).toBeTruthy();
-    expect(screen.getByLabelText("Valor em centavos")).toHaveProperty(
+    expect(screen.getByLabelText("Valor em reais")).toHaveProperty(
       "disabled",
       true,
     );

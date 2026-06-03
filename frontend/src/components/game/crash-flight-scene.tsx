@@ -41,6 +41,15 @@ type SceneState = {
   round: DashboardRound | null;
 };
 
+type StageRendererRect = Pick<DOMRectReadOnly, "height" | "width">;
+
+export function getCrashFlightRendererSize(rect: StageRendererRect | null) {
+  return {
+    height: Math.max(1, Math.floor(rect?.height ?? 460)),
+    width: Math.max(1, Math.floor(rect?.width ?? 760)),
+  };
+}
+
 export function CrashFlightScene({
   animationPhase,
   isLoading,
@@ -154,8 +163,7 @@ export function CrashFlightScene({
     const resize = () => {
       const parent = canvas.parentElement;
       const rect = parent?.getBoundingClientRect();
-      const width = Math.max(320, Math.floor(rect?.width ?? 760));
-      const height = Math.max(320, Math.floor(rect?.height ?? 460));
+      const { height, width } = getCrashFlightRendererSize(rect ?? null);
 
       renderer.setSize(width, height, false);
       camera.aspect = width / height;

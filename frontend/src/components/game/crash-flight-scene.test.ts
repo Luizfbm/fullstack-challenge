@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
+import { getCrashFlightRendererSize } from "./crash-flight-scene";
 import {
   easeInOutCubic,
   easeOutCubic,
@@ -36,6 +37,17 @@ import {
 import { createTimeCarTrail, updateTimeCarTrail } from "./time-car-trail";
 
 describe("crash flight scene primitives", () => {
+  it("sizes the renderer from the actual mobile parent instead of forcing a desktop minimum", () => {
+    expect(getCrashFlightRendererSize({ width: 268.8, height: 287.9 })).toEqual({
+      height: 287,
+      width: 268,
+    });
+    expect(getCrashFlightRendererSize(null)).toEqual({
+      height: 460,
+      width: 760,
+    });
+  });
+
   it("builds a procedural time car without external assets", () => {
     const car = createTimeCarModel();
 
@@ -269,6 +281,12 @@ describe("crash flight scene primitives", () => {
     expect(trail.currentMultiplierLabel.name).toBe(
       "time-car-growth-guide-current-multiplier-label",
     );
+    expect(trail.currentTimeGuide.name).toBe(
+      "time-car-growth-guide-current-time-guide",
+    );
+    expect(trail.currentTimeLabel.name).toBe(
+      "time-car-growth-guide-current-time-label",
+    );
     expect(trail.timeAxis.name).toBe("time-car-growth-guide-time-axis");
     expect(trail.axisReveal.name).toBe("time-car-growth-guide-axis-reveal");
     expect(
@@ -417,6 +435,168 @@ describe("crash flight scene primitives", () => {
     disposeObject(trail.group);
   });
 
+  it("fills the growth guide delta down to the time axis", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 4,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0.9, 0.64, -4],
+        elapsedSeconds: 8,
+        height: 1.08,
+        intensity: 1,
+        multiplier: 4.2,
+        progress: 1,
+        tone: "crash",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    const areaPosition = trail.ribbon.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const midpointPairIndex = Math.floor(areaPosition.count / 4) * 2;
+    const topMidpoint = new THREE.Vector3().fromBufferAttribute(
+      areaPosition,
+      midpointPairIndex,
+    );
+    const bottomMidpoint = new THREE.Vector3().fromBufferAttribute(
+      areaPosition,
+      midpointPairIndex + 1,
+    );
+    const topEndpoint = new THREE.Vector3().fromBufferAttribute(
+      areaPosition,
+      areaPosition.count - 2,
+    );
+    const bottomEndpoint = new THREE.Vector3().fromBufferAttribute(
+      areaPosition,
+      areaPosition.count - 1,
+    );
+
+    expect(bottomMidpoint.y).toBeCloseTo(0, 4);
+    expect(bottomEndpoint.y).toBeCloseTo(0, 4);
+    expect(topMidpoint.y).toBeGreaterThan(bottomMidpoint.y);
+    expect(topEndpoint.y).toBeGreaterThan(bottomEndpoint.y);
+    expect(topEndpoint.x).toBeCloseTo(bottomEndpoint.x, 4);
+    expect(
+      (trail.ribbon.material as THREE.MeshBasicMaterial).opacity,
+    ).toBeGreaterThanOrEqual(0.38);
+
+    disposeObject(trail.group);
+  });
+
+  it("shows the current elapsed time on the x axis with a vertical guide line", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 6.4,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 6.4,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 2.4,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    const guidePosition = trail.currentTimeGuide.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const guideStart = new THREE.Vector3().fromBufferAttribute(guidePosition, 0);
+    const guideEnd = new THREE.Vector3().fromBufferAttribute(guidePosition, 1);
+    const curvePosition = trail.curve.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const curveEndpoint = new THREE.Vector3().fromBufferAttribute(
+      curvePosition,
+      curvePosition.count - 1,
+    );
+
+    expect(trail.currentTimeLabel.userData.labelText).toBe("6.4s");
+    expect(trail.currentTimeLabel.scale.x).toBeGreaterThan(
+      trail.axisLabels.children[4].scale.x,
+    );
+    expect(guideStart.x).toBeCloseTo(curveEndpoint.x, 3);
+    expect(guideStart.y).toBeCloseTo(0, 3);
+    expect(guideEnd.x).toBeCloseTo(curveEndpoint.x, 3);
+    expect(guideEnd.y).toBeCloseTo(curveEndpoint.y, 3);
+    expect(trail.currentTimeLabel.position.x).toBeCloseTo(curveEndpoint.x, 3);
+
+    disposeObject(trail.group);
+  });
+
+  it("floors the current elapsed time label without rounding up", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 6.49,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 6.49,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 2.4,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    expect(trail.currentTimeLabel.userData.labelText).toBe("6.4s");
+
+    updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 8,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 8,
+        height: 0.92,
+        intensity: 0.8,
+        multiplier: 2.4,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    expect(trail.currentTimeLabel.userData.labelText).toBe("8s");
+
+    disposeObject(trail.group);
+  });
+
   it("keeps the trail endpoint inside the right edge after ten seconds", () => {
     const trail = createTimeCarTrail();
     const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
@@ -503,6 +683,108 @@ describe("crash flight scene primitives", () => {
     expect(
       trail.axisLabels.children.map((label) => label.userData.labelText),
     ).toEqual(expect.arrayContaining(["14s"]));
+
+    disposeObject(trail.group);
+  });
+
+  it("keeps the current x-axis indicator continuous while the time scale grows", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const normalizedPositions = [9.9, 10, 10.1, 12.4, 16.7].map(
+      (elapsedSeconds) => {
+        updateTimeCarTrail(trail, {
+          camera,
+          reducedMotion: true,
+          time: elapsedSeconds,
+          trail: {
+            axisRevealProgress: 1,
+            carPosition: [0, 0, -4],
+            elapsedSeconds,
+            height: 0.92,
+            intensity: 0.8,
+            multiplier: 2.4,
+            progress: 1,
+            tone: "boost",
+            visible: true,
+            width: 2.35,
+          },
+        });
+        const timeAxisPosition = trail.timeAxis.geometry.getAttribute(
+          "position",
+        ) as THREE.BufferAttribute;
+        const timeAxisEndpoint = new THREE.Vector3().fromBufferAttribute(
+          timeAxisPosition,
+          1,
+        );
+        const guidePosition = trail.currentTimeGuide.geometry.getAttribute(
+          "position",
+        ) as THREE.BufferAttribute;
+        const guideStart = new THREE.Vector3().fromBufferAttribute(
+          guidePosition,
+          0,
+        );
+
+        return guideStart.x / timeAxisEndpoint.x;
+      },
+    );
+
+    for (const normalizedPosition of normalizedPositions) {
+      expect(normalizedPosition).toBeLessThanOrEqual(0.91);
+    }
+
+    for (let index = 1; index < normalizedPositions.length; index += 1) {
+      expect(normalizedPositions[index]).toBeGreaterThanOrEqual(
+        normalizedPositions[index - 1] - 0.001,
+      );
+    }
+
+    expect(trail.currentTimeLabel.userData.labelText).toBe("16.7s");
+    expect(
+      trail.axisLabels.children.map((label) => label.userData.labelText),
+    ).toEqual(expect.arrayContaining(["19s"]));
+
+    disposeObject(trail.group);
+  });
+
+  it("keeps the final x-axis time indicator visible after crash", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 12.4,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0, 0, -4],
+        elapsedSeconds: 12.4,
+        height: 0.92,
+        intensity: 1,
+        multiplier: 8.4,
+        progress: 1,
+        tone: "crash",
+        visible: true,
+        width: 2.35,
+      },
+    });
+
+    expect(trail.group.visible).toBe(true);
+    expect(trail.currentTimeLabel.userData.labelText).toBe("12.4s");
+    expect(
+      (trail.currentTimeGuide.material as THREE.LineBasicMaterial).opacity,
+    ).toBeGreaterThan(0);
+    expect(
+      (trail.currentTimeLabel.material as THREE.SpriteMaterial).opacity,
+    ).toBeGreaterThan(0);
 
     disposeObject(trail.group);
   });

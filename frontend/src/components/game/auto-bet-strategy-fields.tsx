@@ -24,7 +24,7 @@ export function AutoBetStrategyFields({
 }: AutoBetStrategyFieldsProps) {
   return (
     <div className="mt-3 rounded-md border border-white/10 bg-black/25 p-3">
-      <div className="grid grid-cols-2 gap-1 rounded-md border border-white/10 bg-black/35 p-1">
+      <div className="grid grid-cols-2 gap-2 rounded-md border border-white/10 bg-black/35 p-1.5">
         <StrategyButton
           disabled={disabled}
           label="Valor fixo"
@@ -40,7 +40,7 @@ export function AutoBetStrategyFields({
       </div>
 
       {strategy === "MARTINGALE" ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2 xl:grid-cols-1">
           <NumberField
             disabled={disabled}
             icon={TrendingUp}
@@ -80,7 +80,7 @@ function StrategyButton({
     <button
       aria-pressed={selected}
       className={cn(
-        "h-9 rounded-md text-sm font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-60",
+        "h-9 min-w-0 rounded-md px-2 text-sm font-semibold whitespace-nowrap transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-60",
         selected
           ? "border border-cyan-200/40 bg-cyan-200/15 text-cyan-100"
           : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",

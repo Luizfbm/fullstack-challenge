@@ -117,16 +117,18 @@ function StatePanel({
   now: Date;
   round: DashboardRound | null;
 }) {
-  const statusTone = roundBadgeVariant(round?.status) === "danger"
-    ? "danger"
-    : "success";
+  const statusTone = !round
+    ? "neutral"
+    : roundBadgeVariant(round.status) === "danger"
+      ? "danger"
+      : "success";
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       <EvidenceLine
         label="status"
         tone={statusTone}
-        value={round?.status ?? (isLoading ? "SYNC" : "-")}
+        value={round?.status ?? (isLoading ? "Sincronizando" : "-")}
       />
       <EvidenceLine label="timer" value={getRoundTimerLabel(round, now)} />
       <EvidenceLine

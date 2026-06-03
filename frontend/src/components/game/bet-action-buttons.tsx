@@ -38,8 +38,9 @@ export function BetActionButtons({
   stopAutoBetIsPending,
 }: BetActionButtonsProps) {
   return (
-    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="mt-4 grid grid-cols-1 gap-2">
       <Button
+        className="min-h-11 w-full min-w-0 whitespace-nowrap px-3 leading-none"
         disabled={
           betMode === "auto"
             ? activeAutoBetSession
@@ -63,7 +64,7 @@ export function BetActionButtons({
         type="button"
         variant="temporal"
       >
-        <Sparkles className="size-4" aria-hidden="true" />
+        <Sparkles className="size-4 shrink-0" aria-hidden="true" />
         {getPrimaryActionLabel({
           activeAutoBetSession,
           betMode,
@@ -73,12 +74,13 @@ export function BetActionButtons({
         })}
       </Button>
       <Button
+        className="min-h-11 w-full min-w-0 whitespace-nowrap px-3 leading-none"
         disabled={!canCashOut}
         onClick={onCashOut}
         type="button"
         variant="cash"
       >
-        <Gauge className="size-4" aria-hidden="true" />
+        <Gauge className="size-4 shrink-0" aria-hidden="true" />
         {cashOutIsPending
           ? "Sacando"
           : potentialPayout

@@ -12,6 +12,7 @@ import { WalletOutboxDispatcher } from "../../../src/infrastructure/messaging/wa
 class FakeOutboxRepository implements WalletOutboxRepository {
   public succeeded: Array<{ id: string; result: WalletOutboxSuccess }> = [];
   public failed: Array<{ id: string; failure: WalletOutboxFailure }> = [];
+  public claimNextError: unknown = null;
   public retryable: Array<{
     id: string;
     failure: WalletOutboxFailure;
@@ -44,6 +45,10 @@ class FakeOutboxRepository implements WalletOutboxRepository {
   }
 
   async claimNext(): Promise<WalletOutboxMessage | null> {
+    if (this.claimNextError) {
+      throw this.claimNextError;
+    }
+
     const claimed = this.message;
     this.message = null;
     return claimed;
@@ -183,6 +188,20 @@ describe("WalletOutboxDispatcher", () => {
         },
       },
     ]);
+    expect(outbox.retryable).toEqual([]);
+  });
+
+  test("keeps the dispatcher alive when claiming the next message fails", async () => {
+    const outbox = new FakeOutboxRepository(walletOutboxMessage());
+    outbox.claimNextError = new Error("Postgres unavailable");
+    const publisher = new FakeWalletPublisher();
+    const dispatcher = new WalletOutboxDispatcher(outbox, publisher);
+
+    await expect(dispatcher.dispatchNext()).resolves.toBeUndefined();
+
+    expect(publisher.published).toEqual([]);
+    expect(outbox.succeeded).toEqual([]);
+    expect(outbox.failed).toEqual([]);
     expect(outbox.retryable).toEqual([]);
   });
 });

@@ -21,6 +21,8 @@ export type TimeCarTrail = {
   curve: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   currentMultiplierGuide: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   currentMultiplierLabel: THREE.Sprite;
+  currentTimeGuide: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  currentTimeLabel: THREE.Sprite;
   group: THREE.Group;
   multiplierPillar: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   particles: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
@@ -87,6 +89,8 @@ export function createTimeCarTrail(): TimeCarTrail {
   const axisLabels = createAxisLabels();
   const currentMultiplierGuide = createCurrentMultiplierGuide();
   const currentMultiplierLabel = createCurrentMultiplierLabel();
+  const currentTimeGuide = createCurrentTimeGuide();
+  const currentTimeLabel = createCurrentTimeLabel();
   const multiplierPillar = createMultiplierPillar();
   const particles = createGrowthParticles();
 
@@ -100,9 +104,11 @@ export function createTimeCarTrail(): TimeCarTrail {
     axisTicks,
     multiplierPillar,
     currentMultiplierGuide,
+    currentTimeGuide,
     particles,
     axisLabels,
     currentMultiplierLabel,
+    currentTimeLabel,
   );
   group.add(axisReveal);
 
@@ -113,6 +119,8 @@ export function createTimeCarTrail(): TimeCarTrail {
     curve,
     currentMultiplierGuide,
     currentMultiplierLabel,
+    currentTimeGuide,
+    currentTimeLabel,
     group,
     multiplierPillar,
     particles,
@@ -157,6 +165,7 @@ export function updateTimeCarTrail(
   updateParticleGeometry(trail.particles.geometry, axis, displayInput);
   updateTrailMaterials(trail, displayFrame);
   updateCurrentMultiplierIndicator(trail, displayFrame, axis, displayInput);
+  updateCurrentTimeIndicator(trail, displayFrame, axis, displayInput);
 
   return getTrailCarAnchor(trail, axis, displayInput);
 }
@@ -292,6 +301,37 @@ function createCurrentMultiplierLabel() {
   const label = createAxisLabelSprite("1×");
 
   label.name = "time-car-growth-guide-current-multiplier-label";
+  label.renderOrder = 9;
+
+  return label;
+}
+
+function createCurrentTimeGuide() {
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.LineBasicMaterial({
+    blending: THREE.AdditiveBlending,
+    color: "#bae6fd",
+    depthTest: false,
+    depthWrite: false,
+    opacity: 0,
+    transparent: true,
+  });
+  const guide = new THREE.Line(geometry, material);
+
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(2 * 3), 3),
+  );
+  guide.name = "time-car-growth-guide-current-time-guide";
+  guide.renderOrder = 7;
+
+  return guide;
+}
+
+function createCurrentTimeLabel() {
+  const label = createAxisLabelSprite("0s");
+
+  label.name = "time-car-growth-guide-current-time-label";
   label.renderOrder = 9;
 
   return label;
@@ -581,6 +621,45 @@ function updateCurrentMultiplierIndicator(
   labelMaterial.needsUpdate = true;
 }
 
+function updateCurrentTimeIndicator(
+  trail: TimeCarTrail,
+  frame: TimeCarTrailFrame,
+  axis: AxisFrame,
+  input: TimeCarTrailUpdateInput,
+) {
+  const point = getCurvePoint(1, axis, input);
+  const guidePosition = trail.currentTimeGuide.geometry.getAttribute(
+    "position",
+  ) as THREE.BufferAttribute;
+  const guideMaterial = trail.currentTimeGuide.material as THREE.LineBasicMaterial;
+  const labelMaterial = trail.currentTimeLabel.material as THREE.SpriteMaterial;
+  const boost = frame.tone === "boost";
+  const labelX = Math.min(
+    Math.max(point.x, 0.24),
+    Math.max(0.24, frame.width - 0.24),
+  );
+
+  guidePosition.setXYZ(0, point.x, 0, 0.057);
+  guidePosition.setXYZ(1, point.x, point.y, 0.057);
+  guidePosition.needsUpdate = true;
+  trail.currentTimeGuide.geometry.computeBoundingSphere();
+
+  updateAxisLabelSprite(
+    trail.currentTimeLabel,
+    formatCurrentTimeTick(frame.elapsedSeconds),
+  );
+  trail.currentTimeLabel.position.set(labelX, -0.2, 0.08);
+  trail.currentTimeLabel.scale.set(0.36, 0.1, 1);
+
+  guideMaterial.color.set(boost ? "#bae6fd" : "#fecdd3");
+  guideMaterial.opacity = boost ? 0.18 + frame.intensity * 0.12 : 0.22;
+  guideMaterial.needsUpdate = true;
+
+  labelMaterial.color.set(boost ? "#ffffff" : "#fff1f2");
+  labelMaterial.opacity = boost ? 0.94 : 0.88;
+  labelMaterial.needsUpdate = true;
+}
+
 function updateCurveGeometry(
   geometry: THREE.BufferGeometry,
   axis: AxisFrame,
@@ -609,12 +688,10 @@ function updateAreaGeometry(
   for (let index = 0; index <= CURVE_SEGMENTS; index += 1) {
     const t = getVisibleT(index / CURVE_SEGMENTS, input.trail.progress);
     const point = getCurvePoint(t, axis, input);
-    const glowWidth =
-      0.058 + Math.sin(t * Math.PI) * 0.09 + Math.pow(t, 1.35) * 0.034;
     const vertex = index * 2;
 
-    position.setXYZ(vertex, point.x, point.y + glowWidth * 0.18, 0.025);
-    position.setXYZ(vertex + 1, point.x, Math.max(0, point.y - glowWidth), 0.025);
+    position.setXYZ(vertex, point.x, point.y, 0.025);
+    position.setXYZ(vertex + 1, point.x, 0, 0.025);
   }
 
   position.needsUpdate = true;
@@ -658,7 +735,9 @@ function updateTrailMaterials(trail: TimeCarTrail, frame: TimeCarTrailFrame) {
   curveMaterial.needsUpdate = true;
 
   ribbonMaterial.color.copy(boost ? BOOST_FILL_COLOR : CRASH_FILL_COLOR);
-  ribbonMaterial.opacity = Math.min(0.3, 0.07 + frame.intensity * 0.2);
+  ribbonMaterial.opacity = boost
+    ? Math.min(0.34, 0.08 + frame.intensity * 0.24)
+    : Math.min(0.48, 0.15 + frame.intensity * 0.28);
   ribbonMaterial.needsUpdate = true;
 
   particleMaterial.color.copy(boost ? BOOST_PARTICLE_COLOR : CRASH_PARTICLE_COLOR);
@@ -836,6 +915,14 @@ function formatMultiplierTick(multiplier: number) {
     : `${displayMultiplier.toFixed(2)}×`;
 }
 
+function formatCurrentTimeTick(seconds: number) {
+  const displaySeconds = floorSecondsForAxis(seconds);
+
+  return Number.isInteger(displaySeconds)
+    ? `${displaySeconds.toFixed(0)}s`
+    : `${displaySeconds.toFixed(1)}s`;
+}
+
 function getTimeAxisValue(elapsedSeconds: number, timeMax: number) {
   const seconds = Math.max(0, elapsedSeconds);
 
@@ -860,6 +947,10 @@ function getMultiplierTickValue(multiplierMax: number, progress: number) {
 
 function floorMultiplierForAxis(multiplier: number) {
   return Math.floor(Math.max(1, multiplier) * 100) / 100;
+}
+
+function floorSecondsForAxis(seconds: number) {
+  return Math.floor(Math.max(0, seconds) * 10) / 10;
 }
 
 function getEdgeHoldProgress(elapsedSeconds: number) {
