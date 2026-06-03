@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/// <reference types="node" />
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
@@ -19,6 +20,19 @@ describe("casino surface contracts", () => {
     expect(styles).toContain("--casino-gold: #facc15;");
     expect(styles).toContain("--casino-tech: #22d3ee;");
     expect(styles).toContain(".casino-bet-slip");
+  });
+
+  it("keeps global page chrome on felt and gold instead of red neon", () => {
+    const styles = readFileSync("src/styles.css", "utf8");
+    const bodyBlock = extractCssBlock(styles, "body");
+    const headerFrameBlock = extractCssBlock(styles, ".chrono-frame");
+
+    expect(bodyBlock).toContain("rgba(6, 78, 59");
+    expect(bodyBlock).toContain("rgba(250, 204, 21");
+    expect(bodyBlock).not.toContain("rgba(244, 63, 94");
+    expect(headerFrameBlock).toContain("rgba(6, 78, 59");
+    expect(headerFrameBlock).toContain("rgba(250, 204, 21");
+    expect(headerFrameBlock).not.toContain("rgba(244, 63, 94");
   });
 
   it("uses gold and felt treatments for the primary bet surface controls", () => {
@@ -64,3 +78,13 @@ describe("casino surface contracts", () => {
     expect(entry?.className).toContain("border-amber-200/15");
   });
 });
+
+function extractCssBlock(styles: string, selector: string) {
+  const start = styles.indexOf(`${selector} {`);
+  const end = styles.indexOf("\n}", start);
+
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+
+  return styles.slice(start, end);
+}
