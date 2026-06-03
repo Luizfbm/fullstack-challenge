@@ -93,6 +93,21 @@ Usuario de teste:
 | Senha | `player123` |
 | Wallet inicial | `100000` centavos, equivalente a R$ 1.000,00 |
 
+## Guia rapido para avaliadores
+
+Ao abrir `http://localhost:8000/`, a aplicacao exibe uma chamada discreta para
+avaliadores. O botao `Ver guia` abre a barra lateral de auditoria no painel de
+entrega.
+
+Essa barra agrupa os atalhos mais uteis para revisar o desafio:
+
+- entrega, README e repositorio no GitHub;
+- usuario de teste e credenciais dos dashboards locais;
+- Swagger, metricas, Grafana, Prometheus, Jaeger, RabbitMQ, Kong e Keycloak;
+- evidencias dos fluxos E2E, provably fair e consistencia financeira.
+
+Depois de fechada ou usada, a chamada nao volta a aparecer no mesmo navegador.
+
 ## Arquitetura
 
 ```text
