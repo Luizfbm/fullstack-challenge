@@ -28,6 +28,17 @@ export function getRoundTimerLabel(
   return "Aguardando inicio";
 }
 
+export function getSecondsUntilRoundStart(
+  round: TimedRound | null,
+  now = new Date(),
+): number {
+  if (!round || round.status !== "BETTING") {
+    return 0;
+  }
+
+  return getSecondsUntil(round.bettingEndsAt, now);
+}
+
 export function getRoundProgress(
   round: TimedRound | null,
   now = new Date(),
@@ -66,14 +77,17 @@ function elapsedMs(startIso: string, now: Date): number {
 }
 
 function formatSecondsUntil(targetIso: string, now: Date): string {
-  const milliseconds = Math.max(0, new Date(targetIso).getTime() - now.getTime());
-  const seconds = Math.ceil(milliseconds / 1000);
-
-  return `${seconds}s`;
+  return `${getSecondsUntil(targetIso, now)}s`;
 }
 
 function formatElapsedSeconds(startIso: string, now: Date): string {
   return `${Math.floor(elapsedMs(startIso, now) / 1000)}s`;
+}
+
+function getSecondsUntil(targetIso: string, now: Date): number {
+  const milliseconds = Math.max(0, new Date(targetIso).getTime() - now.getTime());
+
+  return Math.ceil(milliseconds / 1000);
 }
 
 function formatClock(value: string): string {

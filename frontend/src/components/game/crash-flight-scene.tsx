@@ -176,6 +176,8 @@ export function CrashFlightScene({
       const time = performance.now() / 1000;
       const frame = getCrashFlightStoryboard({
         cameraAspect: camera.aspect,
+        displayNow: current.now,
+        now: new Date(),
         phase,
         phaseElapsed,
         reducedMotion,
@@ -185,7 +187,11 @@ export function CrashFlightScene({
 
       parkedCar.visible = !frame.showRunningCar;
       runningCar.visible = frame.showRunningCar;
-      animateTimeCarFire(runningCar, time, frame.showRunningCar && !reducedMotion);
+      animateTimeCarFire(
+        runningCar,
+        time,
+        (frame.entering || frame.running) && !reducedMotion,
+      );
       car.position.set(...frame.car.position);
       car.rotation.set(...frame.car.rotation);
       car.scale.set(...frame.car.scale);

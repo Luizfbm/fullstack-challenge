@@ -10,7 +10,12 @@ import {
   type StageAnimationPhase,
   usesRunningTimeCarAsset,
 } from "./crash-flight-motion";
+import {
+  getDisplayMultiplierBp,
+  getSmoothMultiplierBp,
+} from "../../services/display-multiplier";
 import type { DashboardRound } from "./round-formatting";
+import { ENTERING_BLACK_HOLE_SECONDS } from "./stage-animation-timing";
 import type { TimeCarTrailFrame } from "./time-car-trail";
 
 type VectorTuple = [number, number, number];
@@ -46,10 +51,10 @@ export type CrashFlightStoryboard = {
   wormholePosition: VectorTuple;
 };
 
-const ENTERING_BLACK_HOLE_SECONDS = 1.4;
-
 export function getCrashFlightStoryboard({
   cameraAspect,
+  now = new Date(),
+  displayNow = now,
   phase,
   phaseElapsed,
   reducedMotion,
@@ -57,6 +62,8 @@ export function getCrashFlightStoryboard({
   time,
 }: {
   cameraAspect: number;
+  displayNow?: Date;
+  now?: Date;
   phase: StageAnimationPhase;
   phaseElapsed: number;
   reducedMotion: boolean;
@@ -72,7 +79,6 @@ export function getCrashFlightStoryboard({
     1,
     Math.max(0, phaseElapsed / ENTERING_BLACK_HOLE_SECONDS),
   );
-  const now = new Date();
   const roundElapsedSeconds =
     getRoundElapsedSeconds(round, now) ?? phaseElapsed;
   const crashImpact = crashed ? Math.max(0, 1 - phaseElapsed / 1.1) : 0;
@@ -82,7 +88,12 @@ export function getCrashFlightStoryboard({
   const layout = getStageLayout(compact);
   const shake = reducedMotion
     ? { x: 0, y: 0 }
-    : getCameraShake(time, running ? 0.028 : crashImpact * 0.1);
+    : getCameraShake(
+        time,
+        running
+          ? getRunningCameraShakeAmplitude(phaseElapsed)
+          : crashImpact * 0.1,
+      );
   const cameraZoom = entering ? eased : running || crashed ? 1 : 0;
   const car = getCarFrame({
     betting,
@@ -100,7 +111,16 @@ export function getCrashFlightStoryboard({
   });
 
   return {
-    camera: getCameraFrame({ cameraZoom, compact, crashed, eased, entering, running, shake }),
+    camera: getCameraFrame({
+      cameraZoom,
+      carPosition: car.position,
+      compact,
+      crashed,
+      eased,
+      entering,
+      running,
+      shake,
+    }),
     car,
     compact,
     crashImpact,
@@ -124,8 +144,9 @@ export function getCrashFlightStoryboard({
       compact,
       crashImpact,
       eased,
+      displayMultiplier: getRoundDisplayMultiplier(round, displayNow),
       elapsedSeconds: roundElapsedSeconds,
-      multiplier: getRoundMultiplier(round),
+      multiplier: getRoundMultiplier(round, now),
       phaseElapsed,
       progress,
       reducedMotion,
@@ -142,6 +163,7 @@ function getTrailFrame({
   compact,
   crashImpact,
   crashed,
+  displayMultiplier,
   eased,
   elapsedSeconds,
   multiplier,
@@ -154,6 +176,7 @@ function getTrailFrame({
   compact: boolean;
   crashImpact: number;
   crashed: boolean;
+  displayMultiplier: number;
   eased: number;
   elapsedSeconds: number;
   multiplier: number;
@@ -168,6 +191,7 @@ function getTrailFrame({
     return {
       axisRevealProgress: 1,
       carPosition,
+      displayMultiplier,
       elapsedSeconds,
       height: layout.height,
       intensity: reducedMotion ? 0.58 : 0.76 + crashImpact * 0.22,
@@ -183,6 +207,7 @@ function getTrailFrame({
     return {
       axisRevealProgress: getAxisRevealProgress(phaseElapsed, reducedMotion),
       carPosition,
+      displayMultiplier,
       elapsedSeconds,
       height: layout.height,
       intensity: reducedMotion ? 0.5 : 0.62 + eased * 0.24,
@@ -197,6 +222,7 @@ function getTrailFrame({
   return {
     axisRevealProgress: 0,
     carPosition,
+    displayMultiplier,
     elapsedSeconds: 0,
     height: layout.height,
     intensity: 0,
@@ -283,7 +309,7 @@ function getCarFrame({
 
   if (running || crashed) {
     const speedJitter = reducedMotion ? 0 : Math.sin(time * 22) * 0.035;
-    const scale = running ? 0.42 : 0.46;
+    const scale = 0.42;
 
     return {
       followTrail: true,
@@ -309,7 +335,13 @@ function getCarFrame({
   };
 }
 
-function getRoundMultiplier(round: DashboardRound | null) {
+function getRoundMultiplier(round: DashboardRound | null, now: Date) {
+  const smoothMultiplierBp = getSmoothMultiplierBp(round, now);
+
+  if (typeof smoothMultiplierBp === "number") {
+    return smoothMultiplierBp / 10000;
+  }
+
   if (typeof round?.currentMultiplierBp === "number") {
     return round.currentMultiplierBp / 10000;
   }
@@ -319,6 +351,16 @@ function getRoundMultiplier(round: DashboardRound | null) {
   }
 
   return 1;
+}
+
+function getRoundDisplayMultiplier(round: DashboardRound | null, now: Date) {
+  const displayMultiplierBp = getDisplayMultiplierBp(round, now);
+
+  if (typeof displayMultiplierBp === "number") {
+    return displayMultiplierBp / 10000;
+  }
+
+  return getRoundMultiplier(round, now);
 }
 
 function getRoundElapsedSeconds(round: DashboardRound | null, now: Date) {
@@ -346,8 +388,16 @@ function getAxisRevealProgress(phaseElapsed: number, reducedMotion: boolean) {
   return easeOutCubic(Math.min(1, Math.max(0, phaseElapsed / 0.7)));
 }
 
+function getRunningCameraShakeAmplitude(phaseElapsed: number) {
+  const launchProgress = clamp(phaseElapsed / 0.68, 0, 1);
+  const launchBoost = Math.pow(1 - launchProgress, 1.6) * 0.09;
+
+  return 0.028 + launchBoost;
+}
+
 function getCameraFrame({
   cameraZoom,
+  carPosition,
   compact,
   crashed,
   eased,
@@ -356,6 +406,7 @@ function getCameraFrame({
   shake,
 }: {
   cameraZoom: number;
+  carPosition: VectorTuple;
   compact: boolean;
   crashed: boolean;
   eased: number;
@@ -363,17 +414,29 @@ function getCameraFrame({
   running: boolean;
   shake: { x: number; y: number };
 }): CrashFlightStoryboard["camera"] {
+  const followActive = running || crashed;
+  const followX = followActive ? clamp(carPosition[0] * 0.08, -0.18, 0.22) : 0;
+  const followY = followActive ? clamp(carPosition[1] * 0.06, -0.1, 0.16) : 0;
+
   return {
     lookAt: [
-      (compact ? 0.1 : 0.02) + cameraZoom * 0.22 + shake.x * 0.6,
-      0.08 + cameraZoom * 0.2 + shake.y * 0.6,
+      (compact ? 0.1 : 0.02) + cameraZoom * 0.22 + followX + shake.x * 0.6,
+      0.08 + cameraZoom * 0.2 + followY + shake.y * 0.6,
       -0.42,
     ],
     position: [
-      (compact ? 0.1 + cameraZoom * 0.2 : 0.05 + cameraZoom * 0.34) + shake.x,
-      (compact ? 1.18 + cameraZoom * 0.02 : 1.18 + cameraZoom * 0.04) + shake.y,
+      (compact ? 0.1 + cameraZoom * 0.2 : 0.05 + cameraZoom * 0.34) +
+        followX * 0.7 +
+        shake.x,
+      (compact ? 1.18 + cameraZoom * 0.02 : 1.18 + cameraZoom * 0.04) +
+        followY * 0.35 +
+        shake.y,
       compact ? lerp(6.45, 5.25, cameraZoom) : lerp(5.55, 4.22, cameraZoom),
     ],
     targetFov: getTargetFov({ crashed, eased, entering, running }),
   };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
