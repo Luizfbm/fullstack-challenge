@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { getCrashFlightRendererSize } from "./crash-flight-scene";
+import { getCrashFlightRendererSize } from "./crash-flight-renderer-size";
 import {
   easeInOutCubic,
   easeOutCubic,
@@ -35,6 +35,7 @@ import {
   TIME_CAR_RUNNING_ASSET_PATH,
 } from "./time-car-model";
 import { createTimeCarTrail, updateTimeCarTrail } from "./time-car-trail";
+import { HUD_DISTANCE } from "./time-car-trail-constants";
 
 describe("crash flight scene primitives", () => {
   it("sizes the renderer from the actual mobile parent instead of forcing a desktop minimum", () => {
@@ -431,6 +432,53 @@ describe("crash flight scene primitives", () => {
     expect(
       (trail.particles.material as THREE.PointsMaterial).opacity,
     ).toBeGreaterThan(0.3);
+
+    disposeObject(trail.group);
+  });
+
+  it("keeps the growth guide and car anchor inside narrow stage camera bounds", () => {
+    const trail = createTimeCarTrail();
+    const camera = new THREE.PerspectiveCamera(42, 0.72, 0.1, 100);
+
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    camera.updateMatrixWorld(true);
+
+    const trailState = updateTimeCarTrail(trail, {
+      camera,
+      reducedMotion: true,
+      time: 3,
+      trail: {
+        axisRevealProgress: 1,
+        carPosition: [0.9, 0.68, -4],
+        elapsedSeconds: 12.4,
+        height: 1.08,
+        intensity: 1,
+        multiplier: 8.4,
+        progress: 1,
+        tone: "boost",
+        visible: true,
+        width: 2.35,
+      },
+    });
+    const curvePosition = trail.curve.geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const curveEndpoint = new THREE.Vector3().fromBufferAttribute(
+      curvePosition,
+      curvePosition.count - 1,
+    );
+    const visibleHeight =
+      2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * HUD_DISTANCE;
+    const visibleWidth = visibleHeight * camera.aspect;
+    const safeRight = visibleWidth / 2 - 0.16;
+    const renderedEndpointX =
+      trail.group.position.x +
+      trail.axisReveal.position.x +
+      curveEndpoint.x * trail.axisReveal.scale.x;
+
+    expect(renderedEndpointX).toBeLessThanOrEqual(safeRight);
+    expect(trailState?.carAnchor[0]).toBeLessThanOrEqual(safeRight);
 
     disposeObject(trail.group);
   });
@@ -1250,6 +1298,69 @@ describe("crash flight scene primitives", () => {
     expect(launchCameraOffset).toBeGreaterThan(steadyCameraOffset * 1.8);
   });
 
+  it("frames betting as a pre-launch shot with the car foregrounded toward the portal", () => {
+    const desktopFrame = getCrashFlightStoryboard({
+      cameraAspect: 1.35,
+      phase: "betting",
+      phaseElapsed: 0,
+      reducedMotion: true,
+      round: { status: "BETTING" } as DashboardRound,
+      time: 0,
+    });
+    const compactFrame = getCrashFlightStoryboard({
+      cameraAspect: 0.72,
+      phase: "betting",
+      phaseElapsed: 0,
+      reducedMotion: true,
+      round: { status: "BETTING" } as DashboardRound,
+      time: 0,
+    });
+
+    expect(desktopFrame.portalVisible).toBe(true);
+    expect(desktopFrame.showRunningCar).toBe(false);
+    expect(desktopFrame.trail.visible).toBe(false);
+    expect(desktopFrame.car.followTrail).toBe(false);
+    expect(desktopFrame.car.position[0]).toBeLessThan(-0.8);
+    expect(desktopFrame.car.position[0]).toBeGreaterThan(-1.08);
+    expect(desktopFrame.portal.position[0]).toBeGreaterThan(1);
+    expect(desktopFrame.portal.position[0]).toBeLessThan(1.25);
+    expect(
+      desktopFrame.portal.position[0] - desktopFrame.car.position[0],
+    ).toBeGreaterThan(1.6);
+    expect(desktopFrame.car.position[2]).toBeGreaterThan(
+      desktopFrame.portal.position[2],
+    );
+    expect(
+      desktopFrame.car.position[2] - desktopFrame.portal.position[2],
+    ).toBeGreaterThan(1.05);
+    expect(desktopFrame.car.scale[0]).toBeGreaterThan(1.45);
+    expect(Math.abs(desktopFrame.portal.rotation[0])).toBeLessThan(0.08);
+    expect(Math.abs(desktopFrame.portal.rotation[1])).toBeLessThan(0.08);
+    expect(desktopFrame.camera.position[0]).toBeLessThan(-0.1);
+    expect(desktopFrame.camera.position[2]).toBeLessThan(4.8);
+    expect(desktopFrame.camera.lookAt[0]).toBeGreaterThan(0.62);
+    expect(desktopFrame.camera.targetFov).toBeGreaterThan(42);
+
+    expect(compactFrame.car.position[0]).toBeLessThan(0);
+    expect(compactFrame.car.position[0]).toBeGreaterThan(-0.25);
+    expect(compactFrame.portal.position[0]).toBeGreaterThan(0.78);
+    expect(compactFrame.portal.position[0]).toBeLessThan(1.05);
+    expect(
+      compactFrame.portal.position[0] - compactFrame.car.position[0],
+    ).toBeGreaterThan(0.9);
+    expect(compactFrame.car.scale[0]).toBeGreaterThan(1);
+    expect(compactFrame.car.scale[0]).toBeLessThan(desktopFrame.car.scale[0]);
+    expect(compactFrame.camera.position[2]).toBeGreaterThan(
+      desktopFrame.camera.position[2],
+    );
+    expect(Math.abs(compactFrame.portal.rotation[0])).toBeLessThan(0.08);
+    expect(Math.abs(compactFrame.portal.rotation[1])).toBeLessThan(0.08);
+    expect(compactFrame.camera.lookAt[0]).toBeGreaterThan(0.24);
+    expect(compactFrame.camera.lookAt[0]).toBeGreaterThan(
+      compactFrame.car.position[0],
+    );
+  });
+
   it("calculates portal, wormhole and crash flare storyboard frames", () => {
     const bettingFrame = getCrashFlightStoryboard({
       cameraAspect: 1.2,
@@ -1266,7 +1377,7 @@ describe("crash flight scene primitives", () => {
     );
     expect(bettingFrame.wormholeActive).toBe(false);
     expect(bettingFrame.trail.visible).toBe(false);
-    expect(bettingFrame.car.scale).toEqual([1, 1, 1]);
+    expect(bettingFrame.car.scale[0]).toBeGreaterThan(1);
 
     const enteringFrame = getCrashFlightStoryboard({
       cameraAspect: 1.2,

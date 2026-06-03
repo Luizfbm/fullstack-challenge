@@ -44,7 +44,7 @@ services:
   # ---------------------------------------------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:26.5.5
-    command: start-dev --import-realm
+    entrypoint: ["sh", "/opt/keycloak/data/import/start-dev.sh"]
     ports:
       - "8080:8080"
     environment:

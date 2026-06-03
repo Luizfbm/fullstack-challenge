@@ -18,9 +18,9 @@ export function BetSlipHeader({
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
           Mesa de aposta
         </p>
-        <h2 className="mt-1 truncate text-lg font-black text-zinc-50">
-          Bet slip
-        </h2>
+      <h2 className="mt-1 truncate text-lg font-black text-zinc-50">
+        Aposta
+      </h2>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <Button

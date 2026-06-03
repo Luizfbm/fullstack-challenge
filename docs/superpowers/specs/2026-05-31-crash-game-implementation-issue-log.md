@@ -1085,6 +1085,82 @@ Cada entrada deve conter:
   `GET /games/rounds/current` via Kong voltaram a responder.
 - Status: resolvido.
 
+### 62. Admin Console do Keycloak exigia HTTPS no realm master
+
+- Contexto: Passo 16 do plano de execucao, validacao Docker final dos consoles
+  locais documentados pelo README.
+- Sintoma: `GET /admin/master/console/` retornava o HTML inicial, mas o fluxo
+  de login do Admin Console e o token endpoint do realm `master` retornavam
+  `HTTPS required`; `curl` para
+  `POST /realms/master/protocol/openid-connect/token` com
+  `admin/admin` recebia `403 Forbidden`.
+- Causa: o realm `master` do Keycloak iniciava com `sslRequired=external`.
+  Requisicoes vindas do host chegam ao container por uma interface Docker e
+  sao tratadas como externas, enquanto o realm `crash-game` importado ja tinha
+  `sslRequired=none`.
+- Correcao: o Compose passou a iniciar o Keycloak por
+  `docker/keycloak/start-dev.sh`, que sobe `start-dev --import-realm`, aguarda
+  o admin local via `kcadm.sh` e aplica idempotentemente
+  `sslRequired=none` no realm `master`.
+- Regressao: adicionado `scripts/ci/check-keycloak-admin.ts`, cobrindo o HTML
+  do Admin Console e a obtencao de token admin via host; `ci:e2e` passou a
+  executar essa checagem antes dos E2E de API.
+- Validacao: antes da correcao,
+  `bun scripts/ci/check-keycloak-admin.ts` falhou com
+  `403 Forbidden` e `HTTPS required`; depois da correcao,
+  `docker compose config`, `bunx tsc --noEmit -p tsconfig.quality.json`,
+  `docker compose up -d keycloak` e
+  `bun scripts/ci/check-keycloak-admin.ts` passaram.
+- Status: resolvido.
+
+### 63. Quality gate falhou por concentracao do palco 3D
+
+- Contexto: Passo 16, regressao local completa apos polimento visual da arena
+  3D e reorganizacao do layout do jogo.
+- Sintoma: `bun run ci:local` falhou em `bun run quality:gate` com
+  `frontend/src/components/game/time-car-trail.ts` acima do limite de linhas,
+  `files.filesOverLimit` maior que zero e duplicacao acima da baseline.
+- Causa: a logica do trilho 3D, geometria, labels, materiais e atualizacao de
+  frames tinha ficado concentrada em um unico modulo; a mesma rodada de
+  polimento tambem deixou duplicacoes pequenas em helpers de cena e no render
+  do leaderboard responsivo.
+- Correcao: dividir o palco 3D em modulos focados de tipos, constantes,
+  matematica, materiais, objetos, geometria, eixo, labels e frame loop; separar
+  assets/tamanho do renderer da cena; extrair frames do storyboard e remover
+  duplicacao no render do leaderboard sem alterar o comportamento visivel.
+- Validacao: `bunx tsc --noEmit -p frontend/tsconfig.json`, `bun run lint`,
+  `cd frontend && bun run test src/components/game/crash-flight-scene.test.ts`,
+  `cd frontend && bun run test
+  src/components/game/game-dashboard-shell.test.tsx
+  src/components/game/crash-flight-scene.test.ts`, `bun run test:coverage &&
+  bun run quality:gate` e `bun run ci:local`.
+- Status: resolvido.
+
+### 64. E2E browser usava seletores dos cards removidos
+
+- Contexto: validacao browser apos a remocao dos cards de metricas `LIVE`,
+  rodada e saldo do cockpit.
+- Sintoma: `bun run test:e2e:browser` falhou primeiro esperando texto `LIVE` e
+  `metric-rodada`; depois, ao atualizar a checagem de rodada, falhou esperando
+  `metric-saldo`.
+- Causa: o teste browser ainda dependia dos cards antigos, enquanto a UI atual
+  mostra o estado no palco (`connected BETTING`) e moveu o saldo para o header
+  da conta do jogador.
+- Correcao: o helper de rodada preparada agora valida a UI atual e confirma via
+  API publica que a rodada corrente e a rodada deterministica preparada; a
+  leitura de saldo passou a usar a area acessivel `Conta do jogador` no header.
+- Validacao: `bun run test:e2e:browser` passou com 3 testes.
+- Status: resolvido.
+
+### 65. Teste visual importou Node sem tipos no frontend
+
+- Contexto: premium arcade casino responsive redesign.
+- Sintoma: `bun run ci:local` falhou em `bunx tsc --noEmit -p frontend/tsconfig.json` com `Cannot find name 'node:fs'`.
+- Causa: o novo teste `casino-surface-contracts.test.tsx` leu `src/styles.css` com `node:fs`, mas o `tsconfig` do frontend nao inclui tipos Node globalmente.
+- Correcao: limitar a dependencia de tipos Node ao proprio teste com `/// <reference types="node" />`, sem alterar o `tsconfig` do frontend nem remover a verificacao dos tokens CSS.
+- Validacao: `cd frontend && bun run test src/components/game/casino-surface-contracts.test.tsx` e `bunx tsc --noEmit -p frontend/tsconfig.json` passaram apos a correcao.
+- Status: resolvido.
+
 ## Validacoes de Regressao Ja Executadas
 
 - `bun install`
@@ -1196,6 +1272,13 @@ Cada entrada deve conter:
   `curl -fsS http://localhost:4001/docs`, `curl -fsS
   http://localhost:4002/docs`, `curl -fsS http://localhost:4001/docs-json` e
   `curl -fsS http://localhost:4002/docs-json`.
+- Passo 16 Docker final:
+  `docker compose up -d --build`, `bun scripts/ci/check-kong-health.ts`, `bun
+  scripts/ci/check-keycloak-admin.ts`, `bun
+  scripts/ci/check-observability-health.ts`, token real
+  `player/player123` via Keycloak, `GET /wallets/me` via Kong, RabbitMQ
+  Management API, `bun run ci:local`, `cd frontend && bun run build`, `bun run
+  ci:e2e` e `bun run test:e2e:browser`.
 
 ## Validacoes Docker Ja Executadas
 
@@ -1216,4 +1299,5 @@ Cada entrada deve conter:
 
 ## Validacoes Ainda Pendentes
 
-- Proximo passo do plano: Passo 14, adicionar E2E browser se viavel.
+- Passo 17 envolve README final e esta bloqueado pela instrucao atual de nao
+  alterar `README.md`.

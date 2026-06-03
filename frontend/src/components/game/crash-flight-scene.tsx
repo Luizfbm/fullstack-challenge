@@ -4,9 +4,10 @@ import { FlightFallback } from "./crash-flight-fallback";
 import {
   createBlackholePortalFallback,
   getBlackholePortalAnimationDelta,
-  loadBlackholePortalAsset,
   updateBlackholePortal,
 } from "./blackhole-portal-model";
+import { getCrashFlightRendererSize } from "./crash-flight-renderer-size";
+import { loadCrashFlightAssets } from "./crash-flight-scene-assets";
 import { createFlightStage, disposeObject } from "./crash-flight-stage";
 import {
   type StageAnimationPhase,
@@ -18,9 +19,6 @@ import {
 } from "./wormhole-tunnel";
 import {
   createTimeCarModel,
-  loadTimeCarAsset,
-  TIME_CAR_ASSET_PATH,
-  TIME_CAR_RUNNING_ASSET_PATH,
 } from "./time-car-model";
 import { animateTimeCarFire } from "./time-car-fire";
 import { createTimeCarTrail, updateTimeCarTrail } from "./time-car-trail";
@@ -40,15 +38,6 @@ type SceneState = {
   now: Date;
   round: DashboardRound | null;
 };
-
-type StageRendererRect = Pick<DOMRectReadOnly, "height" | "width">;
-
-export function getCrashFlightRendererSize(rect: StageRendererRect | null) {
-  return {
-    height: Math.max(1, Math.floor(rect?.height ?? 460)),
-    width: Math.max(1, Math.floor(rect?.width ?? 760)),
-  };
-}
 
 export function CrashFlightScene({
   animationPhase,
@@ -124,40 +113,17 @@ export function CrashFlightScene({
     portalRoot.add(portal);
     car.add(parkedCar, runningCar);
     scene.add(camera, stage.group, wormhole.group, portalRoot, car);
-    loadTimeCarAsset(parkedCar, TIME_CAR_ASSET_PATH, () => disposed).catch(
-      () => {
-        if (!disposed) {
-          parkedCar.name = "time-car-model-parked-fallback";
-        }
-      },
-    );
-    loadTimeCarAsset(
-      runningCar,
-      TIME_CAR_RUNNING_ASSET_PATH,
-      () => disposed,
-    ).catch(() => {
-      if (!disposed) {
-        runningCar.name = "time-car-model-running-fallback";
-      }
-    });
-    loadBlackholePortalAsset(undefined, () => disposed)
-      .then((loadedPortal) => {
-        if (disposed) {
-          disposeObject(loadedPortal.group);
-          return;
-        }
-
-        portalRoot.remove(portal);
-        disposeObject(portal);
+    loadCrashFlightAssets({
+      currentPortal: portal,
+      isDisposed: () => disposed,
+      parkedCar,
+      portalRoot,
+      replacePortal: (loadedPortal) => {
         portal = loadedPortal.group;
         portalMixer = loadedPortal.mixer;
-        portalRoot.add(portal);
-      })
-      .catch(() => {
-        if (!disposed) {
-          portal.name = "blackhole-portal-fallback-active";
-        }
-      });
+      },
+      runningCar,
+    });
     camera.position.set(0.2, 1.12, 5.5);
 
     const resize = () => {

@@ -20,7 +20,7 @@
     "quality:baseline": "bun scripts/quality/generate-baseline.ts",
     "quality:gate": "bun scripts/quality/run-quality-gate.ts",
     "ci:local": "bun install --frozen-lockfile && bun run lint && bun run check:types && bun run test:unit && bun run test:coverage && bun run quality:gate && docker compose config",
-    "ci:e2e": "docker compose up -d --build && bun scripts/ci/check-kong-health.ts && cd services/games && bun test tests/e2e"
+    "ci:e2e": "docker compose up -d --build && bun scripts/ci/check-kong-health.ts && bun scripts/ci/check-keycloak-admin.ts && cd services/games && bun test tests/e2e"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
